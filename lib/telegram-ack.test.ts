@@ -54,6 +54,7 @@ describe("telegramAckMessages", () => {
     assert.match(telegramAckSystem(input), /same language as the recent conversation/);
     assert.match(TELEGRAM_ACK_SYSTEM, /Do not repeat an acknowledgement/);
     assert.match(TELEGRAM_ACK_SYSTEM, /Checking calories/);
+    assert.match(TELEGRAM_ACK_SYSTEM, /Listening/);
     assert.ok(telegramAckSystem(input).startsWith(TELEGRAM_ACK_SYSTEM));
   });
 });

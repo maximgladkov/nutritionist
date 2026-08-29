@@ -4,6 +4,13 @@ import { handleChannelLink, resolveChannelUser, saveChannelThreadId } from "../l
 import { telegramSummaryMiniAppUrl } from "../../lib/app-url";
 import { TELEGRAM_ACK_TURN_CONTEXT, postTelegramAck, telegramAckVisibleUserText } from "../../lib/telegram-ack";
 import { appendTelegramAckHistory, loadTelegramAckHistory } from "../../lib/telegram-ack-history";
+import {
+  TELEGRAM_AUDIO_TRANSCRIBE_FAILED,
+  applyTelegramTranscript,
+  telegramAudioFromMessage,
+  telegramMessageHasInboundContent,
+  transcribeTelegramAudio,
+} from "../../lib/telegram-audio";
 import { claimTelegramMessage } from "../../lib/telegram-message-claim";
 import { markdownToTelegramHtml, telegramHtmlMessage } from "../../lib/telegram-html";
 import { attachTelegramVision } from "../../lib/telegram-vision";
@@ -12,6 +19,11 @@ import { appPrincipal } from "../../lib/principal";
 const credentials = {
   botToken: () => process.env.TELEGRAM_BOT_TOKEN!,
 };
+
+const fetchFile = createTelegramFetchFile({
+  credentials,
+  policy: { allowedMediaTypes: "*", maxBytes: 25 * 1024 * 1024 },
+});
 
 export default attachTelegramVision(
   telegramChannel({
@@ -64,11 +76,14 @@ export default attachTelegramVision(
       }
       void ctx.telegram.startTyping();
       const historyKey = ctx.telegram.chatId;
-      const userText = telegramAckVisibleUserText(message);
+      const audio = telegramAudioFromMessage(message);
+      const hasFiles = message.attachments.length > 0 || audio !== null;
+      const transcriptPromise =
+        audio === null ? Promise.resolve(null) : transcribeTelegramAudio(fetchFile, audio);
       const ackPosted = loadTelegramAckHistory(historyKey).then((history) =>
         postTelegramAck(ctx.telegram, {
           caption: message.caption,
-          hasFiles: message.attachments.length > 0,
+          hasFiles,
           history,
           text: message.text,
         }),
@@ -86,7 +101,17 @@ export default attachTelegramVision(
         });
         void ensureSummaryMenuButton(ctx);
       }
+      const transcript = await transcriptPromise;
+      if (audio !== null && transcript === null) {
+        await ctx.telegram.sendMessage(TELEGRAM_AUDIO_TRANSCRIBE_FAILED);
+        void ackPosted.catch(() => false);
+        return null;
+      }
+      if (transcript !== null) {
+        applyTelegramTranscript(message, transcript);
+      }
       const ack = await ackPosted.catch(() => false);
+      const userText = telegramAckVisibleUserText(message);
       void appendTelegramAckHistory(historyKey, [
         { role: "user", text: userText.length > 0 ? userText : "(attached file)" },
         ...(typeof ack === "string" ? [{ role: "assistant" as const, text: ack }] : []),
@@ -97,10 +122,7 @@ export default attachTelegramVision(
       };
     },
   }),
-  createTelegramFetchFile({
-    credentials,
-    policy: { allowedMediaTypes: "*", maxBytes: 25 * 1024 * 1024 },
-  }),
+  fetchFile,
 );
 
 function shouldDispatchTelegramMessage(message: TelegramMessage, botUsername: string | undefined) {
@@ -108,7 +130,7 @@ function shouldDispatchTelegramMessage(message: TelegramMessage, botUsername: st
     return false;
   }
   const text = message.text || message.caption;
-  if (text.trim().length === 0 && message.attachments.length === 0) {
+  if (!telegramMessageHasInboundContent(message)) {
     return false;
   }
   if (message.chat.type === "private") {
