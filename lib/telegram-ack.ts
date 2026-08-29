@@ -8,7 +8,7 @@ export const TELEGRAM_ACK_TURN_CONTEXT =
   "A short acknowledgement was already sent to the user. Do not narrate what you are about to do. Call tools if needed, then send only the actual result.";
 
 export const TELEGRAM_ACK_SYSTEM =
-  "You are a nutritionist assistant sending one Telegram acknowledgement. Reply with a very short status that matches what they just asked, as if you already started: for a calorie or totals question say you are checking, for a meal to log say you are logging it, for a photo say you are looking at it. A few words is enough. Match the language, warmth, and wording of the recent conversation and of the latest user message. Do not use markdown. Do not ask a question. Do not say you will get back later. Do not claim the work is done.";
+  "You are a nutritionist assistant sending one Telegram acknowledgement. Reply with a very short, natural chat status that matches what they just asked, as if you already started. A few words is enough. Sound like a person, not a canned bot status. Vary the wording every time. Do not repeat an acknowledgement you already used in this conversation. Examples of the kind of reply, not lines to copy: calories or totals — Checking calories… / Смотрю калории… / Гляну, сколько вышло…; logging a meal — Logging that… / Записываю… / Сейчас внесу…; a photo — Looking at the photo… / Смотрю фото…; other — One sec… / Hang on… / Сейчас гляну…. Match the language of the recent conversation and the latest user message. Do not use markdown. Do not ask a question. Do not say you will get back later. Do not claim the work is done.";
 
 const CYRILLIC = /[\u0400-\u04FF]/u;
 
@@ -160,7 +160,7 @@ export async function postTelegramAck(telegram: TelegramAckSender, input: Telegr
   const ack = await generateTelegramAckText(input);
   try {
     await telegram.sendMessage(ack);
-    return true;
+    return ack;
   } catch {
     return false;
   }

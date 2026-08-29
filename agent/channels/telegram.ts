@@ -73,9 +73,6 @@ export default attachTelegramVision(
           text: message.text,
         }),
       );
-      void appendTelegramAckHistory(historyKey, [
-        { role: "user", text: userText.length > 0 ? userText : "(attached file)" },
-      ]);
       const user = await resolveChannelUser({
         provider: "telegram",
         providerUserId: from.id,
@@ -89,10 +86,14 @@ export default attachTelegramVision(
         });
         void ensureSummaryMenuButton(ctx);
       }
-      const posted = await ackPosted.catch(() => false);
+      const ack = await ackPosted.catch(() => false);
+      void appendTelegramAckHistory(historyKey, [
+        { role: "user", text: userText.length > 0 ? userText : "(attached file)" },
+        ...(typeof ack === "string" ? [{ role: "assistant" as const, text: ack }] : []),
+      ]);
       return {
         auth: appPrincipal(user.id, "telegram"),
-        ...(posted ? { context: [TELEGRAM_ACK_TURN_CONTEXT] } : {}),
+        ...(ack ? { context: [TELEGRAM_ACK_TURN_CONTEXT] } : {}),
       };
     },
   }),
