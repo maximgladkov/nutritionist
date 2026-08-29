@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { pickSurvivor } from "./identity-core.ts";
+import { pickSurvivor, selectLiveUserId } from "./identity-core.ts";
 import { parseLinkCommand } from "./link-command.ts";
 import { mergeMemoryFiles, parseMemoryFile } from "./memory-format.ts";
 
@@ -48,6 +48,41 @@ describe("pickSurvivor", () => {
     const a = { id: "a", email: "a@x.com", name: null };
     const b = { id: "b", email: "b@x.com", name: null };
     assert.equal(pickSurvivor(a, b).kind, "both-have-email");
+  });
+});
+
+describe("selectLiveUserId", () => {
+  it("prefers the mapped agent session after a merge", () => {
+    assert.equal(
+      selectLiveUserId({
+        sessionUserId: "survivor",
+        principalId: "absorbed",
+        principalExists: false,
+      }),
+      "survivor",
+    );
+  });
+
+  it("uses the session principal when no agent session exists yet", () => {
+    assert.equal(
+      selectLiveUserId({
+        sessionUserId: undefined,
+        principalId: "web",
+        principalExists: true,
+      }),
+      "web",
+    );
+  });
+
+  it("does not keep a deleted principal", () => {
+    assert.equal(
+      selectLiveUserId({
+        sessionUserId: undefined,
+        principalId: "absorbed",
+        principalExists: false,
+      }),
+      undefined,
+    );
   });
 });
 

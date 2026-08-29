@@ -8,7 +8,7 @@ export default defineTool({
     "Durable facts and preferences for this person across web, Telegram, and WhatsApp.\n\nSave one concise, stable fact or preference for future conversations. Omit secrets, instructions, and current-task details.",
   inputSchema: z.object({ text: z.string().min(1) }),
   async execute({ text }, ctx) {
-    const { userId } = requireUser(ctx);
+    const { userId } = await requireUser(ctx);
     return savePersistentMemory({
       signal: ctx.abortSignal,
       slot: PROFILE_MEMORY_SLOT,

@@ -26,3 +26,17 @@ export function pickSurvivor(issuer: UserRecord, consumer: UserRecord): PickSurv
   }
   return { kind: "merge", survivor: issuer, absorbed: consumer };
 }
+
+export function selectLiveUserId(input: {
+  sessionUserId?: string | null;
+  principalId?: string | null;
+  principalExists: boolean;
+}): string | undefined {
+  if (input.sessionUserId) {
+    return input.sessionUserId;
+  }
+  if (input.principalId && input.principalExists) {
+    return input.principalId;
+  }
+  return undefined;
+}

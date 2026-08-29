@@ -23,7 +23,7 @@ export default defineTool({
       },
     ),
   async execute({ notes, country, timezone }, ctx) {
-    const { userId } = requireUser(ctx);
+    const { userId } = await requireUser(ctx);
     const data: { notes?: string; country?: string | null; timezone?: string | null } = {};
     if (notes !== undefined) {
       data.notes = notes;

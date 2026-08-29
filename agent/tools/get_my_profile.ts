@@ -7,7 +7,7 @@ export default defineTool({
   description: "Get the caller's saved nutrition profile notes, country, and timezone.",
   inputSchema: z.object({}),
   async execute(_input, ctx) {
-    const { userId } = requireUser(ctx);
+    const { userId } = await requireUser(ctx);
     const profile = await prisma.userProfile.findUnique({ where: { userId } });
     return {
       notes: profile?.notes ?? "",

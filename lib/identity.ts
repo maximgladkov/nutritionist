@@ -1,4 +1,4 @@
-import { pickSurvivor, type UserRecord } from "./identity-core";
+import { pickSurvivor, selectLiveUserId, type UserRecord } from "./identity-core";
 import { generateLinkCodeValue } from "./link-command";
 import { mergeMemoryFiles, parseMemoryFile, serializeMemoryFile } from "./memory-format";
 import type { ChannelProvider } from "./principal";
@@ -131,6 +131,30 @@ export async function consumeLinkCode(
   return { status: "merged", user: decision.survivor };
 }
 
+export async function resolveAuthenticatedUserId(input: {
+  eveSessionId: string;
+  principalId?: string;
+}): Promise<string | undefined> {
+  const session = await prisma.agentSession.findUnique({
+    where: { eveSessionId: input.eveSessionId },
+    select: { userId: true },
+  });
+  if (session) {
+    return session.userId;
+  }
+  const principal = input.principalId
+    ? await prisma.user.findUnique({
+        where: { id: input.principalId },
+        select: { id: true },
+      })
+    : null;
+  return selectLiveUserId({
+    sessionUserId: undefined,
+    principalId: input.principalId,
+    principalExists: Boolean(principal),
+  });
+}
+
 export async function mergeUsers(survivorId: string, absorbedId: string): Promise<void> {
   if (survivorId === absorbedId) {
     return;
@@ -142,6 +166,10 @@ export async function mergeUsers(survivorId: string, absorbedId: string): Promis
       data: { userId: survivorId },
     });
     await tx.agentSession.updateMany({
+      where: { userId: absorbedId },
+      data: { userId: survivorId },
+    });
+    await tx.meal.updateMany({
       where: { userId: absorbedId },
       data: { userId: survivorId },
     });

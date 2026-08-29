@@ -9,7 +9,7 @@ export default defineTool({
     mealId: z.string().min(1),
   }),
   async execute({ mealId }, ctx) {
-    const { userId } = requireUser(ctx);
+    const { userId } = await requireUser(ctx);
     return deleteMeal({ userId, mealId });
   },
 });

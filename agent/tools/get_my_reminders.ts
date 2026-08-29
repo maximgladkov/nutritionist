@@ -8,7 +8,7 @@ export default defineTool({
     "Get the caller's meal check-in reminders: whether each is enabled, the local clock time, timezone, and next run.",
   inputSchema: z.object({}),
   async execute(_input, ctx) {
-    const { userId } = requireUser(ctx);
+    const { userId } = await requireUser(ctx);
     return listReminders(userId);
   },
 });

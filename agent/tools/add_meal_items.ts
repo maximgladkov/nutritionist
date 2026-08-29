@@ -14,7 +14,7 @@ export default defineTool({
     country: z.string().length(2).optional(),
   }),
   async execute({ mealId, items, country }, ctx) {
-    const { userId } = requireUser(ctx);
+    const { userId } = await requireUser(ctx);
     const resolvedCountry = await resolveLookupCountry(country, ctx);
     return addMealItems({
       userId,

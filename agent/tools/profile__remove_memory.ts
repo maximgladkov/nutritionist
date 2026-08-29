@@ -8,7 +8,7 @@ export default defineTool({
     "Durable facts and preferences for this person across web, Telegram, and WhatsApp.\n\nRemove one persistent memory by the index shown in recalled memory. Use when it is wrong, outdated, or no longer needed.",
   inputSchema: z.object({ index: z.number().int().min(0) }),
   async execute({ index }, ctx) {
-    const { userId } = requireUser(ctx);
+    const { userId } = await requireUser(ctx);
     return removePersistentMemory({
       index,
       signal: ctx.abortSignal,

@@ -13,7 +13,7 @@ export default defineTool({
     label: mealLabelSchema.optional(),
   }),
   async execute({ from, to, label }, ctx) {
-    const { userId } = requireUser(ctx);
+    const { userId } = await requireUser(ctx);
     return listMeals({
       userId,
       from: parseIsoDate(from, "from"),

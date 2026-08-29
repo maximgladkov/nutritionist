@@ -1,7 +1,7 @@
 import type { SessionContext } from "eve/context";
 import { normalizeCountryCode } from "../../lib/countries";
 import { prisma } from "../../lib/prisma";
-import { getUserId } from "./require-user";
+import { getLiveUserId } from "./require-user";
 
 export async function resolveLookupCountry(
   override: string | undefined,
@@ -15,7 +15,7 @@ export async function resolveLookupCountry(
     return normalized;
   }
 
-  const userId = getUserId(ctx);
+  const userId = await getLiveUserId(ctx);
   if (!userId) {
     return undefined;
   }

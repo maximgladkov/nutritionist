@@ -23,7 +23,7 @@ export default defineTool({
     reminders: z.array(reminderPatchSchema).min(1).max(3),
   }),
   async execute({ reminders }, ctx) {
-    const { userId } = requireUser(ctx);
+    const { userId } = await requireUser(ctx);
     return saveReminders({ userId, patches: reminders });
   },
 });

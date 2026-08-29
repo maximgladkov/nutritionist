@@ -15,7 +15,7 @@ export default defineTool({
     timezone: z.string().min(1).optional(),
   }),
   async execute({ from, to, groupBy, timezone }, ctx) {
-    const { userId } = requireUser(ctx);
+    const { userId } = await requireUser(ctx);
     return summarizeNutrition({
       userId,
       from: parseIsoDate(from, "from"),
