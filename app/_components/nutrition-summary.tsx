@@ -462,6 +462,7 @@ function GoalRings({
   return (
     <div className="flex w-full flex-col items-center gap-3">
       <div aria-label={label} className="relative" role="img">
+        <GoalOverPatterns rings={rings} />
         <RadialChart
           barSize={barSize}
           data={data}
@@ -488,7 +489,7 @@ function GoalRings({
                 {rings.map((ring) => (
                   <RadialChart.Cell
                     key={ring.id}
-                    fill={ring.over > 0 ? "var(--color-danger)" : "transparent"}
+                    fill={ring.over > 0 ? `url(#${goalOverPatternId(ring.id)})` : "transparent"}
                   />
                 ))}
               </RadialChart.Bar>
@@ -518,7 +519,7 @@ function GoalRings({
             <li className="flex items-center gap-2 text-sm" key={ring.id}>
               <span
                 className="size-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: ring.fill }}
+                style={goalSwatchStyle(ring.fill, remainder.over)}
               />
               <span className="text-foreground min-w-0 flex-1">{ring.name}</span>
               <span className="text-foreground shrink-0 tabular-nums">
@@ -538,6 +539,41 @@ function GoalRings({
       </ul>
     </div>
   );
+}
+
+function GoalOverPatterns({ rings }: { readonly rings: readonly GoalRing[] }) {
+  return (
+    <svg aria-hidden="true" className="pointer-events-none absolute" height={0} width={0}>
+      <defs>
+        {rings.map((ring) => (
+          <pattern
+            id={goalOverPatternId(ring.id)}
+            key={ring.id}
+            height="6"
+            patternTransform="rotate(45)"
+            patternUnits="userSpaceOnUse"
+            width="6"
+          >
+            <rect fill={ring.fill} height="6" width="6" />
+            <rect fill="var(--foreground)" fillOpacity="0.4" height="6" width="2.5" />
+          </pattern>
+        ))}
+      </defs>
+    </svg>
+  );
+}
+
+function goalOverPatternId(id: GoalRing["id"]): string {
+  return `goal-over-${id}`;
+}
+
+function goalSwatchStyle(fill: string, over: boolean): { backgroundColor?: string; backgroundImage?: string } {
+  if (!over) {
+    return { backgroundColor: fill };
+  }
+  return {
+    backgroundImage: `repeating-linear-gradient(135deg, ${fill} 0 3px, color-mix(in oklch, var(--foreground) 40%, ${fill}) 3px 6px)`,
+  };
 }
 
 function goalRemainder(
