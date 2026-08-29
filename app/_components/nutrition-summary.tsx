@@ -439,7 +439,6 @@ function GoalRings({
   const calorie = rings.find((ring) => ring.id === "calories");
   const size = 240;
   const count = rings.length;
-  const innerRadius = `${Math.max(40, 100 - count * 14)}%`;
   const barSize = count <= 2 ? 12 : count <= 4 ? 10 : 8;
   const data = useMemo(
     () => rings.map((ring) => ({ fill: ring.fill, name: ring.name, value: ring.value })),
@@ -457,7 +456,7 @@ function GoalRings({
           barSize={barSize}
           data={data}
           height={size}
-          innerRadius={innerRadius}
+          innerRadius="80%"
           outerRadius="100%"
           width={size}
         >
