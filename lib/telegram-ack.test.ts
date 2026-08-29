@@ -47,7 +47,6 @@ describe("telegramAckMessages", () => {
       text: "И кофе",
     };
     assert.deepEqual(telegramAckMessages(input), [
-      { role: "system", content: telegramAckSystem(input) },
       { role: "user", content: "Запиши йогурт" },
       { role: "assistant", content: "Записала. 140 ккал." },
       { role: "user", content: "И кофе" },

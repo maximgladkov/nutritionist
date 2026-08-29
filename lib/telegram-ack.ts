@@ -97,16 +97,13 @@ export function coalesceTelegramAckTurns(
 }
 
 export function telegramAckMessages(input: TelegramAckInput) {
-  return [
-    { role: "system" as const, content: telegramAckSystem(input) },
-    ...coalesceTelegramAckTurns([
-      ...(input.history ?? []).map((message) => ({
-        role: message.role,
-        content: message.text,
-      })),
-      { role: "user" as const, content: telegramAckUserContent(input) },
-    ]),
-  ];
+  return coalesceTelegramAckTurns([
+    ...(input.history ?? []).map((message) => ({
+      role: message.role,
+      content: message.text,
+    })),
+    { role: "user" as const, content: telegramAckUserContent(input) },
+  ]);
 }
 
 export function telegramAckErrorMessage(error: unknown) {
@@ -117,6 +114,7 @@ export async function generateTelegramAckText(input: TelegramAckInput) {
   const { text } = await Promise.race([
     generateText({
       abortSignal: AbortSignal.timeout(TELEGRAM_ACK_TIMEOUT_MS),
+      instructions: telegramAckSystem(input),
       maxOutputTokens: 80,
       maxRetries: 0,
       messages: telegramAckMessages(input),
