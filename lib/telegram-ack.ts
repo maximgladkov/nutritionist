@@ -8,7 +8,9 @@ export const TELEGRAM_ACK_TURN_CONTEXT =
   "A short acknowledgement was already sent to the user. Do not narrate what you are about to do. Call tools if needed, then send only the actual result.";
 
 export const TELEGRAM_ACK_SYSTEM =
-  "You are a nutritionist assistant sending one Telegram acknowledgement. Reply with one friendly complete sentence. Sound like the same person as the recent assistant replies: match their language, warmth, and wording. If there is no conversation yet, use the Telegram client language and a warm, natural voice. Briefly acknowledge what they sent, say you are looking into it now, and that you will get back with the result. Do not use markdown. Do not ask a question. Do not claim a meal was logged or looked up yet. If the user attached a file, mention that you received it.";
+  "You are a nutritionist assistant sending one Telegram acknowledgement. Reply with one friendly complete sentence. Sound like the same person as the recent assistant replies: match their language, warmth, and wording. Match the language of the recent conversation and of the latest user message. Briefly acknowledge what they sent, say you are looking into it now, and that you will get back with the result. Do not use markdown. Do not ask a question. Do not claim a meal was logged or looked up yet. If the user attached a file, mention that you received it.";
+
+const CYRILLIC = /[\u0400-\u04FF]/u;
 
 export type TelegramAckHistoryMessage = {
   role: "assistant" | "user";
@@ -19,26 +21,45 @@ type TelegramAckInput = {
   caption: string;
   hasFiles: boolean;
   history?: readonly TelegramAckHistoryMessage[];
-  languageCode?: string;
   text: string;
 };
+
+type TelegramAckLanguageInput = Pick<TelegramAckInput, "hasFiles"> &
+  Partial<Pick<TelegramAckInput, "caption" | "history" | "text">>;
 
 type TelegramAckSender = {
   sendMessage: (message: string) => Promise<unknown>;
 };
 
-export function telegramAckVisibleUserText(input: { caption: string; text: string }) {
-  return input.text.trim() || input.caption.trim();
+export function telegramAckVisibleUserText(input: { caption?: string; text?: string }) {
+  return (input.text ?? "").trim() || (input.caption ?? "").trim();
+}
+
+export function telegramAckConversationIsRussian(input: TelegramAckLanguageInput) {
+  const samples = [
+    ...(input.history ?? []).map((message) => message.text),
+    telegramAckVisibleUserText(input),
+  ];
+  return samples.some((text) => CYRILLIC.test(text));
+}
+
+export function telegramAckSystem(input: TelegramAckInput) {
+  const parts = [TELEGRAM_ACK_SYSTEM];
+  if (input.hasFiles) {
+    parts.push("The latest user message includes an attached file.");
+  }
+  if ((input.history ?? []).length > 0 || telegramAckVisibleUserText(input).length > 0) {
+    parts.push("Reply in the same language as the recent conversation and the latest user message.");
+  }
+  return parts.join(" ");
 }
 
 export function telegramAckUserContent(input: TelegramAckInput) {
   const message = telegramAckVisibleUserText(input);
-  const language = input.languageCode?.trim();
-  return [
-    `User message: ${message.length > 0 ? message : "(none)"}`,
-    `Has attached files: ${input.hasFiles ? "yes" : "no"}`,
-    `Telegram client language: ${language && language.length > 0 ? language : "unknown"}`,
-  ].join("\n");
+  if (message.length > 0) {
+    return message;
+  }
+  return input.hasFiles ? "(attached file)" : "(none)";
 }
 
 export function clipTelegramAckHistory(messages: readonly TelegramAckHistoryMessage[]) {
@@ -72,7 +93,7 @@ export function parseTelegramAckHistory(value: unknown): TelegramAckHistoryMessa
 
 export function telegramAckMessages(input: TelegramAckInput) {
   return [
-    { role: "system" as const, content: TELEGRAM_ACK_SYSTEM },
+    { role: "system" as const, content: telegramAckSystem(input) },
     ...(input.history ?? []).map((message) => ({
       role: message.role,
       content: message.text,
@@ -81,8 +102,8 @@ export function telegramAckMessages(input: TelegramAckInput) {
   ];
 }
 
-export function telegramAckFallback(input: Pick<TelegramAckInput, "hasFiles" | "languageCode">) {
-  const isRu = input.languageCode?.toLowerCase().startsWith("ru") === true;
+export function telegramAckFallback(input: TelegramAckLanguageInput) {
+  const isRu = telegramAckConversationIsRussian(input);
   if (input.hasFiles) {
     return isRu
       ? "Получила фото, сейчас разберусь и вернусь с результатом."

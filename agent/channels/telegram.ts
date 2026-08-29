@@ -22,16 +22,15 @@ export default attachTelegramVision(
         if (data.finishReason === "tool-calls" || !data.message) {
           return;
         }
-        const userId = channel.state.triggeringUserId;
-        if (userId) {
-          void appendTelegramAckHistory(userId, [{ role: "assistant", text: data.message }]);
-        }
         const html = markdownToTelegramHtml(data.message);
         try {
           await channel.telegram.post(telegramHtmlMessage(html));
         } catch {
           await channel.telegram.post(data.message);
         }
+        await appendTelegramAckHistory(channel.telegram.chatId, [
+          { role: "assistant", text: data.message },
+        ]);
       },
     },
     async onMessage(ctx, message) {
@@ -64,17 +63,17 @@ export default attachTelegramVision(
         return null;
       }
       void ctx.telegram.startTyping();
+      const historyKey = ctx.telegram.chatId;
       const userText = telegramAckVisibleUserText(message);
-      const ackPosted = loadTelegramAckHistory(from.id).then((history) =>
+      const ackPosted = loadTelegramAckHistory(historyKey).then((history) =>
         postTelegramAck(ctx.telegram, {
           caption: message.caption,
           hasFiles: message.attachments.length > 0,
           history,
-          languageCode: from.languageCode,
           text: message.text,
         }),
       );
-      void appendTelegramAckHistory(from.id, [
+      void appendTelegramAckHistory(historyKey, [
         { role: "user", text: userText.length > 0 ? userText : "(attached file)" },
       ]);
       const user = await resolveChannelUser({
