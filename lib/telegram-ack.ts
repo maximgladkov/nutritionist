@@ -1,6 +1,6 @@
 import { generateText } from "ai";
 
-export const TELEGRAM_ACK_MODEL = "spacexai/grok-4.1-fast-non-reasoning";
+export const TELEGRAM_ACK_MODEL = "google/gemini-3.5-flash-lite";
 export const TELEGRAM_ACK_TIMEOUT_MS = 4000;
 export const TELEGRAM_ACK_HISTORY_MAX_MESSAGES = 8;
 export const TELEGRAM_ACK_HISTORY_MAX_CHARS = 400;
