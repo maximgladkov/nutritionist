@@ -80,6 +80,8 @@ describe("getProductByBarcode", () => {
             "saturated-fat_100g": 10.6,
             fiber_100g: 0,
             salt_100g: 0.107,
+            "energy-kcal_100ml": 539,
+            proteins_100ml: 6.3,
           },
           image_url: "https://example.com/nutella.jpg",
           countries_tags: ["en:france"],
@@ -96,6 +98,8 @@ describe("getProductByBarcode", () => {
     }
     assert.equal(result.product.name, "Nutella");
     assert.equal(result.product.nutriments.energyKcal100g, 539);
+    assert.equal(result.product.nutriments.energyKcal100ml, 539);
+    assert.equal(result.product.nutriments.proteins100ml, 6.3);
     assert.equal(result.product.nutriments.saturatedFat100g, 10.6);
     assert.deepEqual(result.product.countries, ["en:france"]);
     assert.equal(fetchMock.mock.callCount(), 1);

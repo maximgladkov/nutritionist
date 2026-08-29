@@ -19,6 +19,7 @@ model User {
   linkCodes     LinkCode[]
   agentSessions AgentSession[]
   profile       UserProfile?
+  meals         Meal[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -107,7 +108,58 @@ model UserProfile {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   notes     String   @default("")
   country   String?
+  timezone  String?
   updatedAt DateTime @updatedAt
+}
+
+enum MealLabel {
+  breakfast
+  lunch
+  dinner
+  snack
+  other
+}
+
+enum MealItemUnit {
+  g
+  ml
+  serving
+}
+
+model Meal {
+  id        String     @id @default(cuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eatenAt   DateTime   @db.Timestamptz
+  label     MealLabel
+  items     MealItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([userId, eatenAt])
+}
+
+model MealItem {
+  id                String       @id @default(cuid())
+  mealId            String
+  meal              Meal         @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  name              String
+  barcode           String?
+  amount            Float
+  unit              MealItemUnit
+  grams             Float
+  nutrimentsPer100g Json
+  energyKcal        Float?
+  proteins          Float?
+  carbohydrates     Float?
+  sugars            Float?
+  fat               Float?
+  saturatedFat      Float?
+  fiber             Float?
+  salt              Float?
+  createdAt         DateTime     @default(now())
+
+  @@index([mealId])
 }
 
 model ChatSdkEntry {

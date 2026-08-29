@@ -27,6 +27,14 @@ export type ProductNutriments = {
   saturatedFat100g?: number;
   fiber100g?: number;
   salt100g?: number;
+  energyKcal100ml?: number;
+  proteins100ml?: number;
+  carbohydrates100ml?: number;
+  sugars100ml?: number;
+  fat100ml?: number;
+  saturatedFat100ml?: number;
+  fiber100ml?: number;
+  salt100ml?: number;
 };
 
 export type Product = {
@@ -234,6 +242,14 @@ function mapNutriments(nutriments: OffNutriments | undefined): ProductNutriments
     saturatedFat100g: numberOrUndefined(nutriments["saturated-fat_100g"]),
     fiber100g: numberOrUndefined(nutriments.fiber_100g),
     salt100g: numberOrUndefined(nutriments.salt_100g),
+    energyKcal100ml: numberOrUndefined(nutriments["energy-kcal_100ml"]),
+    proteins100ml: numberOrUndefined(nutriments.proteins_100ml),
+    carbohydrates100ml: numberOrUndefined(nutriments.carbohydrates_100ml),
+    sugars100ml: numberOrUndefined(nutriments.sugars_100ml),
+    fat100ml: numberOrUndefined(nutriments.fat_100ml),
+    saturatedFat100ml: numberOrUndefined(nutriments["saturated-fat_100ml"]),
+    fiber100ml: numberOrUndefined(nutriments.fiber_100ml),
+    salt100ml: numberOrUndefined(nutriments.salt_100ml),
   };
 }
 
