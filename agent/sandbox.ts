@@ -1,6 +1,5 @@
-import { defineSandbox } from "eve/sandbox";
-import { justbash } from "eve/sandbox/just-bash";
+import { defaultBackend, defineSandbox } from "eve/sandbox";
 
 export default defineSandbox({
-  backend: justbash(),
+  backend: defaultBackend(),
 });
