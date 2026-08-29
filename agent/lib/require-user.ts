@@ -1,6 +1,6 @@
-import type { SessionContext } from "eve/context";
+import type { MemoryScopeContext } from "eve/memory";
 
-export function getUserId(ctx: SessionContext): string | undefined {
+export function getUserId(ctx: Pick<MemoryScopeContext, "session">): string | undefined {
   const caller = ctx.session.auth.current ?? ctx.session.auth.initiator;
   if (caller?.principalType !== "user" || !caller.principalId) {
     return undefined;
@@ -8,7 +8,7 @@ export function getUserId(ctx: SessionContext): string | undefined {
   return caller.principalId;
 }
 
-export function requireUser(ctx: SessionContext): { userId: string } {
+export function requireUser(ctx: Pick<MemoryScopeContext, "session">): { userId: string } {
   const userId = getUserId(ctx);
   if (!userId) {
     throw new Error("An authenticated user is required.");
