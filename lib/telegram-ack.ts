@@ -83,13 +83,18 @@ export function telegramAckMessages(input: TelegramAckInput) {
 
 export async function postTelegramAck(telegram: TelegramAckSender, input: TelegramAckInput) {
   try {
-    const { text } = await generateText({
-      abortSignal: AbortSignal.timeout(TELEGRAM_ACK_TIMEOUT_MS),
-      maxOutputTokens: 100,
-      maxRetries: 0,
-      messages: telegramAckMessages(input),
-      model: TELEGRAM_ACK_MODEL,
-    });
+    const { text } = await Promise.race([
+      generateText({
+        abortSignal: AbortSignal.timeout(TELEGRAM_ACK_TIMEOUT_MS),
+        maxOutputTokens: 100,
+        maxRetries: 0,
+        messages: telegramAckMessages(input),
+        model: TELEGRAM_ACK_MODEL,
+      }),
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("telegram ack timed out")), TELEGRAM_ACK_TIMEOUT_MS);
+      }),
+    ]);
     const ack = text.trim();
     if (ack.length === 0) {
       return false;

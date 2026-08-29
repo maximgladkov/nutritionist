@@ -60,18 +60,20 @@ export default attachTelegramVision(
       }
       void ctx.telegram.startTyping();
       const userText = telegramAckVisibleUserText(message);
-      const ackPosted = loadTelegramAckHistory(from.id).then((history) => {
-        void appendTelegramAckHistory(from.id, [
-          { role: "user", text: userText.length > 0 ? userText : "(attached file)" },
-        ]);
-        return postTelegramAck(ctx.telegram, {
-          caption: message.caption,
-          hasFiles: message.attachments.length > 0,
-          history,
-          languageCode: from.languageCode,
-          text: message.text,
-        });
-      });
+      void loadTelegramAckHistory(from.id)
+        .then((history) => {
+          void appendTelegramAckHistory(from.id, [
+            { role: "user", text: userText.length > 0 ? userText : "(attached file)" },
+          ]);
+          return postTelegramAck(ctx.telegram, {
+            caption: message.caption,
+            hasFiles: message.attachments.length > 0,
+            history,
+            languageCode: from.languageCode,
+            text: message.text,
+          });
+        })
+        .catch(() => {});
       const user = await resolveChannelUser({
         provider: "telegram",
         providerUserId: from.id,
@@ -85,10 +87,9 @@ export default attachTelegramVision(
         });
         void ensureSummaryMenuButton(ctx);
       }
-      const posted = await ackPosted;
       return {
         auth: appPrincipal(user.id, "telegram"),
-        ...(posted ? { context: [TELEGRAM_ACK_TURN_CONTEXT] } : {}),
+        context: [TELEGRAM_ACK_TURN_CONTEXT],
       };
     },
   }),
