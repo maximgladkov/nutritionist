@@ -1,6 +1,22 @@
 import type { FilePart, UserContent } from "ai";
 import { isImageMediaType, looksLikeImageFilename, sniffImageMediaType } from "./image-bytes.ts";
 
+export function isAudioMediaType(mediaType: string | undefined): boolean {
+  return mediaType?.toLowerCase().startsWith("audio/") === true && mediaType.toLowerCase() !== "audio/*";
+}
+
+export function isVideoMediaType(mediaType: string | undefined): boolean {
+  return mediaType?.toLowerCase().startsWith("video/") === true && mediaType.toLowerCase() !== "video/*";
+}
+
+export function looksLikeAudioFilename(filename: string | undefined): boolean {
+  return /\.(aac|flac|m4a|mp3|oga|ogg|opus|wav)$/iu.test(filename ?? "");
+}
+
+export function looksLikeVideoFilename(filename: string | undefined): boolean {
+  return /\.(3gp|3gpp|mov|mp4|mpeg|mpg|webm|wmv)$/iu.test(filename ?? "");
+}
+
 const EVE_URL_PREFIX = "eve-url:";
 
 export type TelegramFileFetch = (
@@ -84,7 +100,7 @@ async function inlineTelegramImagePart(part: unknown, fetchFile: TelegramFileFet
   if (url === null) {
     return inlineLocalFilePart(part);
   }
-  if (!shouldInlineAsImage(part.mediaType, part.filename)) {
+  if (!shouldInlineTelegramFile(part.mediaType, part.filename)) {
     return part;
   }
   try {
@@ -94,10 +110,7 @@ async function inlineTelegramImagePart(part: unknown, fetchFile: TelegramFileFet
     }
     const bytes = Buffer.isBuffer(result) ? result : result.bytes;
     const fetchedType = Buffer.isBuffer(result) ? undefined : result.mediaType;
-    const mediaType =
-      sniffImageMediaType(bytes) ??
-      (isImageMediaType(fetchedType) ? fetchedType : undefined) ??
-      (isImageMediaType(part.mediaType) ? part.mediaType : undefined);
+    const mediaType = resolvedInlineMediaType(bytes, fetchedType, part);
     if (mediaType === undefined) {
       return part;
     }
@@ -109,10 +122,10 @@ async function inlineTelegramImagePart(part: unknown, fetchFile: TelegramFileFet
 
 function inlineLocalFilePart(part: FilePart): FilePart {
   const bytes = localFileBytes(part.data);
-  if (bytes === null || !shouldInlineAsImage(part.mediaType, part.filename)) {
+  if (bytes === null || !shouldInlineTelegramFile(part.mediaType, part.filename)) {
     return part;
   }
-  const mediaType = sniffImageMediaType(bytes) ?? (isImageMediaType(part.mediaType) ? part.mediaType : undefined);
+  const mediaType = resolvedInlineMediaType(bytes, undefined, part);
   if (mediaType === undefined) {
     return part;
   }
@@ -128,8 +141,43 @@ function visionFilePart(bytes: Uint8Array, mediaType: string, filename?: string)
   };
 }
 
-function shouldInlineAsImage(mediaType: string | undefined, filename: string | undefined) {
-  return isImageMediaType(mediaType) || looksLikeImageFilename(filename);
+function shouldInlineTelegramFile(mediaType: string | undefined, filename: string | undefined) {
+  return (
+    isImageMediaType(mediaType) ||
+    isAudioMediaType(mediaType) ||
+    isVideoMediaType(mediaType) ||
+    looksLikeImageFilename(filename) ||
+    looksLikeAudioFilename(filename) ||
+    looksLikeVideoFilename(filename)
+  );
+}
+
+function resolvedInlineMediaType(
+  bytes: Uint8Array,
+  fetchedType: string | undefined,
+  part: Pick<FilePart, "filename" | "mediaType">,
+) {
+  const sniffed = sniffImageMediaType(bytes);
+  if (sniffed !== null) {
+    return sniffed;
+  }
+  if (isInlineMediaType(fetchedType)) {
+    return fetchedType;
+  }
+  if (isInlineMediaType(part.mediaType)) {
+    return part.mediaType;
+  }
+  if (looksLikeAudioFilename(part.filename)) {
+    return "audio/ogg";
+  }
+  if (looksLikeVideoFilename(part.filename)) {
+    return "video/mp4";
+  }
+  return undefined;
+}
+
+function isInlineMediaType(mediaType: string | undefined): mediaType is string {
+  return isImageMediaType(mediaType) || isAudioMediaType(mediaType) || isVideoMediaType(mediaType);
 }
 
 function isFilePart(part: unknown): part is FilePart {

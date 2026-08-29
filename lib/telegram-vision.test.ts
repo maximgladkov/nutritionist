@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { isImageMediaType, looksLikeImageFilename, sniffImageMediaType } from "./image-bytes.ts";
-import { attachTelegramVision, inlineTelegramImages, withSniffedImageType } from "./telegram-vision.ts";
+import {
+  attachTelegramVision,
+  inlineTelegramImages,
+  isAudioMediaType,
+  isVideoMediaType,
+  looksLikeAudioFilename,
+  looksLikeVideoFilename,
+  withSniffedImageType,
+} from "./telegram-vision.ts";
 
 const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
 const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -25,6 +33,15 @@ describe("image filename and media type helpers", () => {
     assert.equal(isImageMediaType("application/octet-stream"), false);
     assert.equal(looksLikeImageFilename("photo.jpg"), true);
     assert.equal(looksLikeImageFilename("label.pdf"), false);
+  });
+
+  it("accepts audio and video types used by Telegram", () => {
+    assert.equal(isAudioMediaType("audio/ogg"), true);
+    assert.equal(isAudioMediaType("audio/*"), false);
+    assert.equal(looksLikeAudioFilename("voice.ogg"), true);
+    assert.equal(isVideoMediaType("video/mp4"), true);
+    assert.equal(looksLikeVideoFilename("plate.mp4"), true);
+    assert.equal(looksLikeVideoFilename("voice.ogg"), false);
   });
 });
 
@@ -142,6 +159,38 @@ describe("inlineTelegramImages", () => {
 
     assert.deepEqual(JSON.parse(JSON.stringify(content)), content);
     assert.equal(isJsonValue(content), true);
+  });
+
+  it("inlines telegram audio and video file parts", async () => {
+    const ogg = Buffer.from("ogg-bytes");
+    const mp4 = Buffer.from("mp4-bytes");
+    const content = await inlineTelegramImages(
+      [
+        { type: "file", mediaType: "audio/ogg", filename: "voice.ogg", data: "telegram-file:AwACVoice" },
+        { type: "file", mediaType: "video/mp4", filename: "plate.mp4", data: "telegram-file:BAACVideo" },
+      ],
+      async (url) => {
+        if (url.includes("AwACVoice")) {
+          return { bytes: ogg, mediaType: "audio/ogg" };
+        }
+        return { bytes: mp4, mediaType: "video/mp4" };
+      },
+    );
+
+    assert.deepEqual(content, [
+      {
+        type: "file",
+        mediaType: "audio/ogg",
+        filename: "voice.ogg",
+        data: { type: "data", data: ogg.toString("base64") },
+      },
+      {
+        type: "file",
+        mediaType: "video/mp4",
+        filename: "plate.mp4",
+        data: { type: "data", data: mp4.toString("base64") },
+      },
+    ]);
   });
 });
 
