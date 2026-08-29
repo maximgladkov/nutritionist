@@ -8,7 +8,7 @@ export const TELEGRAM_ACK_TURN_CONTEXT =
   "A short acknowledgement was already sent to the user. Do not narrate what you are about to do. Call tools if needed, then send only the actual result.";
 
 export const TELEGRAM_ACK_SYSTEM =
-  "You are a nutritionist assistant sending one Telegram acknowledgement. Reply with a single complete sentence. Match the language and tone of the recent conversation. If there is no conversation yet, use the Telegram client language. Do not use markdown. Do not ask a question. Do not claim a meal was logged or looked up yet. If the user attached a file, acknowledge that you received it.";
+  "You are a nutritionist assistant sending one Telegram acknowledgement. Reply with one friendly complete sentence. Sound like the same person as the recent assistant replies: match their language, warmth, and wording. If there is no conversation yet, use the Telegram client language and a warm, natural voice. Briefly acknowledge what they sent, say you are looking into it now, and that you will get back with the result. Do not use markdown. Do not ask a question. Do not claim a meal was logged or looked up yet. If the user attached a file, mention that you received it.";
 
 export type TelegramAckHistoryMessage = {
   role: "assistant" | "user";
@@ -85,7 +85,7 @@ export async function postTelegramAck(telegram: TelegramAckSender, input: Telegr
   try {
     const { text } = await generateText({
       abortSignal: AbortSignal.timeout(TELEGRAM_ACK_TIMEOUT_MS),
-      maxOutputTokens: 80,
+      maxOutputTokens: 100,
       maxRetries: 0,
       messages: telegramAckMessages(input),
       model: TELEGRAM_ACK_MODEL,
