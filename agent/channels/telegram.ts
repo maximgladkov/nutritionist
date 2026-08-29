@@ -2,7 +2,8 @@ import { createTelegramFetchFile, telegramChannel } from "eve/channels/telegram"
 import type { TelegramContext, TelegramMessage } from "eve/channels/telegram";
 import { handleChannelLink, resolveChannelUser, saveChannelThreadId } from "../lib/channel-identity";
 import { telegramSummaryMiniAppUrl } from "../../lib/app-url";
-import { TELEGRAM_ACK_TURN_CONTEXT, postTelegramAck } from "../../lib/telegram-ack";
+import { TELEGRAM_ACK_TURN_CONTEXT, postTelegramAck, telegramAckVisibleUserText } from "../../lib/telegram-ack";
+import { appendTelegramAckHistory, loadTelegramAckHistory } from "../../lib/telegram-ack-history";
 import { markdownToTelegramHtml, telegramHtmlMessage } from "../../lib/telegram-html";
 import { attachTelegramVision } from "../../lib/telegram-vision";
 import { appPrincipal } from "../../lib/principal";
@@ -18,6 +19,10 @@ export default attachTelegramVision(
       async "message.completed"(data, channel) {
         if (data.finishReason === "tool-calls" || !data.message) {
           return;
+        }
+        const userId = channel.state.triggeringUserId;
+        if (userId) {
+          void appendTelegramAckHistory(userId, [{ role: "assistant", text: data.message }]);
         }
         const html = markdownToTelegramHtml(data.message);
         try {
@@ -54,10 +59,18 @@ export default attachTelegramVision(
         return null;
       }
       void ctx.telegram.startTyping();
-      const ackPosted = postTelegramAck(ctx.telegram, {
-        caption: message.caption,
-        hasFiles: message.attachments.length > 0,
-        text: message.text,
+      const userText = telegramAckVisibleUserText(message);
+      const ackPosted = loadTelegramAckHistory(from.id).then((history) => {
+        void appendTelegramAckHistory(from.id, [
+          { role: "user", text: userText.length > 0 ? userText : "(attached file)" },
+        ]);
+        return postTelegramAck(ctx.telegram, {
+          caption: message.caption,
+          hasFiles: message.attachments.length > 0,
+          history,
+          languageCode: from.languageCode,
+          text: message.text,
+        });
       });
       const user = await resolveChannelUser({
         provider: "telegram",
