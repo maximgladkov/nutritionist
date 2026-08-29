@@ -142,13 +142,26 @@ export async function mergeUsers(survivorId: string, absorbedId: string): Promis
       if (!survivorProfile) {
         await tx.userProfile.delete({ where: { userId: absorbedId } });
         await tx.userProfile.create({
-          data: { userId: survivorId, notes: absorbedProfile.notes },
+          data: {
+            userId: survivorId,
+            notes: absorbedProfile.notes,
+            country: absorbedProfile.country,
+          },
         });
-      } else if (!survivorProfile.notes && absorbedProfile.notes) {
-        await tx.userProfile.update({
-          where: { userId: survivorId },
-          data: { notes: absorbedProfile.notes },
-        });
+      } else {
+        const data: { notes?: string; country?: string | null } = {};
+        if (!survivorProfile.notes && absorbedProfile.notes) {
+          data.notes = absorbedProfile.notes;
+        }
+        if (!survivorProfile.country && absorbedProfile.country) {
+          data.country = absorbedProfile.country;
+        }
+        if (Object.keys(data).length > 0) {
+          await tx.userProfile.update({
+            where: { userId: survivorId },
+            data,
+          });
+        }
       }
       await tx.userProfile.deleteMany({ where: { userId: absorbedId } });
     }

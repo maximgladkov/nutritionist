@@ -106,6 +106,7 @@ model UserProfile {
   userId    String   @id
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   notes     String   @default("")
+  country   String?
   updatedAt DateTime @updatedAt
 }
 

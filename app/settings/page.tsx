@@ -1,5 +1,7 @@
 import { auth } from "@/auth";
 import { consumeLinkCode, createLinkCode } from "@/lib/identity";
+import { listCountries, normalizeCountryCode } from "@/lib/countries";
+import { prisma } from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
@@ -15,6 +17,11 @@ export default async function SettingsPage({
     redirect("/login?callbackUrl=/settings");
   }
   const params = await searchParams;
+  const profile = await prisma.userProfile.findUnique({
+    where: { userId: session.user.id },
+    select: { country: true },
+  });
+  const countries = listCountries();
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col gap-8 px-6 py-12">
@@ -28,6 +35,52 @@ export default async function SettingsPage({
       {params.notice ? (
         <p className="rounded-md border bg-card px-3 py-2 text-sm">{params.notice}</p>
       ) : null}
+
+      <section className="flex flex-col gap-3">
+        <h2 className="font-medium text-sm">Country</h2>
+        <p className="text-muted-foreground text-sm">
+          Product lookups use this country so results match local packaged foods.
+        </p>
+        <form
+          action={async (formData) => {
+            "use server";
+            const current = await auth();
+            if (!current?.user?.id) {
+              redirect("/login?callbackUrl=/settings");
+            }
+            const raw = String(formData.get("country") ?? "").trim();
+            const country = raw === "" ? null : normalizeCountryCode(raw);
+            if (raw !== "" && !country) {
+              redirect(`/settings?notice=${encodeURIComponent("Choose a valid country.")}`);
+            }
+            await prisma.userProfile.upsert({
+              where: { userId: current.user.id },
+              create: { userId: current.user.id, country },
+              update: { country },
+            });
+            redirect(
+              `/settings?notice=${encodeURIComponent(
+                country ? "Country saved." : "Country cleared. Lookups use the worldwide catalog.",
+              )}`,
+            );
+          }}
+          className="flex gap-2"
+        >
+          <select
+            className="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
+            defaultValue={profile?.country ?? ""}
+            name="country"
+          >
+            <option value="">Not set (worldwide)</option>
+            {countries.map((country) => (
+              <option key={country.code} value={country.code}>
+                {country.name}
+              </option>
+            ))}
+          </select>
+          <Button type="submit">Save</Button>
+        </form>
+      </section>
 
       <section className="flex flex-col gap-3">
         <h2 className="font-medium text-sm">Link Telegram or WhatsApp</h2>
