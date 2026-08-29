@@ -4,6 +4,7 @@ import { handleChannelLink, resolveChannelUser, saveChannelThreadId } from "../l
 import { telegramSummaryMiniAppUrl } from "../../lib/app-url";
 import { TELEGRAM_ACK_TURN_CONTEXT, postTelegramAck, telegramAckVisibleUserText } from "../../lib/telegram-ack";
 import { appendTelegramAckHistory, loadTelegramAckHistory } from "../../lib/telegram-ack-history";
+import { claimTelegramMessage } from "../../lib/telegram-message-claim";
 import { markdownToTelegramHtml, telegramHtmlMessage } from "../../lib/telegram-html";
 import { attachTelegramVision } from "../../lib/telegram-vision";
 import { appPrincipal } from "../../lib/principal";
@@ -15,6 +16,7 @@ const credentials = {
 export default attachTelegramVision(
   telegramChannel({
     credentials,
+    turnPolicy: "queue",
     events: {
       async "message.completed"(data, channel) {
         if (data.finishReason === "tool-calls" || !data.message) {
@@ -56,6 +58,9 @@ export default attachTelegramVision(
         return null;
       }
       if (!shouldDispatchTelegramMessage(message, ctx.telegram.botUsername)) {
+        return null;
+      }
+      if (!(await claimTelegramMessage(message.chat.id, message.messageId))) {
         return null;
       }
       void ctx.telegram.startTyping();
