@@ -1,7 +1,7 @@
 import type { SessionContext } from "eve/context";
 
 export function getUserId(ctx: SessionContext): string | undefined {
-  const caller = ctx.session.auth.current;
+  const caller = ctx.session.auth.current ?? ctx.session.auth.initiator;
   if (caller?.principalType !== "user" || !caller.principalId) {
     return undefined;
   }
