@@ -160,8 +160,15 @@ const captureScreenshot = async (): Promise<File | null> => {
 // Provider Context & Types
 // ============================================================================
 
+export type PromptInputFileStatus = "preparing" | "ready";
+
+export type PromptInputFile = FileUIPart & {
+  id: string;
+  status?: PromptInputFileStatus;
+};
+
 export interface AttachmentsContext {
-  files: (FileUIPart & { id: string })[];
+  files: PromptInputFile[];
   add: (files: File[] | FileList) => void;
   remove: (id: string) => void;
   clear: () => void;
@@ -227,7 +234,7 @@ export const PromptInputProvider = ({
   const clearInput = useCallback(() => setTextInput(""), []);
 
   // ----- attachments state (global when wrapped)
-  const [attachmentFiles, setAttachmentFiles] = useState<(FileUIPart & { id: string })[]>([]);
+  const [attachmentFiles, setAttachmentFiles] = useState<PromptInputFile[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   // oxlint-disable-next-line eslint(no-empty-function)
   const openRef = useRef<() => void>(() => {});
@@ -244,6 +251,7 @@ export const PromptInputProvider = ({
         filename: file.name,
         id: nanoid(),
         mediaType: file.type,
+        status: "ready" as const,
         type: "file" as const,
         url: URL.createObjectURL(file),
       })),
@@ -464,7 +472,11 @@ export type PromptInputProps = Omit<HTMLAttributes<HTMLFormElement>, "onSubmit" 
   maxFiles?: number;
   // bytes
   maxFileSize?: number;
-  onError?: (err: { code: "max_files" | "max_file_size" | "accept"; message: string }) => void;
+  onError?: (err: {
+    code: "max_files" | "max_file_size" | "accept" | "convert";
+    message: string;
+  }) => void;
+  prepareFiles?: (files: File[]) => Promise<File[]>;
   onSubmit: (
     message: PromptInputMessage,
     event: FormEvent<HTMLFormElement>,
@@ -480,6 +492,7 @@ export const PromptInput = ({
   maxFiles,
   maxFileSize,
   onError,
+  prepareFiles,
   onSubmit,
   children,
   ...props
@@ -493,7 +506,7 @@ export const PromptInput = ({
   const formRef = useRef<HTMLFormElement | null>(null);
 
   // ----- Local attachments (only used when no provider)
-  const [items, setItems] = useState<(FileUIPart & { id: string })[]>([]);
+  const [items, setItems] = useState<PromptInputFile[]>([]);
   const files = usingProvider ? controller.attachments.files : items;
 
   // ----- Local referenced sources (always local to PromptInput)
@@ -524,8 +537,10 @@ export const PromptInput = ({
         .filter(Boolean);
 
       return patterns.some((pattern) => {
+        if (pattern.startsWith(".")) {
+          return f.name.toLowerCase().endsWith(pattern.toLowerCase());
+        }
         if (pattern.endsWith("/*")) {
-          // e.g: image/* -> image/
           const prefix = pattern.slice(0, -1);
           return f.type.startsWith(prefix);
         }
@@ -535,8 +550,8 @@ export const PromptInput = ({
     [accept],
   );
 
-  const addLocal = useCallback(
-    (fileList: File[] | FileList) => {
+  const selectIncomingFiles = useCallback(
+    (fileList: File[] | FileList, currentCount: number): File[] | undefined => {
       const incoming = [...fileList];
       const accepted = incoming.filter((f) => matchesAccept(f));
       if (incoming.length && accepted.length === 0) {
@@ -544,7 +559,7 @@ export const PromptInput = ({
           code: "accept",
           message: "No files match the accepted types.",
         });
-        return;
+        return undefined;
       }
       const withinSize = (f: File) => (maxFileSize ? f.size <= maxFileSize : true);
       const sized = accepted.filter(withinSize);
@@ -553,70 +568,9 @@ export const PromptInput = ({
           code: "max_file_size",
           message: "All files exceed the maximum size.",
         });
-        return;
+        return undefined;
       }
 
-      setItems((prev) => {
-        const capacity =
-          typeof maxFiles === "number" ? Math.max(0, maxFiles - prev.length) : undefined;
-        const capped = typeof capacity === "number" ? sized.slice(0, capacity) : sized;
-        if (typeof capacity === "number" && sized.length > capacity) {
-          onError?.({
-            code: "max_files",
-            message: "Too many files. Some were not added.",
-          });
-        }
-        const next: (FileUIPart & { id: string })[] = [];
-        for (const file of capped) {
-          next.push({
-            filename: file.name,
-            id: nanoid(),
-            mediaType: file.type,
-            type: "file",
-            url: URL.createObjectURL(file),
-          });
-        }
-        return [...prev, ...next];
-      });
-    },
-    [matchesAccept, maxFiles, maxFileSize, onError],
-  );
-
-  const removeLocal = useCallback(
-    (id: string) =>
-      setItems((prev) => {
-        const found = prev.find((file) => file.id === id);
-        if (found?.url) {
-          URL.revokeObjectURL(found.url);
-        }
-        return prev.filter((file) => file.id !== id);
-      }),
-    [],
-  );
-
-  // Wrapper that validates files before calling provider's add
-  const addWithProviderValidation = useCallback(
-    (fileList: File[] | FileList) => {
-      const incoming = [...fileList];
-      const accepted = incoming.filter((f) => matchesAccept(f));
-      if (incoming.length && accepted.length === 0) {
-        onError?.({
-          code: "accept",
-          message: "No files match the accepted types.",
-        });
-        return;
-      }
-      const withinSize = (f: File) => (maxFileSize ? f.size <= maxFileSize : true);
-      const sized = accepted.filter(withinSize);
-      if (accepted.length > 0 && sized.length === 0) {
-        onError?.({
-          code: "max_file_size",
-          message: "All files exceed the maximum size.",
-        });
-        return;
-      }
-
-      const currentCount = files.length;
       const capacity =
         typeof maxFiles === "number" ? Math.max(0, maxFiles - currentCount) : undefined;
       const capped = typeof capacity === "number" ? sized.slice(0, capacity) : sized;
@@ -626,28 +580,149 @@ export const PromptInput = ({
           message: "Too many files. Some were not added.",
         });
       }
+      return capped;
+    },
+    [matchesAccept, maxFileSize, maxFiles, onError],
+  );
 
-      if (capped.length > 0) {
-        controller?.attachments.add(capped);
+  const commitItems = useCallback((updater: (prev: PromptInputFile[]) => PromptInputFile[]) => {
+    setItems((prev) => {
+      const next = updater(prev);
+      filesRef.current = next;
+      return next;
+    });
+  }, []);
+
+  const addLocal = useCallback(
+    async (fileList: File[] | FileList) => {
+      const selected = selectIncomingFiles(fileList, filesRef.current.length);
+      if (!selected || selected.length === 0) {
+        return;
+      }
+
+      const pending = selected.map((file) => ({
+        file,
+        id: nanoid(),
+      }));
+      const status = prepareFiles ? ("preparing" as const) : ("ready" as const);
+      const pendingItems: PromptInputFile[] = pending.map(({ file, id }) => ({
+        filename: file.name,
+        id,
+        mediaType: file.type,
+        status,
+        type: "file",
+        url: URL.createObjectURL(file),
+      }));
+
+      commitItems((prev) => [...prev, ...pendingItems]);
+
+      if (!prepareFiles) {
+        return;
+      }
+
+      try {
+        const prepared = await prepareFiles(selected);
+        commitItems((prev) =>
+          prev.flatMap((item) => {
+            const index = pending.findIndex((entry) => entry.id === item.id);
+            if (index === -1) {
+              return [item];
+            }
+            const preparedFile = prepared[index];
+            if (!preparedFile) {
+              if (item.url) {
+                URL.revokeObjectURL(item.url);
+              }
+              return [];
+            }
+            if (preparedFile === pending[index]?.file) {
+              return [{ ...item, status: "ready" }];
+            }
+            if (item.url) {
+              URL.revokeObjectURL(item.url);
+            }
+            return [
+              {
+                ...item,
+                filename: preparedFile.name,
+                mediaType: preparedFile.type,
+                status: "ready",
+                url: URL.createObjectURL(preparedFile),
+              },
+            ];
+          }),
+        );
+      } catch {
+        const pendingIds = new Set(pending.map((entry) => entry.id));
+        commitItems((prev) =>
+          prev.filter((item) => {
+            if (!pendingIds.has(item.id)) {
+              return true;
+            }
+            if (item.url) {
+              URL.revokeObjectURL(item.url);
+            }
+            return false;
+          }),
+        );
+        onError?.({
+          code: "convert",
+          message: "Unable to convert this photo. Try JPEG or PNG.",
+        });
       }
     },
-    [matchesAccept, maxFileSize, maxFiles, onError, files.length, controller],
+    [commitItems, onError, prepareFiles, selectIncomingFiles],
   );
 
-  const clearAttachments = useCallback(
-    () =>
-      usingProvider
-        ? controller?.attachments.clear()
-        : setItems((prev) => {
-            for (const file of prev) {
-              if (file.url) {
-                URL.revokeObjectURL(file.url);
-              }
-            }
-            return [];
-          }),
-    [usingProvider, controller],
+  const removeLocal = useCallback(
+    (id: string) =>
+      commitItems((prev) => {
+        const found = prev.find((file) => file.id === id);
+        if (found?.url) {
+          URL.revokeObjectURL(found.url);
+        }
+        return prev.filter((file) => file.id !== id);
+      }),
+    [commitItems],
   );
+
+  const addWithProviderValidation = useCallback(
+    async (fileList: File[] | FileList) => {
+      const selected = selectIncomingFiles(fileList, files.length);
+      if (!selected || selected.length === 0) {
+        return;
+      }
+      if (!prepareFiles) {
+        controller?.attachments.add(selected);
+        return;
+      }
+      try {
+        const prepared = await prepareFiles(selected);
+        controller?.attachments.add(prepared);
+      } catch {
+        onError?.({
+          code: "convert",
+          message: "Unable to convert this photo. Try JPEG or PNG.",
+        });
+      }
+    },
+    [controller, files.length, onError, prepareFiles, selectIncomingFiles],
+  );
+
+  const clearAttachments = useCallback(() => {
+    if (usingProvider) {
+      controller?.attachments.clear();
+      return;
+    }
+    commitItems((prev) => {
+      for (const file of prev) {
+        if (file.url) {
+          URL.revokeObjectURL(file.url);
+        }
+      }
+      return [];
+    });
+  }, [commitItems, controller, usingProvider]);
 
   const clearReferencedSources = useCallback(() => setReferencedSources([]), []);
 
@@ -656,11 +731,6 @@ export const PromptInput = ({
   const openFileDialog = usingProvider
     ? controller.attachments.openFileDialog
     : openFileDialogLocal;
-
-  const clear = useCallback(() => {
-    clearAttachments();
-    clearReferencedSources();
-  }, [clearAttachments, clearReferencedSources]);
 
   // Let provider know about our hidden file input so external menus can call openFileDialog()
   useEffect(() => {
@@ -791,6 +861,10 @@ export const PromptInput = ({
     async (event) => {
       event.preventDefault();
 
+      if (files.some((file) => file.status === "preparing")) {
+        return;
+      }
+
       const form = event.currentTarget;
       const text = usingProvider
         ? controller.textInput.value
@@ -798,20 +872,21 @@ export const PromptInput = ({
             const formData = new FormData(form);
             return (formData.get("message") as string) || "";
           })();
+      const snapshot = files;
 
-      // Reset form immediately after capturing text to avoid race condition
-      // where user input during async blob conversion would be lost
       if (!usingProvider) {
         form.reset();
+        commitItems(() => []);
+      } else {
+        controller.textInput.clear();
       }
+      clearReferencedSources();
 
       try {
-        // Convert blob URLs to data URLs asynchronously
         const convertedFiles: FileUIPart[] = await Promise.all(
-          files.map(async ({ id: _id, ...item }) => {
+          snapshot.map(async ({ id: _id, status: _status, ...item }) => {
             if (item.url?.startsWith("blob:")) {
               const dataUrl = await convertBlobUrlToDataUrl(item.url);
-              // If conversion failed, keep the original blob URL
               return {
                 ...item,
                 url: dataUrl ?? item.url,
@@ -821,31 +896,22 @@ export const PromptInput = ({
           }),
         );
 
-        const result = onSubmit({ files: convertedFiles, text }, event);
-
-        // Handle both sync and async onSubmit
-        if (result instanceof Promise) {
-          try {
-            await result;
-            clear();
-            if (usingProvider) {
-              controller.textInput.clear();
-            }
-          } catch {
-            // Don't clear on error - user may want to retry
-          }
+        if (usingProvider) {
+          controller.attachments.clear();
         } else {
-          // Sync function completed without throwing, clear inputs
-          clear();
-          if (usingProvider) {
-            controller.textInput.clear();
+          for (const file of snapshot) {
+            if (file.url?.startsWith("blob:")) {
+              URL.revokeObjectURL(file.url);
+            }
           }
         }
+
+        await onSubmit({ files: convertedFiles, text }, event);
       } catch {
-        // Don't clear on error - user may want to retry
+        return;
       }
     },
-    [usingProvider, controller, files, onSubmit, clear],
+    [clearReferencedSources, commitItems, controller, files, onSubmit, usingProvider],
   );
 
   // Render with or without local provider

@@ -1,25 +1,35 @@
-import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import {
+  clearAuthSessionCookies,
+  hasAuthSessionCookie,
+  readAuthJwt,
+} from "./lib/auth-cookies";
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  if (pathname === "/login" || pathname.startsWith("/api/auth")) {
-    return NextResponse.next();
+  const token = await readAuthJwt(request);
+  const staleCookie = hasAuthSessionCookie(request) && token === null;
+
+  if (pathname === "/login") {
+    if (!staleCookie) {
+      return NextResponse.next();
+    }
+    return clearAuthSessionCookies(NextResponse.next());
   }
 
-  const token = await getToken({
-    req: request,
-    secret: process.env.AUTH_SECRET,
-  });
-
   if (pathname === "/" || pathname.startsWith("/s") || pathname.startsWith("/settings")) {
-    if (!token) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/login";
-      url.searchParams.set("callbackUrl", pathname);
-      return NextResponse.redirect(url);
+    if (token) {
+      return NextResponse.next();
     }
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("callbackUrl", pathname);
+    const response = NextResponse.redirect(url);
+    if (staleCookie) {
+      return clearAuthSessionCookies(response);
+    }
+    return response;
   }
 
   return NextResponse.next();

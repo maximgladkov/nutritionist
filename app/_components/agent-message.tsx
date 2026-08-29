@@ -1,5 +1,6 @@
 "use client";
 
+import type { FileUIPart } from "ai";
 import type {
   EveAuthorizationPart,
   EveDynamicToolPart,
@@ -13,11 +14,11 @@ import {
   CheckCircleIcon,
   CheckIcon,
   ExternalLinkIcon,
-  FileIcon,
-  ImageIcon,
   KeyRoundIcon,
   XCircleIcon,
+  XIcon,
 } from "lucide-react";
+import { Attachment, AttachmentPreview, Attachments, getAttachmentLabel } from "@/components/ai-elements/attachments";
 import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
 import {
   Question,
@@ -39,6 +40,13 @@ import {
   ToolOutput,
 } from "@/components/ai-elements/tool";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 export type AgentInputResponse = {
@@ -47,35 +55,67 @@ export type AgentInputResponse = {
   readonly text?: string;
 };
 
-type EveFilePart = Extract<EveMessagePart, { type: "file" }>;
-
 export function AgentMessage({
   canRespond,
+  extraFiles,
   isStreaming,
   message,
   onInputResponses,
 }: {
   readonly canRespond: boolean;
+  readonly extraFiles?: readonly FileUIPart[];
   readonly isStreaming: boolean;
   readonly message: EveMessage;
   readonly onInputResponses: (responses: readonly AgentInputResponse[]) => void | Promise<void>;
 }) {
-  const lastTextIndex = message.parts.reduce(
-    (last, part, index) => (part.type === "text" ? index : last),
-    -1,
-  );
+  const isOptimistic = message.metadata?.optimistic === true;
+  const attachments = messageAttachments(message, isOptimistic ? extraFiles : undefined);
+  const lastTextIndex = message.parts.reduce((last, part, index) => {
+    if (part.type !== "text") {
+      return last;
+    }
+    const text = visibleText(part.text, isOptimistic ? extraFiles : undefined);
+    return text === undefined ? last : index;
+  }, -1);
   const hasAssistantText =
     message.role === "assistant" &&
     message.parts.some((part) => part.type === "text" && part.text.length > 0);
+  const contentParts: { index: number; part: EveMessagePart }[] = [];
+  for (const [index, part] of message.parts.entries()) {
+    if (part.type === "file" || part.type === "step-start") {
+      continue;
+    }
+    if (hasAssistantText && part.type === "reasoning") {
+      continue;
+    }
+    if (part.type === "text") {
+      const text = visibleText(part.text, isOptimistic ? extraFiles : undefined);
+      if (text === undefined) {
+        continue;
+      }
+      contentParts.push({ index, part: { ...part, text } });
+      continue;
+    }
+    contentParts.push({ index, part });
+  }
 
   return (
     <Message
-      data-optimistic={message.metadata?.optimistic ? "true" : undefined}
+      data-optimistic={isOptimistic ? "true" : undefined}
       from={message.role}
     >
-      <MessageContent>
-        {message.parts.map((part, index) =>
-          hasAssistantText && part.type === "reasoning" ? null : (
+      {attachments.length > 0 ? (
+        <MessageAttachments
+          attachments={attachments}
+          className={cn(
+            "group-data-[optimistic=true]:opacity-70",
+            message.role === "user" ? "justify-end" : "ml-0",
+          )}
+        />
+      ) : null}
+      {contentParts.length > 0 ? (
+        <MessageContent>
+          {contentParts.map(({ index, part }) => (
             <AgentMessagePart
               canRespond={canRespond}
               key={partKey(part, index)}
@@ -83,10 +123,80 @@ export function AgentMessage({
               part={part}
               showCaret={isStreaming && message.role === "assistant" && index === lastTextIndex}
             />
-          ),
-        )}
-      </MessageContent>
+          ))}
+        </MessageContent>
+      ) : null}
     </Message>
+  );
+}
+
+function MessageAttachments({
+  attachments,
+  className,
+}: {
+  readonly attachments: readonly (FileUIPart & { id: string })[];
+  readonly className?: string;
+}) {
+  const [preview, setPreview] = useState<(FileUIPart & { id: string }) | undefined>();
+  const previewLabel = preview === undefined ? "Attachment" : getAttachmentLabel(preview);
+
+  return (
+    <>
+      <Attachments className={className} variant="grid">
+        {attachments.map((file) => (
+          <Attachment
+            aria-label={`Preview ${getAttachmentLabel(file)}`}
+            className="cursor-zoom-in outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            data={file}
+            key={file.id}
+            onClick={() => {
+              if (file.url) {
+                setPreview(file);
+              }
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                if (file.url) {
+                  setPreview(file);
+                }
+              }
+            }}
+            role="button"
+            tabIndex={0}
+          >
+            <AttachmentPreview />
+          </Attachment>
+        ))}
+      </Attachments>
+      <Dialog
+        onOpenChange={(open) => {
+          if (!open) {
+            setPreview(undefined);
+          }
+        }}
+        open={preview !== undefined}
+      >
+        <DialogContent
+          className="max-h-[90vh] w-auto max-w-[min(96vw,72rem)] border-none bg-transparent p-0 shadow-none sm:max-w-[min(96vw,72rem)]"
+          showCloseButton={false}
+        >
+          <DialogTitle className="sr-only">{previewLabel}</DialogTitle>
+          <DialogDescription className="sr-only">Full size attachment preview</DialogDescription>
+          <DialogClose className="absolute top-2 right-2 z-10 flex size-8 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm">
+            <XIcon className="size-4" />
+            <span className="sr-only">Close</span>
+          </DialogClose>
+          {preview?.url ? (
+            <img
+              alt={previewLabel}
+              className="max-h-[85vh] w-auto max-w-full rounded-lg object-contain"
+              src={preview.url}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -118,7 +228,7 @@ function AgentMessagePart({
         </Reasoning>
       );
     case "file":
-      return <AttachmentPart part={part} />;
+      return null;
     case "authorization":
       return <AuthorizationPrompt part={part} />;
     case "dynamic-tool": {
@@ -263,37 +373,6 @@ function QuestionRequest({
   );
 }
 
-function AttachmentPart({ part }: { readonly part: EveFilePart }) {
-  const label = part.filename ?? "Attachment";
-  const detail = [part.mediaType, formatBytes(part.size)].filter(Boolean).join(" - ");
-  const isImage = part.mediaType.startsWith("image/") && part.url !== undefined;
-  const Icon = isImage ? ImageIcon : FileIcon;
-  const body = (
-    <span className="flex max-w-sm items-center gap-3 rounded-md border bg-background/60 p-2 text-sm">
-      {isImage ? (
-        <img alt={label} className="size-12 shrink-0 rounded-sm object-cover" src={part.url} />
-      ) : (
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-sm bg-muted text-muted-foreground">
-          <Icon className="size-4" />
-        </span>
-      )}
-      <span className="min-w-0 flex-1">
-        <span className="block truncate font-medium">{label}</span>
-        {detail ? <span className="block truncate text-muted-foreground">{detail}</span> : null}
-      </span>
-      {part.url ? <ExternalLinkIcon className="size-4 shrink-0 text-muted-foreground" /> : null}
-    </span>
-  );
-
-  return part.url ? (
-    <a href={part.url} rel="noreferrer" target="_blank">
-      {body}
-    </a>
-  ) : (
-    body
-  );
-}
-
 function AuthorizationPrompt({ part }: { readonly part: EveAuthorizationPart }) {
   const isAuthorized = part.state === "completed" && part.outcome === "authorized";
   const isCompleted = part.state === "completed";
@@ -387,19 +466,6 @@ function formatAuthorizationOutcome(outcome: NonNullable<EveAuthorizationPart["o
   }
 }
 
-function formatBytes(size: number | undefined): string | undefined {
-  if (size === undefined) {
-    return undefined;
-  }
-  if (size < 1024) {
-    return `${size} B`;
-  }
-  if (size < 1024 * 1024) {
-    return `${(size / 1024).toFixed(1)} KB`;
-  }
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 function InputRequestActions({
   canRespond,
   onInputResponses,
@@ -462,4 +528,57 @@ function partKey(part: EveMessagePart, index: number): string {
     default:
       return `${part.type}:${index}`;
   }
+}
+
+function messageAttachments(
+  message: EveMessage,
+  extraFiles: readonly FileUIPart[] | undefined,
+): readonly (FileUIPart & { id: string })[] {
+  const fromParts = message.parts.flatMap((part, index) => {
+    if (part.type !== "file") {
+      return [];
+    }
+    return [
+      {
+        filename: part.filename,
+        id: `file:${index}:${part.filename ?? part.mediaType}`,
+        mediaType: part.mediaType,
+        type: "file" as const,
+        url: part.url ?? "",
+      },
+    ];
+  });
+  if (fromParts.length > 0) {
+    return fromParts;
+  }
+  return (extraFiles ?? []).map((file, index) => ({
+    ...file,
+    id: `optimistic:${index}:${file.filename ?? file.mediaType}`,
+  }));
+}
+
+function visibleText(
+  text: string,
+  extraFiles: readonly FileUIPart[] | undefined,
+): string | undefined {
+  const stripped = extraFiles === undefined ? text : stripFilePlaceholders(text, extraFiles);
+  const trimmed = stripped.trim();
+  return trimmed.length === 0 ? undefined : stripped;
+}
+
+function stripFilePlaceholders(text: string, files: readonly FileUIPart[]): string {
+  const names = new Set(
+    files.flatMap((file) => (file.filename === undefined ? [] : [file.filename])),
+  );
+  return text
+    .split("\n")
+    .filter((line) => {
+      const match = /^\[file(?:: (.*))?\]$/.exec(line);
+      if (match === null) {
+        return true;
+      }
+      const filename = match[1];
+      return filename !== undefined && !names.has(filename);
+    })
+    .join("\n");
 }

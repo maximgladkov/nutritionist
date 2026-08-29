@@ -11,7 +11,12 @@ import { eveSessionIdFromPath, getUserFromRequest } from "../../lib/session";
 
 function appSession(): AuthFn<Request> {
   return async (request) => {
-    const user = await getUserFromRequest(request);
+    let user;
+    try {
+      user = await getUserFromRequest(request);
+    } catch {
+      return null;
+    }
     if (!user) {
       return null;
     }

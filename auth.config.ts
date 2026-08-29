@@ -1,7 +1,11 @@
 import type { NextAuthConfig } from "next-auth";
+import { authJsCookies } from "./lib/auth-cookies";
 
 export const authConfig = {
+  cookies: authJsCookies(),
   providers: [],
+  secret: process.env.AUTH_SECRET,
+  trustHost: true,
   session: {
     strategy: "jwt",
   },

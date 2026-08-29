@@ -1,6 +1,8 @@
-import { auth, signIn } from "@/auth";
+import { signIn } from "@/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { readAuthJwt } from "@/lib/auth-cookies";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 export default async function LoginPage({
@@ -8,8 +10,8 @@ export default async function LoginPage({
 }: {
   readonly searchParams: Promise<{ readonly callbackUrl?: string; readonly error?: string }>;
 }) {
-  const session = await auth();
-  if (session?.user) {
+  const token = await readAuthJwt({ headers: await headers() });
+  if (token?.sub) {
     redirect("/s");
   }
   const params = await searchParams;

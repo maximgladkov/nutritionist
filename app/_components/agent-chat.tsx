@@ -1,10 +1,18 @@
 "use client";
 
-import type { UserContent } from "ai";
+import type { FileUIPart, UserContent } from "ai";
 import { useEveAgent } from "eve/react";
-import { AlertCircleIcon, BrainIcon, PlusIcon, SettingsIcon, SquareIcon } from "lucide-react";
+import {
+  AlertCircleIcon,
+  BrainIcon,
+  PaperclipIcon,
+  PlusIcon,
+  SettingsIcon,
+  SquareIcon,
+  XIcon,
+} from "lucide-react";
 import { signOutAction } from "@/app/actions/auth";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Conversation,
   ConversationContent,
@@ -15,17 +23,26 @@ import { Message, MessageContent } from "@/components/ai-elements/message";
 import {
   PromptInput,
   PromptInputButton,
+  PromptInputFooter,
+  PromptInputHeader,
   type PromptInputMessage,
   PromptInputSubmit,
   PromptInputTextarea,
+  PromptInputTools,
   usePromptInputAttachments,
 } from "@/components/ai-elements/prompt-input";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import { prepareImageFiles } from "@/lib/heic";
 import { cn } from "@/lib/utils";
 import { AgentMessage } from "./agent-message";
 
 const AGENT_NAME = "Nutritionist";
+const IMAGE_ACCEPT =
+  "image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif,.heic,.heif";
+const MAX_ATTACHMENT_FILES = 5;
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
 export function AgentChat({
   sessionId,
@@ -36,6 +53,7 @@ export function AgentChat({
 }) {
   const [cancellationError, setCancellationError] = useState<string>();
   const [hasInputText, setHasInputText] = useState(false);
+  const [optimisticFiles, setOptimisticFiles] = useState<readonly FileUIPart[]>([]);
   const agent = useEveAgent({
     initialSession:
       sessionId === undefined
@@ -74,6 +92,12 @@ export function AgentChat({
   const showConversationLayout = isResuming || hasConversationContent;
   const activeSessionId = sessionId ?? agent.session?.sessionId;
 
+  useEffect(() => {
+    if (!agent.data.messages.some((message) => message.metadata?.optimistic)) {
+      setOptimisticFiles([]);
+    }
+  }, [agent.data.messages]);
+
   const requestCancellation = () => {
     setCancellationError(undefined);
     void agent.cancel().catch((error: unknown) => {
@@ -87,6 +111,7 @@ export function AgentChat({
 
     setHasInputText(false);
     setCancellationError(undefined);
+    setOptimisticFiles(message.files);
     const options = isBusy ? { turnPolicy: "steer" as const } : undefined;
 
     if (message.files.length === 0) {
@@ -111,18 +136,33 @@ export function AgentChat({
   };
 
   const composer = (
-    <PromptInput onSubmit={handleSubmit}>
+    <PromptInput
+      accept={IMAGE_ACCEPT}
+      maxFiles={MAX_ATTACHMENT_FILES}
+      maxFileSize={MAX_ATTACHMENT_BYTES}
+      multiple
+      onError={(error) => setCancellationError(error.message)}
+      onSubmit={handleSubmit}
+      prepareFiles={prepareImageFiles}
+    >
+      <ComposerHeader />
       <PromptInputTextarea
+        className="min-h-12"
         disabled={isResuming}
         onChange={(event) => setHasInputText(event.currentTarget.value.trim().length > 0)}
-        placeholder="Send a message…"
+        placeholder="Ask about a meal or attach a photo…"
       />
-      <ComposerAction
-        hasInputText={hasInputText}
-        isBusy={isBusy}
-        isResuming={isResuming}
-        onCancel={requestCancellation}
-      />
+      <PromptInputFooter>
+        <PromptInputTools>
+          <ComposerAttachButton disabled={isResuming} />
+        </PromptInputTools>
+        <ComposerAction
+          hasInputText={hasInputText}
+          isBusy={isBusy}
+          isResuming={isResuming}
+          onCancel={requestCancellation}
+        />
+      </PromptInputFooter>
     </PromptInput>
   );
 
@@ -142,13 +182,18 @@ export function AgentChat({
           }
         >
           <ConversationTopFade className="top-14" />
-          <ConversationContent className="mx-auto w-full max-w-3xl gap-6 px-4 pt-20 pb-36 sm:px-6">
+          <ConversationContent className="mx-auto w-full max-w-3xl gap-6 px-4 pt-20 pb-44 sm:px-6">
             {agent.data.messages.map((message, index) =>
               showPendingThinking &&
               isPendingAssistantShell &&
               message.id === lastMessage.id ? null : (
                 <AgentMessage
                   canRespond={!isBusy && !isResuming}
+                  extraFiles={
+                    message.metadata?.optimistic && optimisticFiles.length > 0
+                      ? optimisticFiles
+                      : undefined
+                  }
                   isStreaming={
                     agent.status === "streaming" && index === agent.data.messages.length - 1
                   }
@@ -200,21 +245,101 @@ function ComposerAction({
 }) {
   const attachments = usePromptInputAttachments();
   const canSubmit = hasInputText || attachments.files.length > 0;
+  const isPreparing = attachments.files.some((file) => file.status === "preparing");
 
   if (!isBusy || canSubmit) {
-    return <PromptInputSubmit disabled={isResuming} />;
+    return <PromptInputSubmit className="static" disabled={isResuming || isPreparing} />;
   }
 
   return (
     <PromptInputButton
       aria-label="Stop"
-      className="absolute right-2.5 bottom-2.5"
+      className="static"
       onClick={onCancel}
       variant="outline"
     >
       <SquareIcon className="size-3 fill-current" />
     </PromptInputButton>
   );
+}
+
+function ComposerAttachButton({ disabled }: { readonly disabled: boolean }) {
+  const attachments = usePromptInputAttachments();
+
+  return (
+    <PromptInputButton
+      aria-label="Add photo"
+      disabled={disabled}
+      onClick={() => attachments.openFileDialog()}
+      tooltip="Add photo"
+    >
+      <PaperclipIcon className="size-4" />
+    </PromptInputButton>
+  );
+}
+
+function ComposerHeader() {
+  const attachments = usePromptInputAttachments();
+  if (attachments.files.length === 0) {
+    return null;
+  }
+
+  return (
+    <PromptInputHeader>
+      <ComposerAttachments />
+    </PromptInputHeader>
+  );
+}
+
+function ComposerAttachments() {
+  const attachments = usePromptInputAttachments();
+  if (attachments.files.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {attachments.files.map((file) => {
+        const isPreparing = file.status === "preparing";
+        return (
+          <span
+            aria-busy={isPreparing}
+            className="relative size-14 overflow-hidden rounded-md border bg-muted"
+            key={file.id}
+          >
+            {canPreviewAttachment(file.mediaType) ? (
+              <img
+                alt={file.filename ?? "Attachment"}
+                className="size-full object-cover"
+                src={file.url}
+              />
+            ) : null}
+            {isPreparing ? (
+              <span className="absolute inset-0 flex items-center justify-center bg-background/60">
+                <Spinner className="size-4" />
+              </span>
+            ) : null}
+            <button
+              aria-label={`Remove ${file.filename ?? "attachment"}`}
+              className="absolute top-0.5 right-0.5 z-10 flex size-5 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm"
+              onClick={() => attachments.remove(file.id)}
+              type="button"
+            >
+              <XIcon className="size-3" />
+            </button>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function canPreviewAttachment(mediaType: string | undefined): boolean {
+  if (!mediaType) {
+    return false;
+  }
+  const type = mediaType.toLowerCase();
+  return type.startsWith("image/") && !type.includes("heic") && !type.includes("heif");
 }
 
 function ErrorMessage({ message }: { readonly message: string }) {

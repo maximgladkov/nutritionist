@@ -1,4 +1,5 @@
-import { decode, getToken } from "next-auth/jwt";
+import { decode } from "next-auth/jwt";
+import { AUTH_SESSION_COOKIE_NAMES, readAuthJwt } from "./auth-cookies";
 import { prisma } from "./prisma";
 import type { UserRecord } from "./identity-core";
 
@@ -20,32 +21,33 @@ function readCookie(request: Request, name: string): string | undefined {
   return undefined;
 }
 
-function sessionCookieNames(): string[] {
-  return ["__Secure-authjs.session-token", "authjs.session-token"];
-}
-
-export async function getUserFromRequest(request: Request): Promise<UserRecord | null> {
+async function resolveUserFromRequest(request: Request): Promise<UserRecord | null> {
   const secret = process.env.AUTH_SECRET;
   if (!secret) {
     return null;
   }
 
-  const jwt = await getToken({ req: request, secret });
+  const jwt = await readAuthJwt(request);
   if (typeof jwt?.sub === "string" && jwt.sub.length > 0) {
     const user = await prisma.user.findUnique({ where: { id: jwt.sub } });
     return user ? { id: user.id, email: user.email, name: user.name } : null;
   }
 
-  for (const cookieName of sessionCookieNames()) {
+  for (const cookieName of AUTH_SESSION_COOKIE_NAMES) {
     const raw = readCookie(request, cookieName);
     if (!raw) {
       continue;
     }
-    const decoded = await decode<{ sessionToken?: string; sub?: string }>({
-      token: raw,
-      secret,
-      salt: cookieName,
-    });
+    let decoded: { sessionToken?: string; sub?: string } | null = null;
+    try {
+      decoded = await decode<{ sessionToken?: string; sub?: string }>({
+        secret,
+        salt: cookieName,
+        token: raw,
+      });
+    } catch {
+      continue;
+    }
     const sessionToken =
       (typeof decoded?.sessionToken === "string" && decoded.sessionToken) ||
       (decoded == null ? raw : undefined);
@@ -72,6 +74,14 @@ export async function getUserFromRequest(request: Request): Promise<UserRecord |
   }
 
   return null;
+}
+
+export async function getUserFromRequest(request: Request): Promise<UserRecord | null> {
+  try {
+    return await resolveUserFromRequest(request);
+  } catch {
+    return null;
+  }
 }
 
 export function eveSessionIdFromPath(pathname: string): string | undefined {
