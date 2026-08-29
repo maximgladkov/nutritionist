@@ -7,6 +7,7 @@ import {
   parseTelegramAckHistory,
   telegramAckConversationIsRussian,
   telegramAckFallback,
+  telegramAckIntent,
   telegramAckMessages,
   telegramAckSystem,
   telegramAckUserContent,
@@ -58,6 +59,19 @@ describe("telegramAckConversationIsRussian", () => {
   });
 });
 
+describe("telegramAckIntent", () => {
+  it("treats a calorie question as a check", () => {
+    assert.equal(
+      telegramAckIntent({ caption: "", hasFiles: false, text: "А что по калориям?" }),
+      "check",
+    );
+  });
+
+  it("treats a photo as a photo look", () => {
+    assert.equal(telegramAckIntent({ hasFiles: true, text: "" }), "photo");
+  });
+});
+
 describe("telegramAckMessages", () => {
   it("puts recent conversation turns before the current user prompt", () => {
     const input = {
@@ -97,10 +111,17 @@ describe("clipTelegramAckHistory", () => {
 });
 
 describe("telegramAckFallback", () => {
-  it("uses English when conversation text is not Russian", () => {
+  it("uses a short English check for a calorie question", () => {
     assert.equal(
-      telegramAckFallback({ hasFiles: false }),
-      "Got it — looking into this now and I'll get back to you.",
+      telegramAckFallback({ hasFiles: false, text: "What about calories?" }),
+      "Checking…",
+    );
+  });
+
+  it("uses a short Russian check for a calorie question", () => {
+    assert.equal(
+      telegramAckFallback({ hasFiles: false, text: "А что по калориям?" }),
+      "Смотрю…",
     );
   });
 
@@ -110,18 +131,18 @@ describe("telegramAckFallback", () => {
         hasFiles: true,
         history: [{ role: "user", text: "Запиши йогурт" }],
       }),
-      "Получила фото, сейчас разберусь и вернусь с результатом.",
+      "Смотрю фото…",
     );
   });
 
-  it("follows Russian conversation history", () => {
+  it("follows Russian conversation history for a generic follow-up", () => {
     assert.equal(
       telegramAckFallback({
         hasFiles: false,
         history: [{ role: "assistant", text: "Записала. 140 ккал." }],
         text: "ok",
       }),
-      "Поняла, сейчас разберусь и вернусь с результатом.",
+      "Секунду…",
     );
   });
 });

@@ -8,7 +8,7 @@ export const TELEGRAM_ACK_TURN_CONTEXT =
   "A short acknowledgement was already sent to the user. Do not narrate what you are about to do. Call tools if needed, then send only the actual result.";
 
 export const TELEGRAM_ACK_SYSTEM =
-  "You are a nutritionist assistant sending one Telegram acknowledgement. Reply with one friendly complete sentence. Sound like the same person as the recent assistant replies: match their language, warmth, and wording. Match the language of the recent conversation and of the latest user message. Briefly acknowledge what they sent, say you are looking into it now, and that you will get back with the result. Do not use markdown. Do not ask a question. Do not claim a meal was logged or looked up yet. If the user attached a file, mention that you received it.";
+  "You are a nutritionist assistant sending one Telegram acknowledgement. Reply with a very short status that matches what they just asked, as if you already started: for a calorie or totals question say you are checking, for a meal to log say you are logging it, for a photo say you are looking at it. A few words is enough. Match the language, warmth, and wording of the recent conversation and of the latest user message. Do not use markdown. Do not ask a question. Do not say you will get back later. Do not claim the work is done.";
 
 const CYRILLIC = /[\u0400-\u04FF]/u;
 
@@ -41,6 +41,24 @@ export function telegramAckConversationIsRussian(input: TelegramAckLanguageInput
     telegramAckVisibleUserText(input),
   ];
   return samples.some((text) => CYRILLIC.test(text));
+}
+
+export function telegramAckIntent(input: TelegramAckLanguageInput) {
+  if (input.hasFiles) {
+    return "photo";
+  }
+  const text = telegramAckVisibleUserText(input).toLowerCase();
+  if (
+    /калори|ккал|kcal|calorie|macro|protein|белк|summary|итог|сколько съел|сколько остал/u.test(
+      text,
+    )
+  ) {
+    return "check";
+  }
+  if (/запиш|залог|съел|съела|\bate\b|\bhad\b|\blog\b/u.test(text)) {
+    return "log";
+  }
+  return "generic";
 }
 
 export function telegramAckSystem(input: TelegramAckInput) {
@@ -104,14 +122,16 @@ export function telegramAckMessages(input: TelegramAckInput) {
 
 export function telegramAckFallback(input: TelegramAckLanguageInput) {
   const isRu = telegramAckConversationIsRussian(input);
-  if (input.hasFiles) {
-    return isRu
-      ? "Получила фото, сейчас разберусь и вернусь с результатом."
-      : "Got the photo — looking into it now and I'll get back to you.";
+  switch (telegramAckIntent(input)) {
+    case "check":
+      return isRu ? "Смотрю…" : "Checking…";
+    case "photo":
+      return isRu ? "Смотрю фото…" : "Looking at the photo…";
+    case "log":
+      return isRu ? "Записываю…" : "Logging…";
+    case "generic":
+      return isRu ? "Секунду…" : "On it…";
   }
-  return isRu
-    ? "Поняла, сейчас разберусь и вернусь с результатом."
-    : "Got it — looking into this now and I'll get back to you.";
 }
 
 export async function generateTelegramAckText(input: TelegramAckInput) {
