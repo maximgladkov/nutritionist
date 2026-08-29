@@ -2,7 +2,7 @@ import { createTelegramFetchFile, telegramChannel } from "eve/channels/telegram"
 import type { TelegramContext, TelegramMessage } from "eve/channels/telegram";
 import { handleChannelLink, resolveChannelUser, saveChannelThreadId } from "../lib/channel-identity";
 import { telegramSummaryMiniAppUrl } from "../../lib/app-url";
-import { TELEGRAM_ACK_TURN_CONTEXT, postTelegramAck, telegramAckVisibleUserText } from "../../lib/telegram-ack";
+import { TELEGRAM_ACK_TURN_CONTEXT, postTelegramAck, telegramAckFiles, telegramAckVisibleUserText } from "../../lib/telegram-ack";
 import { appendTelegramAckHistory, loadTelegramAckHistory } from "../../lib/telegram-ack-history";
 import { applyTelegramHiddenMedia, telegramMessageHasInboundContent } from "../../lib/telegram-media";
 import { claimTelegramMessage } from "../../lib/telegram-message-claim";
@@ -75,7 +75,7 @@ export default attachTelegramVision(
       const ackPosted = loadTelegramAckHistory(historyKey).then((history) =>
         postTelegramAck(ctx.telegram, {
           caption: message.caption,
-          hasFiles: message.attachments.length > 0,
+          files: telegramAckFiles(message.attachments),
           history,
           text: message.text,
         }),

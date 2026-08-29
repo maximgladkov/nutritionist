@@ -7,6 +7,8 @@ import {
   coalesceTelegramAckTurns,
   parseTelegramAckHistory,
   telegramAckErrorMessage,
+  telegramAckFileSummary,
+  telegramAckFiles,
   telegramAckMessages,
   telegramAckSystem,
   telegramAckUserContent,
@@ -15,22 +17,81 @@ import {
 describe("telegramAckUserContent", () => {
   it("uses the latest user text as the model turn", () => {
     assert.equal(
-      telegramAckUserContent({ caption: "ignored caption", hasFiles: false, text: "Logged yogurt?" }),
+      telegramAckUserContent({ caption: "ignored caption", text: "Logged yogurt?" }),
       "Logged yogurt?",
     );
   });
 
   it("falls back to caption when text is empty", () => {
     assert.equal(
-      telegramAckUserContent({ caption: "Lunch photo", hasFiles: true, text: "  " }),
+      telegramAckUserContent({
+        caption: "Lunch photo",
+        files: [{ format: "jpeg", kind: "photo" }],
+        text: "  ",
+      }),
       "Lunch photo",
     );
   });
 
-  it("marks a photo-only message as having files and no text", () => {
+  it("names a photo-only message when there is no text", () => {
     assert.equal(
-      telegramAckUserContent({ caption: "", hasFiles: true, text: "" }),
-      "(attached file)",
+      telegramAckUserContent({ caption: "", files: [{ format: "jpeg", kind: "photo" }], text: "" }),
+      "(photo)",
+    );
+  });
+
+  it("names each kind when several files have no text", () => {
+    assert.equal(
+      telegramAckUserContent({
+        caption: "",
+        files: [
+          { format: "jpeg", kind: "photo" },
+          { format: "ogg", kind: "voice" },
+        ],
+        text: "",
+      }),
+      "(photo, voice note)",
+    );
+  });
+});
+
+describe("telegramAckFiles", () => {
+  it("classifies photo, voice, audio, and video attachments", () => {
+    assert.deepEqual(
+      telegramAckFiles([
+        { fileName: "photo.jpg", kind: "photo", mediaType: "image/jpeg" },
+        { fileName: "voice.ogg", kind: "document", mediaType: "audio/ogg" },
+        { fileName: "meal.mp3", kind: "document", mediaType: "audio/mpeg" },
+        { fileName: "plate.mp4", kind: "document", mediaType: "video/mp4" },
+        { fileName: "label.pdf", kind: "document", mediaType: "application/pdf" },
+      ]),
+      [
+        { format: "jpeg", kind: "photo" },
+        { format: "ogg", kind: "voice" },
+        { format: "mp3", kind: "audio" },
+        { format: "mp4", kind: "video" },
+        { format: "pdf", kind: "file" },
+      ],
+    );
+  });
+});
+
+describe("telegramAckFileSummary", () => {
+  it("describes a single file kind and format", () => {
+    assert.equal(
+      telegramAckFileSummary([{ format: "ogg", kind: "voice" }]),
+      "The latest user message includes a voice note (ogg).",
+    );
+  });
+
+  it("lists each format when there are multiple attachments", () => {
+    assert.equal(
+      telegramAckFileSummary([
+        { format: "jpeg", kind: "photo" },
+        { format: "ogg", kind: "voice" },
+        { format: "mp4", kind: "video" },
+      ]),
+      "The latest user message includes 3 attachments: photo (jpeg), voice note (ogg), video (mp4).",
     );
   });
 });
@@ -39,7 +100,7 @@ describe("telegramAckMessages", () => {
   it("puts recent conversation turns before the current user prompt", () => {
     const input = {
       caption: "",
-      hasFiles: false,
+      files: [] as const,
       history: [
         { role: "user" as const, text: "Запиши йогурт" },
         { role: "assistant" as const, text: "Записала. 140 ккал." },
@@ -52,6 +113,7 @@ describe("telegramAckMessages", () => {
       { role: "user", content: "И кофе" },
     ]);
     assert.match(telegramAckSystem(input), /same language as the recent conversation/);
+    assert.match(telegramAckSystem({ caption: "", files: [{ format: "jpeg", kind: "photo" }], text: "" }), /photo \(jpeg\)/);
     assert.match(TELEGRAM_ACK_SYSTEM, /Do not repeat an acknowledgement/);
     assert.match(TELEGRAM_ACK_SYSTEM, /Checking calories/);
     assert.match(TELEGRAM_ACK_SYSTEM, /Listening/);

@@ -1,4 +1,6 @@
 import { generateText } from "ai";
+import { isImageMediaType, looksLikeImageFilename } from "./image-bytes.ts";
+import { isAudioMediaType, isVideoMediaType, looksLikeAudioFilename, looksLikeVideoFilename } from "./telegram-vision.ts";
 
 export const TELEGRAM_ACK_MODEL = "google/gemini-3.5-flash-lite";
 export const TELEGRAM_ACK_TIMEOUT_MS = 4000;
@@ -8,16 +10,29 @@ export const TELEGRAM_ACK_TURN_CONTEXT =
   "A short acknowledgement was already sent to the user. Do not narrate what you are about to do. Call tools if needed, then send only the actual result.";
 
 export const TELEGRAM_ACK_SYSTEM =
-  "You are a nutritionist assistant sending one Telegram acknowledgement. Reply with a very short, natural chat status that matches what they just asked, as if you already started. A few words is enough. Sound like a person, not a canned bot status. Vary the wording every time. Do not repeat an acknowledgement you already used in this conversation. Examples of the kind of reply, not lines to copy: calories or totals — Checking calories… / Смотрю калории… / Гляну, сколько вышло…; logging a meal — Logging that… / Записываю… / Сейчас внесу…; a photo — Looking at the photo… / Смотрю фото…; a voice note — Listening… / Слушаю…; a video — Watching the video… / Смотрю видео…; other — One sec… / Hang on… / Сейчас гляну…. Match the language of the recent conversation and the latest user message. Do not use markdown. Do not ask a question. Do not say you will get back later. Do not claim the work is done.";
+  "You are a nutritionist assistant sending one Telegram acknowledgement. Reply with a very short, natural chat status that matches what they just asked, as if you already started. A few words is enough. Sound like a person, not a canned bot status. Vary the wording every time. Do not repeat an acknowledgement you already used in this conversation. Examples of the kind of reply, not lines to copy: calories or totals — Checking calories… / Смотрю калории… / Гляну, сколько вышло…; logging a meal — Logging that… / Записываю… / Сейчас внесу…; a photo — Looking at the photo… / Смотрю фото…; a voice note — Listening… / Слушаю…; a video — Watching the video… / Смотрю видео…; other — One sec… / Hang on… / Сейчас гляну…. Match look / listen / watch to the attachments listed for this turn. If there are several attachments, you can name the mix in a few words. Match the language of the recent conversation and the latest user message. Do not use markdown. Do not ask a question. Do not say you will get back later. Do not claim the work is done.";
 
 export type TelegramAckHistoryMessage = {
   role: "assistant" | "user";
   text: string;
 };
 
+export type TelegramAckFileKind = "audio" | "file" | "photo" | "video" | "voice";
+
+export type TelegramAckFile = {
+  format: string;
+  kind: TelegramAckFileKind;
+};
+
+type TelegramAckAttachment = {
+  fileName?: string;
+  kind?: string;
+  mediaType?: string;
+};
+
 type TelegramAckInput = {
   caption: string;
-  hasFiles: boolean;
+  files?: readonly TelegramAckFile[];
   history?: readonly TelegramAckHistoryMessage[];
   text: string;
 };
@@ -26,14 +41,31 @@ type TelegramAckSender = {
   sendMessage: (message: string) => Promise<unknown>;
 };
 
+export function telegramAckFiles(attachments: readonly TelegramAckAttachment[]): TelegramAckFile[] {
+  return attachments.map(classifyTelegramAckFile);
+}
+
+export function telegramAckFileSummary(files: readonly TelegramAckFile[]) {
+  if (files.length === 0) {
+    return null;
+  }
+  const items = files.map((file) => `${telegramAckFileKindLabel(file.kind)} (${file.format})`);
+  if (files.length === 1) {
+    return `The latest user message includes a ${items[0]}.`;
+  }
+  return `The latest user message includes ${String(files.length)} attachments: ${items.join(", ")}.`;
+}
+
 export function telegramAckVisibleUserText(input: { caption?: string; text?: string }) {
   return (input.text ?? "").trim() || (input.caption ?? "").trim();
 }
 
 export function telegramAckSystem(input: TelegramAckInput) {
+  const files = input.files ?? [];
   const parts = [TELEGRAM_ACK_SYSTEM];
-  if (input.hasFiles) {
-    parts.push("The latest user message includes an attached file.");
+  const summary = telegramAckFileSummary(files);
+  if (summary !== null) {
+    parts.push(summary);
   }
   if ((input.history ?? []).length > 0 || telegramAckVisibleUserText(input).length > 0) {
     parts.push("Reply in the same language as the recent conversation and the latest user message.");
@@ -46,7 +78,11 @@ export function telegramAckUserContent(input: TelegramAckInput) {
   if (message.length > 0) {
     return message;
   }
-  return input.hasFiles ? "(attached file)" : "(none)";
+  const files = input.files ?? [];
+  if (files.length === 0) {
+    return "(none)";
+  }
+  return `(${files.map((file) => telegramAckFileKindLabel(file.kind)).join(", ")})`;
 }
 
 export function clipTelegramAckHistory(messages: readonly TelegramAckHistoryMessage[]) {
@@ -146,4 +182,50 @@ export async function postTelegramAck(telegram: TelegramAckSender, input: Telegr
     }
     return false;
   }
+}
+
+function classifyTelegramAckFile(attachment: TelegramAckAttachment): TelegramAckFile {
+  const mediaType = attachment.mediaType?.split(";")[0]?.trim().toLowerCase();
+  const fileName = attachment.fileName;
+  if (attachment.kind === "photo" || isImageMediaType(mediaType) || looksLikeImageFilename(fileName)) {
+    return { format: telegramAckFileFormat(mediaType, fileName, "jpeg"), kind: "photo" };
+  }
+  if (isAudioMediaType(mediaType) || looksLikeAudioFilename(fileName)) {
+    return {
+      format: telegramAckFileFormat(mediaType, fileName, "ogg"),
+      kind: fileName === "voice.ogg" ? "voice" : "audio",
+    };
+  }
+  if (isVideoMediaType(mediaType) || looksLikeVideoFilename(fileName)) {
+    return { format: telegramAckFileFormat(mediaType, fileName, "mp4"), kind: "video" };
+  }
+  return { format: telegramAckFileFormat(mediaType, fileName, "file"), kind: "file" };
+}
+
+function telegramAckFileKindLabel(kind: TelegramAckFileKind) {
+  if (kind === "voice") {
+    return "voice note";
+  }
+  if (kind === "audio") {
+    return "audio file";
+  }
+  return kind;
+}
+
+function telegramAckFileFormat(mediaType: string | undefined, fileName: string | undefined, fallback: string) {
+  const subtype = mediaType?.includes("/") === true ? mediaType.slice(mediaType.indexOf("/") + 1) : "";
+  if (subtype.length > 0 && subtype !== "*") {
+    if (subtype === "jpg") {
+      return "jpeg";
+    }
+    if (subtype === "mpeg") {
+      return "mp3";
+    }
+    return subtype;
+  }
+  const extension = fileName?.match(/\.([A-Za-z0-9]+)$/u)?.[1]?.toLowerCase();
+  if (extension === "jpg") {
+    return "jpeg";
+  }
+  return extension ?? fallback;
 }
