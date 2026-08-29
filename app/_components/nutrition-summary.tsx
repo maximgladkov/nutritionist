@@ -456,7 +456,7 @@ function GoalRings({
           barSize={barSize}
           data={data}
           height={size}
-          innerRadius="80%"
+          innerRadius="60%"
           outerRadius="100%"
           width={size}
         >
