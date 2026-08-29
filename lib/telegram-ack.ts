@@ -1,7 +1,7 @@
 import { generateText } from "ai";
 
-export const TELEGRAM_ACK_MODEL = "xai/grok-4.1-fast-non-reasoning";
-export const TELEGRAM_ACK_TIMEOUT_MS = 2500;
+export const TELEGRAM_ACK_MODEL = "google/gemini-3.5-flash-lite";
+export const TELEGRAM_ACK_TIMEOUT_MS = 4000;
 export const TELEGRAM_ACK_HISTORY_MAX_MESSAGES = 8;
 export const TELEGRAM_ACK_HISTORY_MAX_CHARS = 400;
 export const TELEGRAM_ACK_TURN_CONTEXT =
@@ -9,8 +9,6 @@ export const TELEGRAM_ACK_TURN_CONTEXT =
 
 export const TELEGRAM_ACK_SYSTEM =
   "You are a nutritionist assistant sending one Telegram acknowledgement. Reply with a very short, natural chat status that matches what they just asked, as if you already started. A few words is enough. Sound like a person, not a canned bot status. Vary the wording every time. Do not repeat an acknowledgement you already used in this conversation. Examples of the kind of reply, not lines to copy: calories or totals — Checking calories… / Смотрю калории… / Гляну, сколько вышло…; logging a meal — Logging that… / Записываю… / Сейчас внесу…; a photo — Looking at the photo… / Смотрю фото…; other — One sec… / Hang on… / Сейчас гляну…. Match the language of the recent conversation and the latest user message. Do not use markdown. Do not ask a question. Do not say you will get back later. Do not claim the work is done.";
-
-const CYRILLIC = /[\u0400-\u04FF]/u;
 
 export type TelegramAckHistoryMessage = {
   role: "assistant" | "user";
@@ -24,41 +22,12 @@ type TelegramAckInput = {
   text: string;
 };
 
-type TelegramAckLanguageInput = Pick<TelegramAckInput, "hasFiles"> &
-  Partial<Pick<TelegramAckInput, "caption" | "history" | "text">>;
-
 type TelegramAckSender = {
   sendMessage: (message: string) => Promise<unknown>;
 };
 
 export function telegramAckVisibleUserText(input: { caption?: string; text?: string }) {
   return (input.text ?? "").trim() || (input.caption ?? "").trim();
-}
-
-export function telegramAckConversationIsRussian(input: TelegramAckLanguageInput) {
-  const samples = [
-    ...(input.history ?? []).map((message) => message.text),
-    telegramAckVisibleUserText(input),
-  ];
-  return samples.some((text) => CYRILLIC.test(text));
-}
-
-export function telegramAckIntent(input: TelegramAckLanguageInput) {
-  if (input.hasFiles) {
-    return "photo";
-  }
-  const text = telegramAckVisibleUserText(input).toLowerCase();
-  if (
-    /калори|ккал|kcal|calorie|macro|protein|белк|summary|итог|сколько съел|сколько остал/u.test(
-      text,
-    )
-  ) {
-    return "check";
-  }
-  if (/запиш|залог|съел|съела|\bate\b|\bhad\b|\blog\b/u.test(text)) {
-    return "log";
-  }
-  return "generic";
 }
 
 export function telegramAckSystem(input: TelegramAckInput) {
@@ -109,59 +78,74 @@ export function parseTelegramAckHistory(value: unknown): TelegramAckHistoryMessa
   return clipTelegramAckHistory(messages);
 }
 
+export function coalesceTelegramAckTurns(
+  messages: readonly { role: "assistant" | "user"; content: string }[],
+) {
+  const coalesced: { role: "assistant" | "user"; content: string }[] = [];
+  for (const message of messages) {
+    const last = coalesced.at(-1);
+    if (last !== undefined && last.role === message.role) {
+      last.content = `${last.content}\n${message.content}`;
+      continue;
+    }
+    coalesced.push({ content: message.content, role: message.role });
+  }
+  while (coalesced[0]?.role === "assistant") {
+    coalesced.shift();
+  }
+  return coalesced;
+}
+
 export function telegramAckMessages(input: TelegramAckInput) {
   return [
     { role: "system" as const, content: telegramAckSystem(input) },
-    ...(input.history ?? []).map((message) => ({
-      role: message.role,
-      content: message.text,
-    })),
-    { role: "user" as const, content: telegramAckUserContent(input) },
+    ...coalesceTelegramAckTurns([
+      ...(input.history ?? []).map((message) => ({
+        role: message.role,
+        content: message.text,
+      })),
+      { role: "user" as const, content: telegramAckUserContent(input) },
+    ]),
   ];
 }
 
-export function telegramAckFallback(input: TelegramAckLanguageInput) {
-  const isRu = telegramAckConversationIsRussian(input);
-  switch (telegramAckIntent(input)) {
-    case "check":
-      return isRu ? "Смотрю…" : "Checking…";
-    case "photo":
-      return isRu ? "Смотрю фото…" : "Looking at the photo…";
-    case "log":
-      return isRu ? "Записываю…" : "Logging…";
-    case "generic":
-      return isRu ? "Секунду…" : "On it…";
-  }
+export function telegramAckErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
 }
 
 export async function generateTelegramAckText(input: TelegramAckInput) {
-  try {
-    const { text } = await Promise.race([
-      generateText({
-        abortSignal: AbortSignal.timeout(TELEGRAM_ACK_TIMEOUT_MS),
-        maxOutputTokens: 100,
-        maxRetries: 0,
-        messages: telegramAckMessages(input),
-        model: TELEGRAM_ACK_MODEL,
-      }),
-      new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("telegram ack timed out")), TELEGRAM_ACK_TIMEOUT_MS);
-      }),
-    ]);
-    const ack = text.trim();
-    if (ack.length > 0) {
-      return ack;
-    }
-  } catch {}
-  return telegramAckFallback(input);
+  const { text } = await Promise.race([
+    generateText({
+      abortSignal: AbortSignal.timeout(TELEGRAM_ACK_TIMEOUT_MS),
+      maxOutputTokens: 80,
+      maxRetries: 0,
+      messages: telegramAckMessages(input),
+      model: TELEGRAM_ACK_MODEL,
+    }),
+    new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error("telegram ack timed out")), TELEGRAM_ACK_TIMEOUT_MS);
+    }),
+  ]);
+  const ack = text.trim();
+  if (ack.length === 0) {
+    throw new Error("telegram ack model returned empty text");
+  }
+  return ack;
 }
 
 export async function postTelegramAck(telegram: TelegramAckSender, input: TelegramAckInput) {
-  const ack = await generateTelegramAckText(input);
   try {
+    const ack = await generateTelegramAckText(input);
     await telegram.sendMessage(ack);
     return ack;
-  } catch {
+  } catch (error) {
+    const message = telegramAckErrorMessage(error);
+    console.error("telegram ack failed", error);
+    try {
+      await telegram.sendMessage(`Quick reply failed: ${message}`);
+    } catch (deliveryError) {
+      console.error("telegram ack error delivery failed", deliveryError);
+    }
     return false;
   }
 }

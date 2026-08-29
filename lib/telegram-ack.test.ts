@@ -4,10 +4,9 @@ import {
   TELEGRAM_ACK_HISTORY_MAX_CHARS,
   TELEGRAM_ACK_SYSTEM,
   clipTelegramAckHistory,
+  coalesceTelegramAckTurns,
   parseTelegramAckHistory,
-  telegramAckConversationIsRussian,
-  telegramAckFallback,
-  telegramAckIntent,
+  telegramAckErrorMessage,
   telegramAckMessages,
   telegramAckSystem,
   telegramAckUserContent,
@@ -36,42 +35,6 @@ describe("telegramAckUserContent", () => {
   });
 });
 
-describe("telegramAckConversationIsRussian", () => {
-  it("detects Russian from recent conversation", () => {
-    assert.equal(
-      telegramAckConversationIsRussian({
-        hasFiles: false,
-        history: [
-          { role: "user", text: "Запиши йогурт" },
-          { role: "assistant", text: "Записала. 140 ккал." },
-        ],
-        text: "ok",
-      }),
-      true,
-    );
-  });
-
-  it("is false when conversation text has no Cyrillic", () => {
-    assert.equal(
-      telegramAckConversationIsRussian({ hasFiles: false, text: "Log yogurt" }),
-      false,
-    );
-  });
-});
-
-describe("telegramAckIntent", () => {
-  it("treats a calorie question as a check", () => {
-    assert.equal(
-      telegramAckIntent({ caption: "", hasFiles: false, text: "А что по калориям?" }),
-      "check",
-    );
-  });
-
-  it("treats a photo as a photo look", () => {
-    assert.equal(telegramAckIntent({ hasFiles: true, text: "" }), "photo");
-  });
-});
-
 describe("telegramAckMessages", () => {
   it("puts recent conversation turns before the current user prompt", () => {
     const input = {
@@ -96,6 +59,25 @@ describe("telegramAckMessages", () => {
   });
 });
 
+describe("coalesceTelegramAckTurns", () => {
+  it("merges consecutive assistant turns and drops a leading assistant", () => {
+    assert.deepEqual(
+      coalesceTelegramAckTurns([
+        { role: "assistant", content: "Секунду…" },
+        { role: "user", content: "а обед?" },
+        { role: "assistant", content: "Секунду…" },
+        { role: "assistant", content: "На обед можно курицу." },
+        { role: "user", content: "а ужин?" },
+      ]),
+      [
+        { role: "user", content: "а обед?" },
+        { role: "assistant", content: "Секунду…\nНа обед можно курицу." },
+        { role: "user", content: "а ужин?" },
+      ],
+    );
+  });
+});
+
 describe("clipTelegramAckHistory", () => {
   it("keeps the latest turns and clips long text", () => {
     const long = "a".repeat(TELEGRAM_ACK_HISTORY_MAX_CHARS + 20);
@@ -112,43 +94,6 @@ describe("clipTelegramAckHistory", () => {
   });
 });
 
-describe("telegramAckFallback", () => {
-  it("uses a short English check for a calorie question", () => {
-    assert.equal(
-      telegramAckFallback({ hasFiles: false, text: "What about calories?" }),
-      "Checking…",
-    );
-  });
-
-  it("uses a short Russian check for a calorie question", () => {
-    assert.equal(
-      telegramAckFallback({ hasFiles: false, text: "А что по калориям?" }),
-      "Смотрю…",
-    );
-  });
-
-  it("mentions a photo in Russian when the conversation is Russian", () => {
-    assert.equal(
-      telegramAckFallback({
-        hasFiles: true,
-        history: [{ role: "user", text: "Запиши йогурт" }],
-      }),
-      "Смотрю фото…",
-    );
-  });
-
-  it("follows Russian conversation history for a generic follow-up", () => {
-    assert.equal(
-      telegramAckFallback({
-        hasFiles: false,
-        history: [{ role: "assistant", text: "Записала. 140 ккал." }],
-        text: "ok",
-      }),
-      "Секунду…",
-    );
-  });
-});
-
 describe("parseTelegramAckHistory", () => {
   it("ignores malformed entries", () => {
     assert.deepEqual(
@@ -160,5 +105,11 @@ describe("parseTelegramAckHistory", () => {
       ]),
       [{ role: "user", text: "hi" }],
     );
+  });
+});
+
+describe("telegramAckErrorMessage", () => {
+  it("reads Error.message", () => {
+    assert.equal(telegramAckErrorMessage(new Error("telegram ack timed out")), "telegram ack timed out");
   });
 });
