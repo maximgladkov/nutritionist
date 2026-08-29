@@ -1,6 +1,6 @@
 import { defineAgent } from "eve";
 
 export default defineAgent({
-  model: "google/gemini-3.5-flash-lite",
+  model: "spacexai/grok-4.1-fast-non-reasoning",
   reasoning: "minimal",
 });
