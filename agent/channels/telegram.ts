@@ -14,7 +14,7 @@ export default attachTelegramVision(
     credentials,
     events: {
       async "message.completed"(data, channel) {
-        if (data.finishReason === "tool-calls" || !data.message) {
+        if (!data.message) {
           return;
         }
         const html = markdownToTelegramHtml(data.message);
