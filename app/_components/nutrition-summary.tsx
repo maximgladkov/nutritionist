@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleDashed } from "@gravity-ui/icons";
+import { CircleDashed, Cup, Moon, Sun } from "@gravity-ui/icons";
 import {
   Card,
   DateField,
@@ -9,22 +9,24 @@ import {
   RangeCalendar,
   Spinner,
 } from "@heroui/react";
-import { ChartTooltip, EmptyState, NumberValue, Segment, Widget } from "@heroui-pro/react";
+import { ChartTooltip, EmptyState, Segment, Widget } from "@heroui-pro/react";
 import { BarChart } from "@heroui-pro/react/bar-chart";
 import { KPI } from "@heroui-pro/react/kpi";
+import { Timeline } from "@heroui-pro/react/timeline";
 import type { DateValue } from "@internationalized/date";
 import { parseDate, today } from "@internationalized/date";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { I18nProvider } from "react-aria-components";
 import { getNutritionSummaryAction } from "@/app/actions/summary";
 import type { MealView } from "@/lib/meals";
-import type { NutrientKey } from "@/lib/nutrition";
 import type { NutritionSummaryPayload, SummaryPeriod } from "@/lib/summary";
 import { isSummaryPeriod } from "@/lib/summary-range";
+import { cn } from "@/lib/utils";
 
 const PERIODS: { id: SummaryPeriod; label: string }[] = [
   { id: "today", label: "Today" },
-  { id: "week", label: "This week" },
-  { id: "days30", label: "Last 30 days" },
+  { id: "week", label: "Week" },
+  { id: "days30", label: "30d" },
   { id: "custom", label: "Custom" },
 ];
 
@@ -36,15 +38,12 @@ const MEAL_LABELS: Record<MealView["label"], string> = {
   snack: "Snack",
 };
 
-const NUTRIENT_LABELS: Record<NutrientKey, string> = {
-  carbohydrates: "carbs",
-  energyKcal: "calories",
-  fat: "fat",
-  fiber: "fiber",
-  proteins: "protein",
-  salt: "salt",
-  saturatedFat: "saturated fat",
-  sugars: "sugars",
+const MEAL_ICONS: Record<MealView["label"], typeof CircleDashed> = {
+  breakfast: Cup,
+  dinner: Moon,
+  lunch: Sun,
+  other: CircleDashed,
+  snack: CircleDashed,
 };
 
 type DateRange = {
@@ -120,7 +119,13 @@ export function NutritionSummaryApp({
   const timezone = data?.timezone ?? "UTC";
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 overflow-y-auto px-4 py-6 sm:px-6 sm:py-8">
+    <div
+      className={
+        embed
+          ? "mx-auto flex w-full max-w-lg flex-col gap-3 overflow-y-auto px-3 py-3"
+          : "mx-auto flex w-full max-w-lg flex-col gap-5 overflow-y-auto px-4 py-6 sm:px-6 sm:py-8"
+      }
+    >
       {embed ? null : (
         <div className="flex flex-col gap-1">
           <h1 className="text-foreground text-xl font-semibold">Summary</h1>
@@ -128,8 +133,9 @@ export function NutritionSummaryApp({
         </div>
       )}
       <Segment
-        className="w-full min-w-0 overflow-x-auto"
+        className="w-full min-w-0"
         selectedKey={period}
+        size="sm"
         onSelectionChange={(key) => {
           const next = String(key);
           if (!isSummaryPeriod(next) || next === period) {
@@ -147,72 +153,74 @@ export function NutritionSummaryApp({
         }}
       >
         {PERIODS.map((item) => (
-          <Segment.Item key={item.id} id={item.id}>
+          <Segment.Item key={item.id} className="px-2" id={item.id}>
             {item.label}
           </Segment.Item>
         ))}
       </Segment>
       {period === "custom" ? (
-        <DateRangePicker
-          className="max-w-sm"
-          maxValue={today(timezone)}
-          value={customRange}
-          onChange={(value) => {
-            setCustomRange(value);
-            if (value && !embed) {
-              load("custom", value);
-            }
-          }}
-        >
-          <Label>Date range</Label>
-          <DateField.Group fullWidth>
-            <DateField.Input slot="start">
-              {(segment) => <DateField.Segment segment={segment} />}
-            </DateField.Input>
-            <DateRangePicker.RangeSeparator />
-            <DateField.Input slot="end">
-              {(segment) => <DateField.Segment segment={segment} />}
-            </DateField.Input>
-            <DateField.Suffix>
-              <DateRangePicker.Trigger>
-                <DateRangePicker.TriggerIndicator />
-              </DateRangePicker.Trigger>
-            </DateField.Suffix>
-          </DateField.Group>
-          <DateRangePicker.Popover>
-            <RangeCalendar aria-label="Summary dates">
-              <RangeCalendar.Header>
-                <RangeCalendar.YearPickerTrigger>
-                  <RangeCalendar.YearPickerTriggerHeading />
-                  <RangeCalendar.YearPickerTriggerIndicator />
-                </RangeCalendar.YearPickerTrigger>
-                <RangeCalendar.NavButton slot="previous" />
-                <RangeCalendar.NavButton slot="next" />
-              </RangeCalendar.Header>
-              <RangeCalendar.Grid>
-                <RangeCalendar.GridHeader>
-                  {(day) => <RangeCalendar.HeaderCell>{day}</RangeCalendar.HeaderCell>}
-                </RangeCalendar.GridHeader>
-                <RangeCalendar.GridBody>
-                  {(date) => <RangeCalendar.Cell date={date} />}
-                </RangeCalendar.GridBody>
-              </RangeCalendar.Grid>
-              <RangeCalendar.YearPickerGrid>
-                <RangeCalendar.YearPickerGridBody>
-                  {({ year }) => <RangeCalendar.YearPickerCell year={year} />}
-                </RangeCalendar.YearPickerGridBody>
-              </RangeCalendar.YearPickerGrid>
-            </RangeCalendar>
-          </DateRangePicker.Popover>
-        </DateRangePicker>
+        <I18nProvider locale="en-GB">
+          <DateRangePicker
+            className="max-w-sm"
+            maxValue={today(timezone)}
+            value={customRange}
+            onChange={(value) => {
+              setCustomRange(value);
+              if (value && !embed) {
+                load("custom", value);
+              }
+            }}
+          >
+            <Label>Date range</Label>
+            <DateField.Group fullWidth>
+              <DateField.Input slot="start">
+                {(segment) => <DateField.Segment segment={segment} />}
+              </DateField.Input>
+              <DateRangePicker.RangeSeparator />
+              <DateField.Input slot="end">
+                {(segment) => <DateField.Segment segment={segment} />}
+              </DateField.Input>
+              <DateField.Suffix>
+                <DateRangePicker.Trigger>
+                  <DateRangePicker.TriggerIndicator />
+                </DateRangePicker.Trigger>
+              </DateField.Suffix>
+            </DateField.Group>
+            <DateRangePicker.Popover>
+              <RangeCalendar aria-label="Summary dates">
+                <RangeCalendar.Header>
+                  <RangeCalendar.YearPickerTrigger>
+                    <RangeCalendar.YearPickerTriggerHeading />
+                    <RangeCalendar.YearPickerTriggerIndicator />
+                  </RangeCalendar.YearPickerTrigger>
+                  <RangeCalendar.NavButton slot="previous" />
+                  <RangeCalendar.NavButton slot="next" />
+                </RangeCalendar.Header>
+                <RangeCalendar.Grid>
+                  <RangeCalendar.GridHeader>
+                    {(day) => <RangeCalendar.HeaderCell>{day}</RangeCalendar.HeaderCell>}
+                  </RangeCalendar.GridHeader>
+                  <RangeCalendar.GridBody>
+                    {(date) => <RangeCalendar.Cell date={date} />}
+                  </RangeCalendar.GridBody>
+                </RangeCalendar.Grid>
+                <RangeCalendar.YearPickerGrid>
+                  <RangeCalendar.YearPickerGridBody>
+                    {({ year }) => <RangeCalendar.YearPickerCell year={year} />}
+                  </RangeCalendar.YearPickerGridBody>
+                </RangeCalendar.YearPickerGrid>
+              </RangeCalendar>
+            </DateRangePicker.Popover>
+          </DateRangePicker>
+        </I18nProvider>
       ) : null}
       {data?.timezoneIsFallback ? (
         <p className="text-muted text-sm">Times use UTC until you save a time zone in Settings.</p>
       ) : null}
       {error ? <p className="text-danger text-sm">{error}</p> : null}
-      {data && !error ? <NutritionSummaryView data={data} isPending={isPending} /> : null}
+      {data && !error ? <NutritionSummaryView compact={embed} data={data} isPending={isPending} /> : null}
       {!data && !error && (isPending || (embed && initData === null)) ? (
-        <div className="flex justify-center py-12">
+        <div className="flex justify-center py-8">
           <Spinner />
         </div>
       ) : null}
@@ -221,9 +229,11 @@ export function NutritionSummaryApp({
 }
 
 function NutritionSummaryView({
+  compact,
   data,
   isPending,
 }: {
+  readonly compact: boolean;
   readonly data: NutritionSummaryPayload;
   readonly isPending: boolean;
 }) {
@@ -240,13 +250,18 @@ function NutritionSummaryView({
   const empty = summary.mealCount === 0;
 
   return (
-    <div className={isPending ? "flex flex-col gap-6 opacity-60" : "flex flex-col gap-6"}>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <SummaryKpi suffix="kcal" title="Calories" value={summary.totals.energyKcal} />
+    <div className={cn("flex flex-col", compact ? "gap-3" : "gap-4", isPending && "opacity-60")}>
+      <div className="grid grid-cols-3 gap-2">
+        <SummaryKpi
+          className="col-span-3"
+          suffix="kcal"
+          title="Calories"
+          value={summary.totals.energyKcal}
+          valueClassName="text-2xl"
+        />
         <SummaryKpi suffix="g" title="Protein" value={summary.totals.proteins} />
         <SummaryKpi suffix="g" title="Carbs" value={summary.totals.carbohydrates} />
         <SummaryKpi suffix="g" title="Fat" value={summary.totals.fat} />
-        <SummaryKpi title="Meals" value={summary.mealCount} />
       </div>
       {empty ? (
         <EmptyState className="bg-surface-secondary rounded-2xl" size="sm">
@@ -265,10 +280,10 @@ function NutritionSummaryView({
             <Widget.Title>Daily calories</Widget.Title>
           </Widget.Header>
           <Widget.Content>
-            <BarChart data={chartData} height={220}>
+            <BarChart data={chartData} height={compact ? 156 : 200}>
               <BarChart.Grid vertical={false} />
-              <BarChart.XAxis dataKey="date" tickMargin={8} />
-              <BarChart.YAxis width={40} />
+              <BarChart.XAxis dataKey="date" tickMargin={6} />
+              <BarChart.YAxis width={36} />
               <BarChart.Bar dataKey="kcal" fill="var(--accent)" name="Calories" radius={[4, 4, 0, 0]} />
               <BarChart.Tooltip
                 content={({ active, label, payload }) => {
@@ -282,7 +297,9 @@ function NutritionSummaryView({
                         <ChartTooltip.Item key={String(entry.dataKey)}>
                           <ChartTooltip.Indicator color={entry.color ?? entry.fill} />
                           <ChartTooltip.Label>{entry.name ?? "Calories"}</ChartTooltip.Label>
-                          <ChartTooltip.Value>{entry.value} kcal</ChartTooltip.Value>
+                          <ChartTooltip.Value>
+                            {typeof entry.value === "number" ? `${Math.round(entry.value)} kcal` : "—"}
+                          </ChartTooltip.Value>
                         </ChartTooltip.Item>
                       ))}
                     </ChartTooltip>
@@ -294,57 +311,82 @@ function NutritionSummaryView({
         </Widget>
       ) : null}
       {meals && meals.length > 0 ? (
-        <Card>
-          <Card.Header>
-            <Card.Title>Meals</Card.Title>
-          </Card.Header>
-          <Card.Content className="flex flex-col gap-3">
-            {meals.map((meal) => (
-              <div className="flex items-baseline justify-between gap-3 text-sm" key={meal.id}>
-                <div className="min-w-0">
-                  <p className="text-foreground font-medium">{MEAL_LABELS[meal.label]}</p>
-                  <p className="text-muted truncate">
-                    {formatMealTime(meal.eatenAt, timezone)}
-                    {meal.items.length > 0 ? ` · ${meal.items.map((item) => item.name).join(", ")}` : ""}
-                  </p>
-                </div>
-                <p className="text-foreground shrink-0 tabular-nums">
-                  {meal.totals.energyKcal === null ? "—" : `${Math.round(meal.totals.energyKcal)} kcal`}
-                </p>
-              </div>
-            ))}
+        <Card className="p-3">
+          <Card.Content>
+            <Timeline density="compact" size="sm">
+              {meals.map((meal) => {
+                const Icon = MEAL_ICONS[meal.label];
+                const hasItems = meal.items.length > 0;
+                return (
+                  <Timeline.Item align={hasItems ? "start" : "center"} key={meal.id}>
+                    <Timeline.Marker aria-hidden="true">
+                      <Icon />
+                    </Timeline.Marker>
+                    <Timeline.Content className="gap-1">
+                      <div className="flex min-w-0 items-baseline justify-between gap-3">
+                        <h3 className="text-foreground m-0 min-w-0 truncate text-sm font-medium leading-tight">
+                          {MEAL_LABELS[meal.label]}
+                          <time className="text-muted font-normal">
+                            {" · "}
+                            {formatMealTime(meal.eatenAt, timezone)}
+                          </time>
+                        </h3>
+                        <KcalText className="text-foreground m-0 shrink-0 text-sm" value={meal.totals.energyKcal} />
+                      </div>
+                      {hasItems ? (
+                        <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
+                          {meal.items.map((item) => (
+                            <li
+                              className="text-muted flex min-w-0 items-baseline justify-between gap-3 text-xs leading-snug"
+                              key={item.id}
+                            >
+                              <span className="truncate">{item.name}</span>
+                              <KcalText className="shrink-0" value={item.metrics.energyKcal} />
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </Timeline.Content>
+                  </Timeline.Item>
+                );
+              })}
+            </Timeline>
           </Card.Content>
         </Card>
-      ) : null}
-      {summary.incomplete.length > 0 && !empty ? (
-        <p className="text-muted text-xs">
-          Some items are missing {summary.incomplete.map((key) => NUTRIENT_LABELS[key]).join(", ")}.
-        </p>
       ) : null}
     </div>
   );
 }
 
 function SummaryKpi({
+  className,
   suffix,
   title,
   value,
+  valueClassName,
 }: {
+  readonly className?: string;
   readonly suffix?: string;
   readonly title: string;
   readonly value: number | null;
+  readonly valueClassName?: string;
 }) {
   return (
-    <KPI>
+    <KPI className={cn("gap-1 p-3", className)}>
       <KPI.Header>
-        <KPI.Title>{title}</KPI.Title>
+        <KPI.Title className="text-xs">{title}</KPI.Title>
       </KPI.Header>
       <KPI.Content>
         {value === null ? (
-          <span className="text-2xl font-semibold">—</span>
+          <span className={valueClassName ?? "text-lg font-semibold"}>—</span>
         ) : (
-          <KPI.Value maximumFractionDigits={title === "Meals" ? 0 : 1} value={value}>
-            {suffix ? <NumberValue.Suffix>{suffix}</NumberValue.Suffix> : null}
+          <KPI.Value className={valueClassName ?? "text-lg"} maximumFractionDigits={0} value={value}>
+            {(formatted) => (
+              <>
+                {formatted}
+                {suffix ? <span className="text-muted ml-1 text-sm font-normal">{suffix}</span> : null}
+              </>
+            )}
           </KPI.Value>
         )}
       </KPI.Content>
@@ -371,6 +413,24 @@ function formatMealTime(iso: string, timeZone: string): string {
     minute: "2-digit",
     timeZone,
   }).format(new Date(iso));
+}
+
+function KcalText({
+  className,
+  value,
+}: {
+  readonly className?: string;
+  readonly value: number | null;
+}) {
+  if (value === null) {
+    return <span className={className}>—</span>;
+  }
+  return (
+    <span className={cn("tabular-nums", className)}>
+      {Math.round(value)}
+      <span className="text-muted font-normal"> kcal</span>
+    </span>
+  );
 }
 
 function bootTelegramWebApp(onReady: (initData: string) => void): () => void {
