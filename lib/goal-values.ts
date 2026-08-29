@@ -103,11 +103,11 @@ const RING_META: Record<
   GoalRingId,
   { field: GoalField; fill: string; nutrient: "carbohydrates" | "energyKcal" | "fat" | "fiber" | "proteins" }
 > = {
-  calories: { field: "caloriesPerDay", fill: "var(--chart-3)", nutrient: "energyKcal" },
-  carbs: { field: "carbsGPerDay", fill: "var(--chart-2)", nutrient: "carbohydrates" },
-  fat: { field: "fatGPerDay", fill: "var(--chart-4)", nutrient: "fat" },
-  fiber: { field: "fiberGPerDay", fill: "var(--chart-5)", nutrient: "fiber" },
-  protein: { field: "proteinGPerDay", fill: "var(--chart-1)", nutrient: "proteins" },
+  calories: { field: "caloriesPerDay", fill: "var(--goal-calories)", nutrient: "energyKcal" },
+  carbs: { field: "carbsGPerDay", fill: "var(--goal-carbs)", nutrient: "carbohydrates" },
+  fat: { field: "fatGPerDay", fill: "var(--goal-fat)", nutrient: "fat" },
+  fiber: { field: "fiberGPerDay", fill: "var(--goal-fiber)", nutrient: "fiber" },
+  protein: { field: "proteinGPerDay", fill: "var(--goal-protein)", nutrient: "proteins" },
 };
 
 export function emptyGoalsView(): GoalsView {

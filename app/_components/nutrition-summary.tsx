@@ -437,7 +437,7 @@ function GoalRings({
   readonly rings: readonly GoalRing[];
 }) {
   const calorie = rings.find((ring) => ring.id === "calories");
-  const size = compact ? 160 : 200;
+  const size = 200;
   const count = rings.length;
   const innerRadius = `${Math.max(40, 100 - count * 14)}%`;
   const barSize = count <= 2 ? 12 : count <= 4 ? 10 : 8;
@@ -480,7 +480,7 @@ function GoalRings({
           )}
         </div>
       </div>
-      <ul className={cn("m-0 flex w-full list-none flex-col p-0", compact ? "max-w-xs gap-1" : "max-w-sm gap-1.5")}>
+      <ul className={cn("m-0 flex w-full list-none flex-col p-0", compact ? "gap-1" : "max-w-sm gap-1.5")}>
         {legend.map((ring) => (
           <li className="flex items-center gap-2 text-sm" key={ring.id}>
             <span
