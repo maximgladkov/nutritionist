@@ -1,27 +1,29 @@
 "use client";
 
-import { CircleDashed, Cup, Moon, Sun } from "@gravity-ui/icons";
-import {
-  Card,
-  DateField,
-  DateRangePicker,
-  Label,
-  RangeCalendar,
-  Spinner,
-} from "@heroui/react";
-import { ChartTooltip, EmptyState, Segment, Widget } from "@heroui-pro/react";
-import { BarChart } from "@heroui-pro/react/bar-chart";
-import { KPI } from "@heroui-pro/react/kpi";
-import { Timeline } from "@heroui-pro/react/timeline";
-import type { DateValue } from "@internationalized/date";
-import { parseDate, today } from "@internationalized/date";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { I18nProvider } from "react-aria-components";
 import { getNutritionSummaryAction } from "@/app/actions/summary";
 import type { MealView } from "@/lib/meals";
 import type { NutritionSummaryPayload, SummaryPeriod } from "@/lib/summary";
 import { isSummaryPeriod } from "@/lib/summary-range";
 import { cn } from "@/lib/utils";
+import { CircleDashed, Cup, Moon, Sun } from "@gravity-ui/icons";
+import { ChartTooltip, EmptyState, Segment, Widget } from "@heroui-pro/react";
+import { BarChart } from "@heroui-pro/react/bar-chart";
+import { KPI } from "@heroui-pro/react/kpi";
+import { RadialChart } from "@heroui-pro/react/radial-chart";
+import { Timeline } from "@heroui-pro/react/timeline";
+import {
+  Card,
+  DateField,
+  DateRangePicker,
+  Label,
+  Link,
+  RangeCalendar,
+  Spinner,
+} from "@heroui/react";
+import type { DateValue } from "@internationalized/date";
+import { parseDate, today } from "@internationalized/date";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { I18nProvider } from "react-aria-components";
 
 const PERIODS: { id: SummaryPeriod; label: string }[] = [
   { id: "today", label: "Today" },
@@ -237,7 +239,7 @@ function NutritionSummaryView({
   readonly data: NutritionSummaryPayload;
   readonly isPending: boolean;
 }) {
-  const { summary, meals, timezone } = data;
+  const { calorieGoalKcal, period, summary, meals, timezone } = data;
   const chartData = useMemo(
     () =>
       (summary.days ?? []).map((day) => ({
@@ -248,17 +250,31 @@ function NutritionSummaryView({
   );
   const showChart = (summary.days?.length ?? 0) > 1;
   const empty = summary.mealCount === 0;
+  const isToday = period === "today";
+  const showRing = isToday && calorieGoalKcal !== null;
 
   return (
     <div className={cn("flex flex-col", compact ? "gap-3" : "gap-4", isPending && "opacity-60")}>
       <div className="grid grid-cols-3 gap-2">
-        <SummaryKpi
-          className="col-span-3"
-          suffix="kcal"
-          title="Calories"
-          value={summary.totals.energyKcal}
-          valueClassName="text-2xl"
-        />
+        {showRing ? (
+          <div className="col-span-3 flex justify-center py-1">
+            <CalorieGoalRing
+              compact={compact}
+              consumed={summary.totals.energyKcal}
+              goal={calorieGoalKcal}
+            />
+          </div>
+        ) : (
+          <div className="col-span-3 flex flex-col gap-1">
+            <SummaryKpi
+              suffix="kcal"
+              title="Calories"
+              value={summary.totals.energyKcal}
+              valueClassName="text-2xl"
+            />
+            {isToday ? <SetCalorieGoalHint compact={compact} /> : null}
+          </div>
+        )}
         <SummaryKpi suffix="g" title="Protein" value={summary.totals.proteins} />
         <SummaryKpi suffix="g" title="Carbs" value={summary.totals.carbohydrates} />
         <SummaryKpi suffix="g" title="Fat" value={summary.totals.fat} />
@@ -358,6 +374,67 @@ function NutritionSummaryView({
   );
 }
 
+function CalorieGoalRing({
+  compact,
+  consumed,
+  goal,
+}: {
+  readonly compact: boolean;
+  readonly consumed: number | null;
+  readonly goal: number;
+}) {
+  const eaten = consumed === null ? 0 : Math.round(consumed);
+  const fill = Math.min(eaten, goal);
+  const over = Math.max(0, eaten - goal);
+  const left = Math.max(0, goal - eaten);
+  const size = compact ? 160 : 200;
+  const data = useMemo(
+    () => [{ fill: "var(--chart-3)", name: "Calories", value: fill }],
+    [fill],
+  );
+  const label =
+    over > 0
+      ? `${eaten} of ${goal} kilocalories, ${over} over`
+      : `${eaten} of ${goal} kilocalories, ${left} left`;
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div aria-label={label} className="relative" role="img">
+        <RadialChart
+          barSize={12}
+          data={data}
+          height={size}
+          innerRadius="86%"
+          outerRadius="100%"
+          width={size}
+        >
+          <RadialChart.AngleAxis angleAxisId={0} domain={[0, goal]} tick={false} type="number" />
+          <RadialChart.Bar background angleAxisId={0} cornerRadius={12} dataKey="value" />
+        </RadialChart>
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-muted text-xs">Calories</span>
+          <span className="text-foreground text-xl font-semibold tabular-nums">{eaten} kcal</span>
+          <span className="text-muted text-xs">
+            {over > 0 ? `${over} kcal over` : left > 0 ? `${left} kcal left` : "Goal reached"}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SetCalorieGoalHint({ compact }: { readonly compact: boolean }) {
+  if (compact) {
+    return <p className="text-muted px-1 text-sm">Set a daily calorie goal in chat to track it here.</p>;
+  }
+  return (
+    <p className="text-muted px-1 text-sm">
+      <Link href="/settings">Set a daily calorie goal</Link>
+      {" to fill a ring as you eat."}
+    </p>
+  );
+}
+
 function SummaryKpi({
   className,
   suffix,
@@ -439,7 +516,7 @@ function bootTelegramWebApp(onReady: (initData: string) => void): () => void {
     existing.ready();
     existing.expand();
     onReady(existing.initData);
-    return () => {};
+    return () => { };
   }
   const script = document.createElement("script");
   script.src = "https://telegram.org/js/telegram-web-app.js";

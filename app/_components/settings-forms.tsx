@@ -1,6 +1,20 @@
 "use client";
 
-import { Time } from "@internationalized/date";
+import {
+  consumeLinkCodeAction,
+  generateLinkCodeAction,
+  saveCalorieGoalAction,
+  saveCountryAction,
+  saveRemindersAction,
+  saveTimezoneAction,
+} from "@/app/actions/settings";
+import type { CountryOption } from "@/lib/countries";
+import { CALORIE_GOAL_MAX, CALORIE_GOAL_MIN } from "@/lib/goal-values";
+import {
+  REMINDER_LABELS,
+  type ReminderClock,
+  type ReminderLabel,
+} from "@/lib/reminder-clock";
 import {
   Button,
   Card,
@@ -8,24 +22,13 @@ import {
   Input,
   Label,
   ListBox,
+  NumberField,
   Switch,
   TextField,
   TimeField,
 } from "@heroui/react";
+import { Time } from "@internationalized/date";
 import { useState, useTransition } from "react";
-import {
-  consumeLinkCodeAction,
-  generateLinkCodeAction,
-  saveCountryAction,
-  saveRemindersAction,
-  saveTimezoneAction,
-} from "@/app/actions/settings";
-import type { CountryOption } from "@/lib/countries";
-import {
-  REMINDER_LABELS,
-  type ReminderClock,
-  type ReminderLabel,
-} from "@/lib/reminder-clock";
 
 const NONE_KEY = "__none__";
 
@@ -92,6 +95,58 @@ export function CountrySettings({
           onPress={() => {
             startTransition(() => {
               void saveCountryAction(selected === NONE_KEY ? "" : selected);
+            });
+          }}
+        >
+          Save
+        </Button>
+      </Card.Content>
+    </Card>
+  );
+}
+
+export function CalorieGoalSettings({
+  defaultCalories,
+}: {
+  readonly defaultCalories: number | null;
+}) {
+  const [kcal, setKcal] = useState<number | undefined>(defaultCalories ?? undefined);
+  const [isPending, startTransition] = useTransition();
+
+  return (
+    <Card>
+      <Card.Header>
+        <Card.Title>Daily Calories</Card.Title>
+        <Card.Description>
+          The summary ring fills toward this target. Leave empty to clear it.
+        </Card.Description>
+      </Card.Header>
+      <Card.Content className="flex items-end gap-2">
+        <NumberField
+          className="min-w-[8.5rem] max-w-[12rem] flex-1"
+          formatOptions={{ maximumFractionDigits: 0, useGrouping: false }}
+          fullWidth
+          step={100}
+          maxValue={CALORIE_GOAL_MAX}
+          minValue={CALORIE_GOAL_MIN}
+          value={kcal ?? Number.NaN}
+          variant="secondary"
+          onChange={(value) => {
+            setKcal(value === undefined || Number.isNaN(value) ? undefined : value);
+          }}
+        >
+          <Label className="sr-only">Daily calorie goal</Label>
+          <NumberField.Group>
+            <NumberField.DecrementButton />
+            <NumberField.Input placeholder="kcal per day" />
+            <NumberField.IncrementButton />
+          </NumberField.Group>
+        </NumberField>
+        <Button
+          isPending={isPending}
+          onPress={() => {
+            startTransition(() => {
+              void saveCalorieGoalAction(kcal ?? null);
             });
           }}
         >

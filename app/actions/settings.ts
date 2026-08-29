@@ -3,6 +3,8 @@
 import { auth } from "@/auth";
 import { consumeLinkCode, createLinkCode } from "@/lib/identity";
 import { normalizeCountryCode } from "@/lib/countries";
+import { GoalError } from "@/lib/goal-values";
+import { saveCalorieGoal } from "@/lib/goals";
 import { prisma } from "@/lib/prisma";
 import {
   REMINDER_LABELS,
@@ -47,6 +49,21 @@ export async function saveCountryAction(raw: string) {
   noticeRedirect(
     country ? "Country saved." : "Country cleared. Lookups use the worldwide catalog.",
   );
+}
+
+export async function saveCalorieGoalAction(raw: number | null) {
+  const userId = await requireUserId();
+  try {
+    const goals = await saveCalorieGoal(userId, raw);
+    noticeRedirect(
+      goals.caloriesPerDay === null
+        ? "Daily calorie goal cleared."
+        : `Daily calorie goal saved: ${goals.caloriesPerDay} kcal.`,
+    );
+  } catch (error) {
+    const message = error instanceof GoalError ? error.message : "Could not save that goal.";
+    noticeRedirect(message);
+  }
 }
 
 export async function saveTimezoneAction(raw: string) {

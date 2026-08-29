@@ -1,4 +1,5 @@
 import { pickSurvivor, selectLiveUserId, type UserRecord } from "./identity-core";
+import { planGoalMerge } from "./goal-values";
 import { generateLinkCodeValue } from "./link-command";
 import { mergeMemoryFiles, parseMemoryFile, serializeMemoryFile } from "./memory-format";
 import type { ChannelProvider } from "./principal";
@@ -191,6 +192,28 @@ export async function mergeUsers(survivorId: string, absorbedId: string): Promis
       }
       await tx.mealReminder.update({
         where: { id: reminder.id },
+        data: { userId: survivorId },
+      });
+    }
+    const survivorGoalKinds = new Set(
+      (
+        await tx.userGoal.findMany({
+          where: { userId: survivorId },
+          select: { kind: true },
+        })
+      ).map((row) => row.kind),
+    );
+    const absorbedGoals = await tx.userGoal.findMany({
+      where: { userId: absorbedId },
+      select: { id: true, kind: true },
+    });
+    const { deleteIds, moveIds } = planGoalMerge(survivorGoalKinds, absorbedGoals);
+    if (deleteIds.length > 0) {
+      await tx.userGoal.deleteMany({ where: { id: { in: deleteIds } } });
+    }
+    if (moveIds.length > 0) {
+      await tx.userGoal.updateMany({
+        where: { id: { in: moveIds } },
         data: { userId: survivorId },
       });
     }

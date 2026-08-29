@@ -21,6 +21,7 @@ model User {
   profile       UserProfile?
   meals         Meal[]
   reminders     MealReminder[]
+  goals         UserGoal[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -112,6 +113,23 @@ model UserProfile {
   country   String?
   timezone  String?
   updatedAt DateTime @updatedAt
+}
+
+enum GoalKind {
+  calories_per_day
+}
+
+model UserGoal {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      GoalKind
+  value     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, kind])
+  @@index([userId])
 }
 
 enum MealLabel {

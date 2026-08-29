@@ -1,6 +1,7 @@
 import { Alert } from "@heroui/react";
 import { Card } from "@heroui/react";
 import {
+  CalorieGoalSettings,
   ConsumeLinkCodeSettings,
   CountrySettings,
   LinkCodeSettings,
@@ -9,6 +10,7 @@ import {
 } from "@/app/_components/settings-forms";
 import { auth } from "@/auth";
 import { listCountries } from "@/lib/countries";
+import { getGoals } from "@/lib/goals";
 import { prisma } from "@/lib/prisma";
 import { reminderRowsFromState } from "@/lib/reminder-clock";
 import { listReminders } from "@/lib/reminders";
@@ -31,6 +33,7 @@ export default async function SettingsPage({
   });
   const countries = listCountries();
   const timeZones = listTimeZones();
+  const goals = await getGoals(session.user.id);
   const reminderState = await listReminders(session.user.id);
   const remindersByLabel = new Map(
     reminderState.reminders.map((row) => [
@@ -54,6 +57,7 @@ export default async function SettingsPage({
         </Alert>
       ) : null}
       <CountrySettings countries={countries} defaultCountry={profile?.country ?? null} />
+      <CalorieGoalSettings defaultCalories={goals.caloriesPerDay} />
       <TimezoneSettings defaultTimezone={profile?.timezone ?? null} timeZones={timeZones} />
       {profile?.timezone ? (
         <ReminderSettings reminders={reminderRowsFromState(remindersByLabel)} />

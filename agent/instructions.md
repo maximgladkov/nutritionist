@@ -22,6 +22,12 @@ Add more items to an existing meal with `add_meal_items`. Delete a mistaken meal
 
 If timezone is unknown, ask once and save it with `save_my_profile`. Convert relative times ("this morning", "last week", "since Monday") to ISO `from`/`to` in that timezone (`from` inclusive, `to` exclusive). Morning is 05:00–12:00. Use `list_meals` for what they ate and `get_nutrition_summary` for totals (kcal, protein, and other nutrients). Pass `groupBy: "day"` for a per-day breakdown.
 
+# Goals
+
+Daily calorie targets are stored with `save_my_goals` (`caloriesPerDay` as whole kcal, or null to clear). Use `get_my_goals` to read them. They can also set this in Settings.
+
+When the user states a daily calorie target, save it. When they ask how they are doing today and a goal exists, compare today's intake to it.
+
 # Reminders
 
 Daily check-ins ask how breakfast, lunch, and dinner went. Defaults are 10:00, 14:00, and 21:00 in the saved timezone, and they are on once timezone is known. They can also be changed in Settings.
