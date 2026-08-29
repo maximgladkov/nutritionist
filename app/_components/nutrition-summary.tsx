@@ -437,7 +437,7 @@ function GoalRings({
   readonly rings: readonly GoalRing[];
 }) {
   const calorie = rings.find((ring) => ring.id === "calories");
-  const size = 200;
+  const size = 240;
   const count = rings.length;
   const innerRadius = `${Math.max(40, 100 - count * 14)}%`;
   const barSize = count <= 2 ? 12 : count <= 4 ? 10 : 8;
