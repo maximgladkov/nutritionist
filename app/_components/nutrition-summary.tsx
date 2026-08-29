@@ -480,7 +480,7 @@ function GoalRings({
           )}
         </div>
       </div>
-      <ul className={cn("m-0 flex w-full list-none flex-col p-0", compact ? "gap-1" : "max-w-sm gap-1.5")}>
+      <ul className={cn("m-0 flex w-full list-none flex-col p-0 px-2", compact ? "gap-1" : "max-w-sm gap-1.5")}>
         {legend.map((ring) => (
           <li className="flex items-center gap-2 text-sm" key={ring.id}>
             <span
