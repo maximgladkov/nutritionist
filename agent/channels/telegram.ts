@@ -2,7 +2,7 @@ import { createTelegramFetchFile, telegramChannel } from "eve/channels/telegram"
 import type { TelegramContext, TelegramMessage } from "eve/channels/telegram";
 import { handleChannelLink, resolveChannelUser, saveChannelThreadId } from "../lib/channel-identity";
 import { telegramSummaryMiniAppUrl } from "../../lib/app-url";
-import { TELEGRAM_ACK_TURN_CONTEXT, postTelegramAck, telegramAckFiles, telegramAckVisibleUserText } from "../../lib/telegram-ack";
+import { TELEGRAM_ACK_TURN_CONTEXT, postTelegramAck, telegramAckFiles, telegramAckUserContent } from "../../lib/telegram-ack";
 import { appendTelegramAckHistory, loadTelegramAckHistory } from "../../lib/telegram-ack-history";
 import { applyTelegramHiddenMedia, telegramMessageHasInboundContent } from "../../lib/telegram-media";
 import { claimTelegramMessage } from "../../lib/telegram-message-claim";
@@ -71,11 +71,11 @@ export default attachTelegramVision(
       void ctx.telegram.startTyping();
       const historyKey = ctx.telegram.chatId;
       applyTelegramHiddenMedia(message);
-      const userText = telegramAckVisibleUserText(message);
+      const files = telegramAckFiles(message.attachments);
       const ackPosted = loadTelegramAckHistory(historyKey).then((history) =>
         postTelegramAck(ctx.telegram, {
           caption: message.caption,
-          files: telegramAckFiles(message.attachments),
+          files,
           history,
           text: message.text,
         }),
@@ -95,7 +95,7 @@ export default attachTelegramVision(
       }
       const ack = await ackPosted.catch(() => false);
       void appendTelegramAckHistory(historyKey, [
-        { role: "user", text: userText.length > 0 ? userText : "(attached file)" },
+        { role: "user", text: telegramAckUserContent({ caption: message.caption, files, text: message.text }) },
         ...(typeof ack === "string" ? [{ role: "assistant" as const, text: ack }] : []),
       ]);
       return {
