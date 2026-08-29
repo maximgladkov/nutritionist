@@ -43,8 +43,8 @@ describe("default reminder times", () => {
 describe("skip-if-logged window", () => {
   it("covers the local day for the reminder label lookup", () => {
     const range = localDayRange(new Date("2026-08-29T07:05:00.000Z"), "Europe/Berlin");
-    assert.equal(range.from.toISOString(), "2026-08-28T22:00:00.000Z");
-    assert.equal(range.to.toISOString(), "2026-08-29T22:00:00.000Z");
+    assert.equal(range.from.toISOString(), "2026-08-29T02:00:00.000Z");
+    assert.equal(range.to.toISOString(), "2026-08-30T02:00:00.000Z");
   });
 });
 

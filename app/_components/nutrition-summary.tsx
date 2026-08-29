@@ -5,6 +5,7 @@ import { goalRingsForToday, type GoalRing } from "@/lib/goal-values";
 import type { MealView } from "@/lib/meals";
 import type { NutritionSummaryPayload, SummaryPeriod } from "@/lib/summary";
 import { isSummaryPeriod } from "@/lib/summary-range";
+import { formatDateInTimeZone } from "@/lib/timezone";
 import { cn } from "@/lib/utils";
 import { CircleDashed, Cup, Moon, Sun } from "@gravity-ui/icons";
 import { ChartTooltip, EmptyState, Segment, Timeline, Widget } from "@heroui-pro/react";
@@ -20,7 +21,7 @@ import {
   Spinner,
 } from "@heroui/react";
 import type { DateValue } from "@internationalized/date";
-import { parseDate, today } from "@internationalized/date";
+import { parseDate } from "@internationalized/date";
 import { useEffect, useMemo, useState } from "react";
 import { I18nProvider } from "react-aria-components";
 import useSWR from "swr";
@@ -218,7 +219,7 @@ export function NutritionSummaryApp({
         <I18nProvider locale="en-GB">
           <DateRangePicker
             className="max-w-sm"
-            maxValue={today(timezone)}
+            maxValue={nutritionToday(timezone)}
             value={customRange}
             onChange={(value) => {
               setCustomRange(value);
@@ -567,8 +568,12 @@ function defaultCustomRange(initial: NutritionSummaryPayload | undefined): DateR
   return null;
 }
 
+function nutritionToday(timeZone: string) {
+  return parseDate(formatDateInTimeZone(new Date(), timeZone));
+}
+
 function rangeForLastDays(timeZone: string, days: number): DateRange {
-  const end = today(timeZone);
+  const end = nutritionToday(timeZone);
   return { end, start: end.subtract({ days: days - 1 }) };
 }
 

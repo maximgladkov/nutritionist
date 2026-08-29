@@ -8,16 +8,16 @@ describe("resolveSummaryRange", () => {
 
   it("maps today, week, and last 30 days", () => {
     assert.deepEqual(resolveSummaryRange({ now, period: "today", timeZone }), {
-      from: new Date("2026-08-28T22:00:00.000Z"),
-      to: new Date("2026-08-29T22:00:00.000Z"),
+      from: new Date("2026-08-29T02:00:00.000Z"),
+      to: new Date("2026-08-30T02:00:00.000Z"),
     });
     assert.deepEqual(resolveSummaryRange({ now, period: "week", timeZone }), {
-      from: new Date("2026-08-23T22:00:00.000Z"),
-      to: new Date("2026-08-30T22:00:00.000Z"),
+      from: new Date("2026-08-24T02:00:00.000Z"),
+      to: new Date("2026-08-31T02:00:00.000Z"),
     });
     assert.deepEqual(resolveSummaryRange({ now, period: "days30", timeZone }), {
-      from: new Date("2026-07-30T22:00:00.000Z"),
-      to: new Date("2026-08-29T22:00:00.000Z"),
+      from: new Date("2026-07-31T02:00:00.000Z"),
+      to: new Date("2026-08-30T02:00:00.000Z"),
     });
   });
 
@@ -31,8 +31,8 @@ describe("resolveSummaryRange", () => {
         timeZone,
       }),
       {
-        from: new Date("2026-07-31T22:00:00.000Z"),
-        to: new Date("2026-08-03T22:00:00.000Z"),
+        from: new Date("2026-08-01T02:00:00.000Z"),
+        to: new Date("2026-08-04T02:00:00.000Z"),
       },
     );
   });

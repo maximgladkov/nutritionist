@@ -1,3 +1,5 @@
+export const DAY_START_HOUR = 4;
+
 export function normalizeTimezone(value: string): string | null {
   const trimmed = value.trim();
   if (!trimmed) {
@@ -11,8 +13,7 @@ export function normalizeTimezone(value: string): string | null {
 }
 
 export function formatDateInTimeZone(date: Date, timeZone: string): string {
-  const parts = getZonedParts(date, timeZone);
-  return `${String(parts.year).padStart(4, "0")}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+  return formatYmd(nutritionDayParts(date, timeZone));
 }
 
 export type ZonedParts = {
@@ -108,12 +109,11 @@ export function nextLocalOccurrence(input: {
 }
 
 export function localDayRange(now: Date, timeZone: string): { from: Date; to: Date } {
-  const local = getZonedParts(now, timeZone);
-  return rangeFromLocalStart(local, 1, timeZone);
+  return rangeFromLocalStart(nutritionDayParts(now, timeZone), 1, timeZone);
 }
 
 export function localWeekRange(now: Date, timeZone: string): { from: Date; to: Date } {
-  const local = getZonedParts(now, timeZone);
+  const local = nutritionDayParts(now, timeZone);
   const start = addCalendarDays(local, -mondayOffset(local));
   return rangeFromLocalStart(start, 7, timeZone);
 }
@@ -126,7 +126,7 @@ export function localRollingDaysRange(
   if (!Number.isInteger(days) || days < 1) {
     throw new RangeError("days must be a positive integer");
   }
-  const local = getZonedParts(now, timeZone);
+  const local = nutritionDayParts(now, timeZone);
   const start = addCalendarDays(local, -(days - 1));
   return rangeFromLocalStart(start, days, timeZone);
 }
@@ -171,21 +171,21 @@ export function localInclusiveDateRange(
 
 export function listLocalDates(from: Date, to: Date, timeZone: string): string[] {
   const dates: string[] = [];
-  let cursor: Pick<ZonedParts, "year" | "month" | "day"> = getZonedParts(from, timeZone);
+  let cursor: Pick<ZonedParts, "year" | "month" | "day"> = nutritionDayParts(from, timeZone);
   for (let i = 0; i < 366; i += 1) {
     const start = zonedLocalToUtc({
       timeZone,
       year: cursor.year,
       month: cursor.month,
       day: cursor.day,
-      hour: 0,
+      hour: DAY_START_HOUR,
       minute: 0,
       second: 0,
     });
     if (start.getTime() >= to.getTime()) {
       break;
     }
-    dates.push(formatDateInTimeZone(start, timeZone));
+    dates.push(formatYmd(cursor));
     cursor = addCalendarDays(cursor, 1);
   }
   return dates;
@@ -199,6 +199,18 @@ export function listTimeZones(): string[] {
   }
 }
 
+function nutritionDayParts(date: Date, timeZone: string): Pick<ZonedParts, "year" | "month" | "day"> {
+  const local = getZonedParts(date, timeZone);
+  if (local.hour < DAY_START_HOUR) {
+    return addCalendarDays(local, -1);
+  }
+  return { year: local.year, month: local.month, day: local.day };
+}
+
+function formatYmd(parts: Pick<ZonedParts, "year" | "month" | "day">): string {
+  return `${String(parts.year).padStart(4, "0")}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+}
+
 function rangeFromLocalStart(
   start: Pick<ZonedParts, "year" | "month" | "day">,
   days: number,
@@ -209,7 +221,7 @@ function rangeFromLocalStart(
     year: start.year,
     month: start.month,
     day: start.day,
-    hour: 0,
+    hour: DAY_START_HOUR,
     minute: 0,
     second: 0,
   });
@@ -219,7 +231,7 @@ function rangeFromLocalStart(
     year: end.year,
     month: end.month,
     day: end.day,
-    hour: 0,
+    hour: DAY_START_HOUR,
     minute: 0,
     second: 0,
   });

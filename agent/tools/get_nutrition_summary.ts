@@ -7,7 +7,7 @@ import { requireUser } from "../lib/require-user";
 
 export default defineTool({
   description:
-    "Sum nutrition for the caller's meals in a date range. from is inclusive, to is exclusive. Both are ISO-8601. Pass groupBy day for a per-day breakdown. Uses the saved timezone for day buckets unless timezone is passed.",
+    "Sum nutrition for the caller's meals in a date range. from is inclusive, to is exclusive. Both are ISO-8601. Pass groupBy day for a per-day breakdown. Day buckets run from 04:00 to 04:00 the next morning in the saved timezone unless timezone is passed.",
   inputSchema: z.object({
     from: z.string().min(1),
     to: z.string().min(1),

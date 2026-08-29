@@ -26,10 +26,20 @@ describe("normalizeTimezone", () => {
 });
 
 describe("formatDateInTimeZone", () => {
-  it("formats a UTC instant as a local calendar date", () => {
-    const date = new Date("2026-08-29T01:00:00.000Z");
+  it("formats a UTC instant as the nutrition date starting at 04:00", () => {
+    const date = new Date("2026-08-29T12:00:00.000Z");
     assert.equal(formatDateInTimeZone(date, "UTC"), "2026-08-29");
-    assert.equal(formatDateInTimeZone(date, "America/New_York"), "2026-08-28");
+    assert.equal(formatDateInTimeZone(date, "America/New_York"), "2026-08-29");
+  });
+
+  it("keeps hours before 04:00 on the previous nutrition date", () => {
+    assert.equal(formatDateInTimeZone(new Date("2026-08-29T01:00:00.000Z"), "UTC"), "2026-08-28");
+    assert.equal(formatDateInTimeZone(new Date("2026-08-29T07:00:00.000Z"), "America/New_York"), "2026-08-28");
+  });
+
+  it("starts the new nutrition date at 04:00", () => {
+    assert.equal(formatDateInTimeZone(new Date("2026-08-29T02:00:00.000Z"), "Europe/Berlin"), "2026-08-29");
+    assert.equal(formatDateInTimeZone(new Date("2026-08-29T08:00:00.000Z"), "America/New_York"), "2026-08-29");
   });
 });
 
@@ -70,26 +80,32 @@ describe("nextLocalOccurrence", () => {
 });
 
 describe("localDayRange", () => {
-  it("returns the local calendar day as an exclusive UTC range", () => {
+  it("returns the local nutrition day as an exclusive UTC range", () => {
     const range = localDayRange(new Date("2026-08-29T07:00:00.000Z"), "Europe/Berlin");
-    assert.equal(range.from.toISOString(), "2026-08-28T22:00:00.000Z");
-    assert.equal(range.to.toISOString(), "2026-08-29T22:00:00.000Z");
+    assert.equal(range.from.toISOString(), "2026-08-29T02:00:00.000Z");
+    assert.equal(range.to.toISOString(), "2026-08-30T02:00:00.000Z");
+  });
+
+  it("stays on the previous nutrition day until 04:00", () => {
+    const range = localDayRange(new Date("2026-08-29T01:00:00.000Z"), "Europe/Berlin");
+    assert.equal(range.from.toISOString(), "2026-08-28T02:00:00.000Z");
+    assert.equal(range.to.toISOString(), "2026-08-29T02:00:00.000Z");
   });
 });
 
 describe("localWeekRange", () => {
   it("returns Monday through Sunday in the local timezone", () => {
     const range = localWeekRange(new Date("2026-08-29T07:00:00.000Z"), "Europe/Berlin");
-    assert.equal(range.from.toISOString(), "2026-08-23T22:00:00.000Z");
-    assert.equal(range.to.toISOString(), "2026-08-30T22:00:00.000Z");
+    assert.equal(range.from.toISOString(), "2026-08-24T02:00:00.000Z");
+    assert.equal(range.to.toISOString(), "2026-08-31T02:00:00.000Z");
   });
 });
 
 describe("localRollingDaysRange", () => {
   it("includes today and the previous N-1 local days", () => {
     const range = localRollingDaysRange(new Date("2026-08-29T07:00:00.000Z"), "Europe/Berlin", 30);
-    assert.equal(range.from.toISOString(), "2026-07-30T22:00:00.000Z");
-    assert.equal(range.to.toISOString(), "2026-08-29T22:00:00.000Z");
+    assert.equal(range.from.toISOString(), "2026-07-31T02:00:00.000Z");
+    assert.equal(range.to.toISOString(), "2026-08-30T02:00:00.000Z");
   });
 
   it("matches localDayRange when days is 1", () => {
@@ -112,8 +128,8 @@ describe("parseYmd", () => {
 describe("localInclusiveDateRange", () => {
   it("converts inclusive local dates to an exclusive UTC range", () => {
     const range = localInclusiveDateRange("Europe/Berlin", "2026-08-01", "2026-08-03");
-    assert.equal(range.from.toISOString(), "2026-07-31T22:00:00.000Z");
-    assert.equal(range.to.toISOString(), "2026-08-03T22:00:00.000Z");
+    assert.equal(range.from.toISOString(), "2026-08-01T02:00:00.000Z");
+    assert.equal(range.to.toISOString(), "2026-08-04T02:00:00.000Z");
   });
 
   it("rejects inverted or oversized ranges", () => {
