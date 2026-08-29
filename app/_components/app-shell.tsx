@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRightFromSquare, Comment, Gear, Plus } from "@gravity-ui/icons";
+import { ArrowRightFromSquare, ChartColumn, Comment, Gear, Plus } from "@gravity-ui/icons";
 import { Button } from "@heroui/react";
 import { AppLayout, Navbar, Sidebar } from "@heroui-pro/react";
 import { usePathname, useRouter } from "next/navigation";
@@ -10,17 +10,20 @@ import { signOutAction } from "@/app/actions/auth";
 export function AppShell({
   children,
   email,
+  embed = false,
 }: {
   readonly children: ReactNode;
   readonly email?: string;
+  readonly embed?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
   const isChat = pathname === "/" || pathname === "/s" || pathname.startsWith("/s/");
   const isSettings = pathname.startsWith("/settings");
-  const title = isSettings ? "Settings" : "Chat";
+  const isSummary = pathname.startsWith("/summary");
+  const title = isSettings ? "Settings" : isSummary ? "Summary" : "Chat";
 
-  if (pathname === "/login") {
+  if (pathname === "/login" || embed) {
     return children;
   }
 
@@ -54,13 +57,13 @@ export function AppShell({
         <>
           <Sidebar>
             <SidebarBrand />
-            <SidebarNav isChat={isChat} isSettings={isSettings} />
+            <SidebarNav isChat={isChat} isSettings={isSettings} isSummary={isSummary} />
             <SidebarAccount email={email} />
             <Sidebar.Rail />
           </Sidebar>
           <Sidebar.Mobile>
             <SidebarBrand />
-            <SidebarNav isChat={isChat} isSettings={isSettings} />
+            <SidebarNav isChat={isChat} isSettings={isSettings} isSummary={isSummary} />
             <SidebarAccount email={email} />
           </Sidebar.Mobile>
         </>
@@ -90,9 +93,11 @@ function SidebarBrand() {
 function SidebarNav({
   isChat,
   isSettings,
+  isSummary,
 }: {
   readonly isChat: boolean;
   readonly isSettings: boolean;
+  readonly isSummary: boolean;
 }) {
   return (
     <Sidebar.Content>
@@ -103,6 +108,12 @@ function SidebarNav({
               <Comment className="size-4" />
             </Sidebar.MenuIcon>
             <Sidebar.MenuLabel>Chat</Sidebar.MenuLabel>
+          </Sidebar.MenuItem>
+          <Sidebar.MenuItem href="/summary" id="summary" isCurrent={isSummary} textValue="Summary">
+            <Sidebar.MenuIcon>
+              <ChartColumn className="size-4" />
+            </Sidebar.MenuIcon>
+            <Sidebar.MenuLabel>Summary</Sidebar.MenuLabel>
           </Sidebar.MenuItem>
           <Sidebar.MenuItem
             href="/settings"

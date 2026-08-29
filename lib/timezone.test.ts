@@ -2,9 +2,14 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   formatDateInTimeZone,
+  listLocalDates,
   localDayRange,
+  localInclusiveDateRange,
+  localRollingDaysRange,
+  localWeekRange,
   nextLocalOccurrence,
   normalizeTimezone,
+  parseYmd,
   zonedLocalToUtc,
 } from "./timezone.ts";
 
@@ -69,5 +74,61 @@ describe("localDayRange", () => {
     const range = localDayRange(new Date("2026-08-29T07:00:00.000Z"), "Europe/Berlin");
     assert.equal(range.from.toISOString(), "2026-08-28T22:00:00.000Z");
     assert.equal(range.to.toISOString(), "2026-08-29T22:00:00.000Z");
+  });
+});
+
+describe("localWeekRange", () => {
+  it("returns Monday through Sunday in the local timezone", () => {
+    const range = localWeekRange(new Date("2026-08-29T07:00:00.000Z"), "Europe/Berlin");
+    assert.equal(range.from.toISOString(), "2026-08-23T22:00:00.000Z");
+    assert.equal(range.to.toISOString(), "2026-08-30T22:00:00.000Z");
+  });
+});
+
+describe("localRollingDaysRange", () => {
+  it("includes today and the previous N-1 local days", () => {
+    const range = localRollingDaysRange(new Date("2026-08-29T07:00:00.000Z"), "Europe/Berlin", 30);
+    assert.equal(range.from.toISOString(), "2026-07-30T22:00:00.000Z");
+    assert.equal(range.to.toISOString(), "2026-08-29T22:00:00.000Z");
+  });
+
+  it("matches localDayRange when days is 1", () => {
+    const now = new Date("2026-08-29T07:00:00.000Z");
+    const day = localDayRange(now, "Europe/Berlin");
+    const rolling = localRollingDaysRange(now, "Europe/Berlin", 1);
+    assert.equal(rolling.from.toISOString(), day.from.toISOString());
+    assert.equal(rolling.to.toISOString(), day.to.toISOString());
+  });
+});
+
+describe("parseYmd", () => {
+  it("parses calendar dates and rejects invalid days", () => {
+    assert.deepEqual(parseYmd("2026-08-29"), { year: 2026, month: 8, day: 29 });
+    assert.equal(parseYmd("2026-02-30"), null);
+    assert.equal(parseYmd("29-08-2026"), null);
+  });
+});
+
+describe("localInclusiveDateRange", () => {
+  it("converts inclusive local dates to an exclusive UTC range", () => {
+    const range = localInclusiveDateRange("Europe/Berlin", "2026-08-01", "2026-08-03");
+    assert.equal(range.from.toISOString(), "2026-07-31T22:00:00.000Z");
+    assert.equal(range.to.toISOString(), "2026-08-03T22:00:00.000Z");
+  });
+
+  it("rejects inverted or oversized ranges", () => {
+    assert.throws(() => localInclusiveDateRange("UTC", "2026-08-03", "2026-08-01"));
+    assert.throws(() => localInclusiveDateRange("UTC", "2026-01-01", "2026-04-02"));
+  });
+});
+
+describe("listLocalDates", () => {
+  it("lists each local calendar day in the exclusive range", () => {
+    const range = localInclusiveDateRange("Europe/Berlin", "2026-08-01", "2026-08-03");
+    assert.deepEqual(listLocalDates(range.from, range.to, "Europe/Berlin"), [
+      "2026-08-01",
+      "2026-08-02",
+      "2026-08-03",
+    ]);
   });
 });

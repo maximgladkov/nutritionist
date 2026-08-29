@@ -1,6 +1,7 @@
 import { createTelegramFetchFile, telegramChannel } from "eve/channels/telegram";
-import type { TelegramMessage } from "eve/channels/telegram";
+import type { TelegramContext, TelegramMessage } from "eve/channels/telegram";
 import { handleChannelLink, resolveChannelUser, saveChannelThreadId } from "../lib/channel-identity";
+import { telegramSummaryMiniAppUrl } from "../../lib/app-url";
 import { markdownToTelegramHtml, telegramHtmlMessage } from "../../lib/telegram-html";
 import { attachTelegramVision } from "../../lib/telegram-vision";
 import { appPrincipal } from "../../lib/principal";
@@ -45,6 +46,9 @@ export default attachTelegramVision(
         await ctx.telegram.sendMessage(linkReply);
         return null;
       }
+      if (await handleSummaryCommand(ctx, message)) {
+        return null;
+      }
       if (!shouldDispatchTelegramMessage(message, ctx.telegram.botUsername)) {
         return null;
       }
@@ -60,6 +64,7 @@ export default attachTelegramVision(
           providerUserId: String(from.id),
           threadId: String(message.chat.id),
         });
+        await ensureSummaryMenuButton(ctx);
       }
       return { auth: appPrincipal(user.id, "telegram") };
     },
@@ -97,4 +102,59 @@ function isBotCommand(text: string, botUsername: string | undefined) {
   }
   const target = match.groups?.target;
   return target === undefined || botUsername !== undefined && target.toLowerCase() === botUsername.toLowerCase();
+}
+
+async function handleSummaryCommand(ctx: TelegramContext, message: TelegramMessage): Promise<boolean> {
+  if (!/^\/summary(?:@|\s|$)/iu.test(message.text.trim())) {
+    return false;
+  }
+  if (message.chat.type !== "private") {
+    await ctx.telegram.sendMessage("Open a private chat with me to view your summary.");
+    return true;
+  }
+  const from = message.from;
+  if (from) {
+    await resolveChannelUser({
+      name: [from.firstName, from.lastName].filter(Boolean).join(" ") || from.username,
+      provider: "telegram",
+      providerUserId: from.id,
+    });
+    await saveChannelThreadId({
+      provider: "telegram",
+      providerUserId: String(from.id),
+      threadId: String(message.chat.id),
+    });
+  }
+  const url = telegramSummaryMiniAppUrl();
+  if (!url) {
+    await ctx.telegram.sendMessage("The summary page is not configured yet.");
+    return true;
+  }
+  await ensureSummaryMenuButton(ctx);
+  await ctx.telegram.post({
+    reply_markup: {
+      inline_keyboard: [[{ text: "Open summary", web_app: { url } }]],
+    },
+    text: "Open your nutrition summary.",
+  });
+  return true;
+}
+
+async function ensureSummaryMenuButton(ctx: TelegramContext): Promise<void> {
+  const url = telegramSummaryMiniAppUrl();
+  if (!url) {
+    return;
+  }
+  try {
+    await ctx.telegram.request("setChatMenuButton", {
+      chat_id: ctx.telegram.chatId,
+      menu_button: {
+        text: "Summary",
+        type: "web_app",
+        web_app: { url },
+      },
+    });
+  } catch {
+    return;
+  }
 }

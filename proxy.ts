@@ -10,6 +10,8 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = await readAuthJwt(request);
   const staleCookie = hasAuthSessionCookie(request) && token === null;
+  const telegramEmbed =
+    pathname.startsWith("/summary") && request.nextUrl.searchParams.get("embed") === "tg";
 
   if (pathname === "/login") {
     if (!staleCookie) {
@@ -18,7 +20,18 @@ export async function proxy(request: NextRequest) {
     return clearAuthSessionCookies(NextResponse.next());
   }
 
-  if (pathname === "/" || pathname.startsWith("/s") || pathname.startsWith("/settings")) {
+  if (telegramEmbed) {
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-tg-embed", "1");
+    return NextResponse.next({ request: { headers: requestHeaders } });
+  }
+
+  if (
+    pathname === "/" ||
+    pathname.startsWith("/s") ||
+    pathname.startsWith("/settings") ||
+    pathname.startsWith("/summary")
+  ) {
     if (token) {
       return NextResponse.next();
     }
@@ -36,5 +49,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/s/:path*", "/settings", "/login"],
+  matcher: ["/", "/s/:path*", "/settings", "/summary", "/login"],
 };

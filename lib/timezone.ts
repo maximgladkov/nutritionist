@@ -109,26 +109,86 @@ export function nextLocalOccurrence(input: {
 
 export function localDayRange(now: Date, timeZone: string): { from: Date; to: Date } {
   const local = getZonedParts(now, timeZone);
-  const from = zonedLocalToUtc({
-    timeZone,
-    year: local.year,
-    month: local.month,
-    day: local.day,
-    hour: 0,
-    minute: 0,
-    second: 0,
-  });
-  const next = addCalendarDays(local, 1);
-  const to = zonedLocalToUtc({
-    timeZone,
-    year: next.year,
-    month: next.month,
-    day: next.day,
-    hour: 0,
-    minute: 0,
-    second: 0,
-  });
-  return { from, to };
+  return rangeFromLocalStart(local, 1, timeZone);
+}
+
+export function localWeekRange(now: Date, timeZone: string): { from: Date; to: Date } {
+  const local = getZonedParts(now, timeZone);
+  const start = addCalendarDays(local, -mondayOffset(local));
+  return rangeFromLocalStart(start, 7, timeZone);
+}
+
+export function localRollingDaysRange(
+  now: Date,
+  timeZone: string,
+  days: number,
+): { from: Date; to: Date } {
+  if (!Number.isInteger(days) || days < 1) {
+    throw new RangeError("days must be a positive integer");
+  }
+  const local = getZonedParts(now, timeZone);
+  const start = addCalendarDays(local, -(days - 1));
+  return rangeFromLocalStart(start, days, timeZone);
+}
+
+export function parseYmd(value: string): { year: number; month: number; day: number } | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(value.trim());
+  if (!match) {
+    return null;
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const utc = new Date(Date.UTC(year, month - 1, day));
+  if (utc.getUTCFullYear() !== year || utc.getUTCMonth() !== month - 1 || utc.getUTCDate() !== day) {
+    return null;
+  }
+  return { year, month, day };
+}
+
+export function localInclusiveDateRange(
+  timeZone: string,
+  fromYmd: string,
+  toYmd: string,
+  maxDays = 90,
+): { from: Date; to: Date } {
+  const start = parseYmd(fromYmd);
+  const end = parseYmd(toYmd);
+  if (!start || !end) {
+    throw new RangeError("from and to must be valid YYYY-MM-DD dates");
+  }
+  const startUtc = Date.UTC(start.year, start.month - 1, start.day);
+  const endUtc = Date.UTC(end.year, end.month - 1, end.day);
+  if (startUtc > endUtc) {
+    throw new RangeError("from must be on or before to");
+  }
+  const dayCount = Math.round((endUtc - startUtc) / 86_400_000) + 1;
+  if (dayCount > maxDays) {
+    throw new RangeError(`Range cannot exceed ${maxDays} days`);
+  }
+  return rangeFromLocalStart(start, dayCount, timeZone);
+}
+
+export function listLocalDates(from: Date, to: Date, timeZone: string): string[] {
+  const dates: string[] = [];
+  let cursor: Pick<ZonedParts, "year" | "month" | "day"> = getZonedParts(from, timeZone);
+  for (let i = 0; i < 366; i += 1) {
+    const start = zonedLocalToUtc({
+      timeZone,
+      year: cursor.year,
+      month: cursor.month,
+      day: cursor.day,
+      hour: 0,
+      minute: 0,
+      second: 0,
+    });
+    if (start.getTime() >= to.getTime()) {
+      break;
+    }
+    dates.push(formatDateInTimeZone(start, timeZone));
+    cursor = addCalendarDays(cursor, 1);
+  }
+  return dates;
 }
 
 export function listTimeZones(): string[] {
@@ -137,6 +197,38 @@ export function listTimeZones(): string[] {
   } catch {
     return ["UTC"];
   }
+}
+
+function rangeFromLocalStart(
+  start: Pick<ZonedParts, "year" | "month" | "day">,
+  days: number,
+  timeZone: string,
+): { from: Date; to: Date } {
+  const from = zonedLocalToUtc({
+    timeZone,
+    year: start.year,
+    month: start.month,
+    day: start.day,
+    hour: 0,
+    minute: 0,
+    second: 0,
+  });
+  const end = addCalendarDays(start, days);
+  const to = zonedLocalToUtc({
+    timeZone,
+    year: end.year,
+    month: end.month,
+    day: end.day,
+    hour: 0,
+    minute: 0,
+    second: 0,
+  });
+  return { from, to };
+}
+
+function mondayOffset(parts: Pick<ZonedParts, "year" | "month" | "day">): number {
+  const weekday = new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay();
+  return weekday === 0 ? 6 : weekday - 1;
 }
 
 function addCalendarDays(
