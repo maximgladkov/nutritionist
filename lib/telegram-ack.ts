@@ -1,6 +1,6 @@
 import { generateText } from "ai";
 
-export const TELEGRAM_ACK_MODEL = "spacexai/grok-4.1-fast-non-reasoning";
+export const TELEGRAM_ACK_MODEL = "xai/grok-4.1-fast-non-reasoning";
 export const TELEGRAM_ACK_TIMEOUT_MS = 2500;
 export const TELEGRAM_ACK_HISTORY_MAX_MESSAGES = 8;
 export const TELEGRAM_ACK_HISTORY_MAX_CHARS = 400;
@@ -81,7 +81,19 @@ export function telegramAckMessages(input: TelegramAckInput) {
   ];
 }
 
-export async function postTelegramAck(telegram: TelegramAckSender, input: TelegramAckInput) {
+export function telegramAckFallback(input: Pick<TelegramAckInput, "hasFiles" | "languageCode">) {
+  const isRu = input.languageCode?.toLowerCase().startsWith("ru") === true;
+  if (input.hasFiles) {
+    return isRu
+      ? "Получила фото, сейчас разберусь и вернусь с результатом."
+      : "Got the photo — looking into it now and I'll get back to you.";
+  }
+  return isRu
+    ? "Поняла, сейчас разберусь и вернусь с результатом."
+    : "Got it — looking into this now and I'll get back to you.";
+}
+
+export async function generateTelegramAckText(input: TelegramAckInput) {
   try {
     const { text } = await Promise.race([
       generateText({
@@ -96,9 +108,16 @@ export async function postTelegramAck(telegram: TelegramAckSender, input: Telegr
       }),
     ]);
     const ack = text.trim();
-    if (ack.length === 0) {
-      return false;
+    if (ack.length > 0) {
+      return ack;
     }
+  } catch {}
+  return telegramAckFallback(input);
+}
+
+export async function postTelegramAck(telegram: TelegramAckSender, input: TelegramAckInput) {
+  const ack = await generateTelegramAckText(input);
+  try {
     await telegram.sendMessage(ack);
     return true;
   } catch {

@@ -5,6 +5,7 @@ import {
   TELEGRAM_ACK_SYSTEM,
   clipTelegramAckHistory,
   parseTelegramAckHistory,
+  telegramAckFallback,
   telegramAckMessages,
   telegramAckUserContent,
 } from "./telegram-ack.ts";
@@ -83,6 +84,22 @@ describe("clipTelegramAckHistory", () => {
     assert.equal(clipped[0]?.text, "old");
     assert.equal(clipped[1]?.text.length, TELEGRAM_ACK_HISTORY_MAX_CHARS);
     assert.equal(clipped[2]?.text, "ok");
+  });
+});
+
+describe("telegramAckFallback", () => {
+  it("uses English when the client language is unknown", () => {
+    assert.equal(
+      telegramAckFallback({ hasFiles: false }),
+      "Got it — looking into this now and I'll get back to you.",
+    );
+  });
+
+  it("mentions a photo in the client language", () => {
+    assert.equal(
+      telegramAckFallback({ hasFiles: true, languageCode: "ru" }),
+      "Получила фото, сейчас разберусь и вернусь с результатом.",
+    );
   });
 });
 
