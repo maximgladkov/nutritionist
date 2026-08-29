@@ -93,6 +93,7 @@ export type GoalRing = {
   goal: number;
   id: GoalRingId;
   name: string;
+  over: number;
   unit: "g" | "kcal";
   value: number;
 };
@@ -176,14 +177,16 @@ export function goalRingsForToday(
       continue;
     }
     const consumed = Math.round(totals[meta.nutrient] ?? 0);
+    const percent = goal === 0 ? (consumed > 0 ? 100 : 0) : (consumed / goal) * 100;
     rings.push({
       consumed,
       fill: meta.fill,
       goal,
       id,
       name: spec.label,
+      over: Math.min(100, Math.max(0, Math.round(percent - 100))),
       unit: spec.unit,
-      value: Math.min(100, Math.round((consumed / goal) * 100)),
+      value: Math.min(100, Math.round(percent)),
     });
   }
   return rings;

@@ -445,9 +445,18 @@ function GoalRings({
     () => rings.map((ring) => ({ fill: ring.fill, name: ring.name, value: ring.value })),
     [rings],
   );
+  const overData = useMemo(
+    () => rings.map((ring) => ({ name: ring.name, over: ring.over })),
+    [rings],
+  );
   const legend = useMemo(() => [...rings].reverse(), [rings]);
+  const hasOver = rings.some((ring) => ring.over > 0);
+  const calorieRemainder = calorie ? goalRemainder(calorie.consumed, calorie.goal, calorie.unit) : null;
   const label = rings
-    .map((ring) => `${ring.name}: ${ring.consumed} of ${ring.goal} ${ring.unit}, ${goalRemainder(ring.consumed, ring.goal, ring.unit)}`)
+    .map((ring) => {
+      const remainder = goalRemainder(ring.consumed, ring.goal, ring.unit);
+      return `${ring.name}: ${ring.consumed} of ${ring.goal} ${ring.unit}, ${remainder.text}`;
+    })
     .join(". ");
 
   return (
@@ -464,15 +473,37 @@ function GoalRings({
           <RadialChart.AngleAxis angleAxisId={0} domain={[0, 100]} tick={false} type="number" />
           <RadialChart.Bar background angleAxisId={0} cornerRadius={12} dataKey="value" />
         </RadialChart>
+        {hasOver ? (
+          <div className="pointer-events-none absolute inset-0">
+            <RadialChart
+              barSize={barSize}
+              data={overData}
+              height={size}
+              innerRadius="60%"
+              outerRadius="100%"
+              width={size}
+            >
+              <RadialChart.AngleAxis angleAxisId={0} domain={[0, 100]} tick={false} type="number" />
+              <RadialChart.Bar angleAxisId={0} cornerRadius={12} dataKey="over">
+                {rings.map((ring) => (
+                  <RadialChart.Cell
+                    key={ring.id}
+                    fill={ring.over > 0 ? "var(--color-danger)" : "transparent"}
+                  />
+                ))}
+              </RadialChart.Bar>
+            </RadialChart>
+          </div>
+        ) : null}
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          {calorie ? (
+          {calorie && calorieRemainder ? (
             <>
               <span className="text-muted text-xs">Calories</span>
               <span className="text-foreground text-xl font-semibold tabular-nums">
                 {calorie.consumed} kcal
               </span>
-              <span className="text-muted text-xs">
-                {goalRemainder(calorie.consumed, calorie.goal, calorie.unit)}
+              <span className={cn("text-xs", calorieRemainder.over ? "text-danger" : "text-muted")}>
+                {calorieRemainder.text}
               </span>
             </>
           ) : (
@@ -481,36 +512,48 @@ function GoalRings({
         </div>
       </div>
       <ul className={cn("m-0 flex w-full list-none flex-col p-0 px-2", compact ? "gap-1" : "max-w-sm gap-1.5")}>
-        {legend.map((ring) => (
-          <li className="flex items-center gap-2 text-sm" key={ring.id}>
-            <span
-              className="size-2.5 shrink-0 rounded-full"
-              style={{ backgroundColor: ring.fill }}
-            />
-            <span className="text-foreground min-w-0 flex-1">{ring.name}</span>
-            <span className="text-foreground shrink-0 tabular-nums">
-              {ring.consumed} / {ring.goal} {ring.unit}
-            </span>
-            <span className="text-muted w-[5.75rem] shrink-0 text-right text-xs tabular-nums">
-              {goalRemainder(ring.consumed, ring.goal, ring.unit)}
-            </span>
-          </li>
-        ))}
+        {legend.map((ring) => {
+          const remainder = goalRemainder(ring.consumed, ring.goal, ring.unit);
+          return (
+            <li className="flex items-center gap-2 text-sm" key={ring.id}>
+              <span
+                className="size-2.5 shrink-0 rounded-full"
+                style={{ backgroundColor: ring.fill }}
+              />
+              <span className="text-foreground min-w-0 flex-1">{ring.name}</span>
+              <span className="text-foreground shrink-0 tabular-nums">
+                {ring.consumed} / {ring.goal} {ring.unit}
+              </span>
+              <span
+                className={cn(
+                  "w-[5.75rem] shrink-0 text-right text-xs tabular-nums",
+                  remainder.over ? "text-danger" : "text-muted",
+                )}
+              >
+                {remainder.text}
+              </span>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
 }
 
-function goalRemainder(consumed: number, goal: number, unit: string): string {
+function goalRemainder(
+  consumed: number,
+  goal: number,
+  unit: string,
+): { over: boolean; text: string } {
   const over = Math.max(0, consumed - goal);
   const left = Math.max(0, goal - consumed);
   if (over > 0) {
-    return `${over} ${unit} over`;
+    return { over: true, text: `${over} ${unit} over` };
   }
   if (left > 0) {
-    return `${left} ${unit} left`;
+    return { over: false, text: `${left} ${unit} left` };
   }
-  return "Goal reached";
+  return { over: false, text: "Goal reached" };
 }
 
 function SetCalorieGoalHint({ compact }: { readonly compact: boolean }) {
