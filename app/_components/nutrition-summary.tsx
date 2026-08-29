@@ -21,8 +21,9 @@ import {
 } from "@heroui/react";
 import type { DateValue } from "@internationalized/date";
 import { parseDate, today } from "@internationalized/date";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { I18nProvider } from "react-aria-components";
+import useSWR from "swr";
 
 const PERIODS: { id: SummaryPeriod; label: string }[] = [
   { id: "today", label: "Today" },
@@ -52,11 +53,61 @@ type DateRange = {
   start: DateValue;
 };
 
+type SummarySWRKey = readonly [
+  "nutrition-summary",
+  SummaryPeriod,
+  string | undefined,
+  string | undefined,
+  string,
+];
+
 type TelegramWebApp = {
   expand: () => void;
   initData: string;
+  offEvent?: (event: string, callback: () => void) => void;
+  onEvent?: (event: string, callback: () => void) => void;
   ready: () => void;
 };
+
+async function fetchNutritionSummary([
+  ,
+  period,
+  customFrom,
+  customTo,
+  initData,
+]: SummarySWRKey): Promise<NutritionSummaryPayload> {
+  const result = await getNutritionSummaryAction({
+    customFrom,
+    customTo,
+    initData: initData || undefined,
+    period,
+  });
+  if (!result.ok) {
+    throw new Error(result.error);
+  }
+  return result.data;
+}
+
+function summarySWRKey(input: {
+  customRange: DateRange | null;
+  embed: boolean;
+  initData: string | null;
+  period: SummaryPeriod;
+}): SummarySWRKey | null {
+  if (input.embed && !input.initData) {
+    return null;
+  }
+  if (input.period === "custom" && !input.customRange) {
+    return null;
+  }
+  return [
+    "nutrition-summary",
+    input.period,
+    input.period === "custom" ? input.customRange?.start.toString() : undefined,
+    input.period === "custom" ? input.customRange?.end.toString() : undefined,
+    input.embed ? (input.initData ?? "") : "",
+  ];
+}
 
 export function NutritionSummaryApp({
   embed,
@@ -67,10 +118,7 @@ export function NutritionSummaryApp({
 }) {
   const [period, setPeriod] = useState<SummaryPeriod>(initial?.period ?? "today");
   const [customRange, setCustomRange] = useState<DateRange | null>(() => defaultCustomRange(initial));
-  const [data, setData] = useState<NutritionSummaryPayload | null>(initial ?? null);
-  const [error, setError] = useState<string | null>(null);
   const [initData, setInitData] = useState<string | null>(embed ? null : "");
-  const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     if (!embed) {
@@ -78,46 +126,56 @@ export function NutritionSummaryApp({
     }
     return bootTelegramWebApp((value) => {
       setInitData(value);
-      if (!value) {
-        setError("Open this from the Telegram bot.");
-      }
     });
   }, [embed]);
 
-  const load = useCallback(
-    (nextPeriod: SummaryPeriod, nextCustom: DateRange | null) => {
-      if (embed && !initData) {
-        return;
-      }
-      startTransition(async () => {
-        const result = await getNutritionSummaryAction({
-          customFrom: nextPeriod === "custom" ? nextCustom?.start.toString() : undefined,
-          customTo: nextPeriod === "custom" ? nextCustom?.end.toString() : undefined,
-          initData: embed ? (initData ?? undefined) : undefined,
-          period: nextPeriod,
-        });
-        if (!result.ok) {
-          setError(result.error);
-          return;
-        }
-        setError(null);
-        setData(result.data);
-      });
-    },
-    [embed, initData],
-  );
+  const key = summarySWRKey({ customRange, embed, initData, period });
+  const fallbackData =
+    initial &&
+    key &&
+    key[1] === initial.period &&
+    key[2] === (initial.customFrom ?? undefined) &&
+    key[3] === (initial.customTo ?? undefined)
+      ? initial
+      : undefined;
+  const { data, error, isLoading, isValidating, mutate } = useSWR(key, fetchNutritionSummary, {
+    fallbackData,
+    focusThrottleInterval: 0,
+    keepPreviousData: true,
+    revalidateOnFocus: true,
+    revalidateOnMount: true,
+    revalidateOnReconnect: true,
+  });
 
   useEffect(() => {
-    if (!embed) {
+    if (!embed || !initData) {
       return;
     }
-    if (!initData) {
+    const webapp = telegramWebApp();
+    if (!webapp?.onEvent) {
       return;
     }
-    load(period, customRange);
-  }, [customRange, embed, initData, load, period]);
+    const revalidate = () => {
+      void mutate();
+    };
+    webapp.onEvent("activated", revalidate);
+    return () => {
+      webapp.offEvent?.("activated", revalidate);
+    };
+  }, [embed, initData, mutate]);
 
   const timezone = data?.timezone ?? "UTC";
+  const bootError = embed && initData === "" ? "Open this from the Telegram bot." : null;
+  const errorMessage =
+    bootError ??
+    (error instanceof Error ? error.message : error ? "Could not load that summary." : null);
+  const isPending =
+    data != null &&
+    isValidating &&
+    (data.period !== period ||
+      (period === "custom" &&
+        (data.customFrom !== customRange?.start.toString() ||
+          data.customTo !== customRange?.end.toString())));
 
   return (
     <div
@@ -148,9 +206,6 @@ export function NutritionSummaryApp({
           if (next === "custom" && !customRange) {
             setCustomRange(nextCustom);
           }
-          if (!embed) {
-            load(next, nextCustom);
-          }
         }}
       >
         {PERIODS.map((item) => (
@@ -167,9 +222,6 @@ export function NutritionSummaryApp({
             value={customRange}
             onChange={(value) => {
               setCustomRange(value);
-              if (value && !embed) {
-                load("custom", value);
-              }
             }}
           >
             <Label>Date range</Label>
@@ -218,9 +270,9 @@ export function NutritionSummaryApp({
       {data?.timezoneIsFallback ? (
         <p className="text-muted text-sm">Times use UTC until you save a time zone in Settings.</p>
       ) : null}
-      {error ? <p className="text-danger text-sm">{error}</p> : null}
-      {data && !error ? <NutritionSummaryView compact={embed} data={data} isPending={isPending} /> : null}
-      {!data && !error && (isPending || (embed && initData === null)) ? (
+      {errorMessage ? <p className="text-danger text-sm">{errorMessage}</p> : null}
+      {data ? <NutritionSummaryView compact={embed} data={data} isPending={isPending} /> : null}
+      {!data && !errorMessage && (isLoading || (embed && initData === null)) ? (
         <div className="flex justify-center py-8">
           <Spinner />
         </div>
