@@ -1,11 +1,25 @@
 import { telegramChannel } from "eve/channels/telegram";
 import type { TelegramMessage } from "eve/channels/telegram";
 import { handleChannelLink, resolveChannelUser } from "../lib/channel-identity";
+import { markdownToTelegramHtml, telegramHtmlMessage } from "../../lib/telegram-html";
 import { appPrincipal } from "../../lib/principal";
 
 export default telegramChannel({
   credentials: {
     botToken: () => process.env.TELEGRAM_BOT_TOKEN!,
+  },
+  events: {
+    async "message.completed"(data, channel) {
+      if (data.finishReason === "tool-calls" || !data.message) {
+        return;
+      }
+      const html = markdownToTelegramHtml(data.message);
+      try {
+        await channel.telegram.post(telegramHtmlMessage(html));
+      } catch {
+        await channel.telegram.post(data.message);
+      }
+    },
   },
   async onMessage(ctx, message) {
     const from = message.from;
