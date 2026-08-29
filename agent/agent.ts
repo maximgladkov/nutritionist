@@ -1,5 +1,6 @@
 import { defineAgent } from "eve";
 
 export default defineAgent({
-  model: "deepseek/deepseek-v4-flash-vision-exp",
+  model: "google/gemini-3.5-flash-lite",
+  reasoning: "minimal",
 });

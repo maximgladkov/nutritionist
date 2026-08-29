@@ -12,7 +12,6 @@ import { KPI } from "@heroui-pro/react/kpi";
 import { RadialChart } from "@heroui-pro/react/radial-chart";
 import { Timeline } from "@heroui-pro/react/timeline";
 import {
-  Card,
   DateField,
   DateRangePicker,
   Label,
@@ -327,48 +326,44 @@ function NutritionSummaryView({
         </Widget>
       ) : null}
       {meals && meals.length > 0 ? (
-        <Card className="p-3">
-          <Card.Content>
-            <Timeline density="compact" size="sm">
-              {meals.map((meal) => {
-                const Icon = MEAL_ICONS[meal.label];
-                const hasItems = meal.items.length > 0;
-                return (
-                  <Timeline.Item align={hasItems ? "start" : "center"} key={meal.id}>
-                    <Timeline.Marker aria-hidden="true">
-                      <Icon />
-                    </Timeline.Marker>
-                    <Timeline.Content className="gap-1">
-                      <div className="flex min-w-0 items-baseline justify-between gap-3">
-                        <h3 className="text-foreground m-0 min-w-0 truncate text-sm font-medium leading-tight">
-                          {MEAL_LABELS[meal.label]}
-                          <time className="text-muted font-normal">
-                            {" · "}
-                            {formatMealTime(meal.eatenAt, timezone)}
-                          </time>
-                        </h3>
-                        <KcalText className="text-foreground m-0 shrink-0 text-sm" value={meal.totals.energyKcal} />
-                      </div>
-                      {hasItems ? (
-                        <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
-                          {meal.items.map((item) => (
-                            <li
-                              className="text-muted flex min-w-0 items-baseline justify-between gap-3 text-xs leading-snug"
-                              key={item.id}
-                            >
-                              <span className="truncate">{item.name}</span>
-                              <KcalText className="shrink-0" value={item.metrics.energyKcal} />
-                            </li>
-                          ))}
-                        </ul>
-                      ) : null}
-                    </Timeline.Content>
-                  </Timeline.Item>
-                );
-              })}
-            </Timeline>
-          </Card.Content>
-        </Card>
+        <Timeline density="compact" size="sm">
+          {meals.map((meal) => {
+            const Icon = MEAL_ICONS[meal.label];
+            const hasItems = meal.items.length > 0;
+            return (
+              <Timeline.Item align={hasItems ? "start" : "center"} key={meal.id}>
+                <Timeline.Marker aria-hidden="true">
+                  <Icon />
+                </Timeline.Marker>
+                <Timeline.Content className="gap-1">
+                  <div className="flex min-w-0 items-baseline justify-between gap-3">
+                    <h3 className="text-foreground m-0 min-w-0 truncate text-sm font-medium leading-tight">
+                      {MEAL_LABELS[meal.label]}
+                      <time className="text-muted font-normal">
+                        {" · "}
+                        {formatMealTime(meal.eatenAt, timezone)}
+                      </time>
+                    </h3>
+                    <KcalText className="text-foreground m-0 shrink-0 text-sm" value={meal.totals.energyKcal} />
+                  </div>
+                  {hasItems ? (
+                    <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
+                      {meal.items.map((item) => (
+                        <li
+                          className="text-muted flex min-w-0 items-baseline justify-between gap-3 text-xs leading-snug"
+                          key={item.id}
+                        >
+                          <span className="truncate">{item.name}</span>
+                          <KcalText className="shrink-0" value={item.metrics.energyKcal} />
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </Timeline.Content>
+              </Timeline.Item>
+            );
+          })}
+        </Timeline>
       ) : null}
     </div>
   );
