@@ -6,11 +6,10 @@ import type { NutritionSummaryPayload, SummaryPeriod } from "@/lib/summary";
 import { isSummaryPeriod } from "@/lib/summary-range";
 import { cn } from "@/lib/utils";
 import { CircleDashed, Cup, Moon, Sun } from "@gravity-ui/icons";
-import { ChartTooltip, EmptyState, Segment, Widget } from "@heroui-pro/react";
+import { ChartTooltip, EmptyState, Segment, Timeline, Widget } from "@heroui-pro/react";
 import { BarChart } from "@heroui-pro/react/bar-chart";
 import { KPI } from "@heroui-pro/react/kpi";
 import { RadialChart } from "@heroui-pro/react/radial-chart";
-import { Timeline } from "@heroui-pro/react/timeline";
 import {
   DateField,
   DateRangePicker,
@@ -132,10 +131,10 @@ export function NutritionSummaryApp({
   const key = summarySWRKey({ customRange, embed, initData, period });
   const fallbackData =
     initial &&
-    key &&
-    key[1] === initial.period &&
-    key[2] === (initial.customFrom ?? undefined) &&
-    key[3] === (initial.customTo ?? undefined)
+      key &&
+      key[1] === initial.period &&
+      key[2] === (initial.customFrom ?? undefined) &&
+      key[3] === (initial.customTo ?? undefined)
       ? initial
       : undefined;
   const { data, error, isLoading, isValidating, mutate } = useSWR(key, fetchNutritionSummary, {
@@ -378,7 +377,7 @@ function NutritionSummaryView({
         </Widget>
       ) : null}
       {meals && meals.length > 0 ? (
-        <Timeline density="compact" size="sm">
+        <Timeline density="compact" size="sm" className="mt-2">
           {meals.map((meal) => {
             const Icon = MEAL_ICONS[meal.label];
             const hasItems = meal.items.length > 0;
