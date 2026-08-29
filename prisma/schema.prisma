@@ -20,6 +20,7 @@ model User {
   agentSessions AgentSession[]
   profile       UserProfile?
   meals         Meal[]
+  reminders     MealReminder[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -63,6 +64,7 @@ model ChannelIdentity {
   id             String   @id @default(cuid())
   provider       String
   providerUserId String
+  threadId       String?
   userId         String
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt      DateTime @default(now())
@@ -124,6 +126,25 @@ enum MealItemUnit {
   g
   ml
   serving
+}
+
+model MealReminder {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label       MealLabel
+  enabled     Boolean   @default(true)
+  hour        Int
+  minute      Int       @default(0)
+  nextRunAt   DateTime  @db.Timestamptz
+  leaseUntil  DateTime? @db.Timestamptz
+  leaseToken  String?
+  lastFiredAt DateTime? @db.Timestamptz
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([userId, label])
+  @@index([enabled, nextRunAt])
 }
 
 model Meal {

@@ -1,3 +1,4 @@
+import type { UserContent } from "ai";
 import { eveChannel } from "eve/channels/eve";
 import {
   ForbiddenError,
@@ -5,6 +6,7 @@ import {
   type AuthFn,
   vercelOidc,
 } from "eve/channels/auth";
+import type { ChannelReceiveContext } from "eve/channels";
 import { appPrincipal } from "../../lib/principal";
 import { prisma } from "../../lib/prisma";
 import { eveSessionIdFromPath, getUserFromRequest } from "../../lib/session";
@@ -44,6 +46,25 @@ function appSession(): AuthFn<Request> {
   };
 }
 
-export default eveChannel({
+const channel = eveChannel({
   auth: [appSession(), vercelOidc(), localDev()],
 });
+
+Object.assign(channel, {
+  async receive(
+    input: {
+      readonly auth: ReturnType<typeof appPrincipal> | null;
+      readonly message: string | UserContent;
+      readonly target: Readonly<{ sessionId?: string }>;
+    },
+    ctx: ChannelReceiveContext,
+  ) {
+    const sessionId = input.target.sessionId;
+    if (!sessionId) {
+      throw new Error("Web reminder delivery requires target.sessionId");
+    }
+    return ctx.from(sessionId).send(input.message, { auth: input.auth });
+  },
+});
+
+export default channel;

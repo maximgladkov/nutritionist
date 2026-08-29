@@ -2,6 +2,7 @@ import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { normalizeCountryCode } from "../../lib/countries";
 import { prisma } from "../../lib/prisma";
+import { ensureDefaultReminders, rescheduleReminders } from "../../lib/reminders";
 import { normalizeTimezone } from "../../lib/timezone";
 import { requireUser } from "../lib/require-user";
 
@@ -60,6 +61,12 @@ export default defineTool({
       },
       update: data,
     });
+    if (profile.timezone) {
+      await ensureDefaultReminders(userId, profile.timezone);
+      if (timezone !== undefined && timezone !== null) {
+        await rescheduleReminders(userId, profile.timezone);
+      }
+    }
     return { notes: profile.notes, country: profile.country, timezone: profile.timezone };
   },
 });

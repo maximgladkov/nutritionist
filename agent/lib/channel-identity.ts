@@ -1,4 +1,4 @@
-import { consumeLinkCode, createLinkCode, resolveChannelUser } from "../../lib/identity";
+import { consumeLinkCode, createLinkCode, resolveChannelUser, saveChannelThreadId } from "../../lib/identity";
 import { parseLinkCommand } from "../../lib/link-command";
 import { appPrincipal } from "../../lib/principal";
 
@@ -38,4 +38,4 @@ export async function handleChannelLink(input: {
   return "That code is not valid.";
 }
 
-export { appPrincipal, resolveChannelUser };
+export { appPrincipal, resolveChannelUser, saveChannelThreadId };

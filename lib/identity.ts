@@ -42,6 +42,20 @@ export async function resolveChannelUser(input: ResolveChannelUserInput): Promis
   });
 }
 
+export async function saveChannelThreadId(input: {
+  provider: "telegram" | "whatsapp";
+  providerUserId: string;
+  threadId: string;
+}): Promise<void> {
+  await prisma.channelIdentity.updateMany({
+    where: {
+      provider: input.provider,
+      providerUserId: input.providerUserId,
+    },
+    data: { threadId: input.threadId },
+  });
+}
+
 export async function ensureEmailIdentity(userId: string, email: string): Promise<void> {
   await prisma.channelIdentity.upsert({
     where: {
@@ -131,6 +145,27 @@ export async function mergeUsers(survivorId: string, absorbedId: string): Promis
       where: { userId: absorbedId },
       data: { userId: survivorId },
     });
+    const survivorReminderLabels = new Set(
+      (
+        await tx.mealReminder.findMany({
+          where: { userId: survivorId },
+          select: { label: true },
+        })
+      ).map((row) => row.label),
+    );
+    const absorbedReminders = await tx.mealReminder.findMany({
+      where: { userId: absorbedId },
+    });
+    for (const reminder of absorbedReminders) {
+      if (survivorReminderLabels.has(reminder.label)) {
+        await tx.mealReminder.delete({ where: { id: reminder.id } });
+        continue;
+      }
+      await tx.mealReminder.update({
+        where: { id: reminder.id },
+        data: { userId: survivorId },
+      });
+    }
     await tx.linkCode.updateMany({
       where: { userId: absorbedId, consumedAt: null },
       data: { userId: survivorId },
@@ -146,15 +181,19 @@ export async function mergeUsers(survivorId: string, absorbedId: string): Promis
             userId: survivorId,
             notes: absorbedProfile.notes,
             country: absorbedProfile.country,
+            timezone: absorbedProfile.timezone,
           },
         });
       } else {
-        const data: { notes?: string; country?: string | null } = {};
+        const data: { notes?: string; country?: string | null; timezone?: string | null } = {};
         if (!survivorProfile.notes && absorbedProfile.notes) {
           data.notes = absorbedProfile.notes;
         }
         if (!survivorProfile.country && absorbedProfile.country) {
           data.country = absorbedProfile.country;
+        }
+        if (!survivorProfile.timezone && absorbedProfile.timezone) {
+          data.timezone = absorbedProfile.timezone;
         }
         if (Object.keys(data).length > 0) {
           await tx.userProfile.update({

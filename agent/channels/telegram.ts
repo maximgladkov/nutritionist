@@ -1,6 +1,6 @@
 import { createTelegramFetchFile, telegramChannel } from "eve/channels/telegram";
 import type { TelegramMessage } from "eve/channels/telegram";
-import { handleChannelLink, resolveChannelUser } from "../lib/channel-identity";
+import { handleChannelLink, resolveChannelUser, saveChannelThreadId } from "../lib/channel-identity";
 import { markdownToTelegramHtml, telegramHtmlMessage } from "../../lib/telegram-html";
 import { attachTelegramVision } from "../../lib/telegram-vision";
 import { appPrincipal } from "../../lib/principal";
@@ -54,6 +54,13 @@ export default attachTelegramVision(
         providerUserId: from.id,
         name: [from.firstName, from.lastName].filter(Boolean).join(" ") || from.username,
       });
+      if (message.chat.type === "private") {
+        await saveChannelThreadId({
+          provider: "telegram",
+          providerUserId: String(from.id),
+          threadId: String(message.chat.id),
+        });
+      }
       return { auth: appPrincipal(user.id, "telegram") };
     },
   }),
