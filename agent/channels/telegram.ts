@@ -2,11 +2,8 @@ import { createTelegramFetchFile, telegramChannel } from "eve/channels/telegram"
 import type { TelegramContext, TelegramMessage } from "eve/channels/telegram";
 import { handleChannelLink, resolveChannelUser, saveChannelThreadId } from "../lib/channel-identity";
 import { telegramSummaryMiniAppUrl } from "../../lib/app-url";
-import {
-  appendTelegramStream,
-  clearTelegramStream,
-  completeTelegramStream,
-} from "../../lib/telegram-stream";
+import { TELEGRAM_ACK_TURN_CONTEXT, postTelegramAck } from "../../lib/telegram-ack";
+import { markdownToTelegramHtml, telegramHtmlMessage } from "../../lib/telegram-html";
 import { attachTelegramVision } from "../../lib/telegram-vision";
 import { appPrincipal } from "../../lib/principal";
 
@@ -18,22 +15,16 @@ export default attachTelegramVision(
   telegramChannel({
     credentials,
     events: {
-      async "turn.started"(_data, channel) {
-        clearTelegramStream(channel.state);
-        void channel.telegram.startTyping();
-      },
-      async "message.appended"(data, channel) {
-        await appendTelegramStream(channel.telegram, channel.state, data);
-      },
       async "message.completed"(data, channel) {
-        if (!data.message) {
+        if (data.finishReason === "tool-calls" || !data.message) {
           return;
         }
-        await completeTelegramStream(channel.telegram, channel.state, {
-          message: data.message,
-          sequence: data.sequence,
-          turnId: data.turnId,
-        });
+        const html = markdownToTelegramHtml(data.message);
+        try {
+          await channel.telegram.post(telegramHtmlMessage(html));
+        } catch {
+          await channel.telegram.post(data.message);
+        }
       },
     },
     async onMessage(ctx, message) {
@@ -63,6 +54,11 @@ export default attachTelegramVision(
         return null;
       }
       void ctx.telegram.startTyping();
+      const ackPosted = postTelegramAck(ctx.telegram, {
+        caption: message.caption,
+        hasFiles: message.attachments.length > 0,
+        text: message.text,
+      });
       const user = await resolveChannelUser({
         provider: "telegram",
         providerUserId: from.id,
@@ -76,7 +72,11 @@ export default attachTelegramVision(
         });
         void ensureSummaryMenuButton(ctx);
       }
-      return { auth: appPrincipal(user.id, "telegram") };
+      const posted = await ackPosted;
+      return {
+        auth: appPrincipal(user.id, "telegram"),
+        ...(posted ? { context: [TELEGRAM_ACK_TURN_CONTEXT] } : {}),
+      };
     },
   }),
   createTelegramFetchFile({
