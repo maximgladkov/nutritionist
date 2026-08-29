@@ -1,16 +1,22 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { saveCalorieGoal } from "../../lib/goals";
+import { saveGoals } from "../../lib/goals";
 import { requireUser } from "../lib/require-user";
+
+const goalValue = z.union([z.number(), z.null()]).optional();
 
 export default defineTool({
   description:
-    "Save or clear the caller's structured goals. Pass caloriesPerDay as a whole number of kcal per day, or null to clear it. They can also set this in Settings. Never pass another person's id.",
+    "Save or clear the caller's structured daily goals. Pass a whole number to set a field, or null to clear it. Omit fields you are not changing. caloriesPerDay is kcal; proteinGPerDay, carbsGPerDay, fatGPerDay, and fiberGPerDay are grams. They can also set these in Settings. Never pass another person's id.",
   inputSchema: z.object({
-    caloriesPerDay: z.union([z.number(), z.null()]),
+    caloriesPerDay: goalValue,
+    carbsGPerDay: goalValue,
+    fatGPerDay: goalValue,
+    fiberGPerDay: goalValue,
+    proteinGPerDay: goalValue,
   }),
-  async execute({ caloriesPerDay }, ctx) {
+  async execute(patch, ctx) {
     const { userId } = await requireUser(ctx);
-    return saveCalorieGoal(userId, caloriesPerDay);
+    return saveGoals(userId, patch);
   },
 });

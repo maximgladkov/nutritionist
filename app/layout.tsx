@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { headers } from "next/headers";
 import type { ReactNode } from "react";
 import { AppShell } from "@/app/_components/app-shell";
+import { ToastHost } from "@/app/_components/toast-host";
 import { auth } from "@/auth";
 import { cn } from "@/lib/utils";
 import "./globals.css";
@@ -32,6 +33,7 @@ export default async function RootLayout({ children }: { readonly children: Reac
   return (
     <html className={cn(sans.variable, mono.variable)} lang="en" suppressHydrationWarning>
       <body className="bg-background text-foreground antialiased">
+        <ToastHost />
         <AppShell email={session?.user?.email ?? undefined} embed={embed}>
           {children}
         </AppShell>

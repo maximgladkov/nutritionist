@@ -1,13 +1,13 @@
-import { Alert } from "@heroui/react";
 import { Card } from "@heroui/react";
 import {
-  CalorieGoalSettings,
+  DailyGoalsSettings,
   ConsumeLinkCodeSettings,
   CountrySettings,
   LinkCodeSettings,
   ReminderSettings,
   TimezoneSettings,
 } from "@/app/_components/settings-forms";
+import { FlashToast } from "@/app/_components/flash-toast";
 import { auth } from "@/auth";
 import { listCountries } from "@/lib/countries";
 import { getGoals } from "@/lib/goals";
@@ -20,7 +20,7 @@ import { redirect } from "next/navigation";
 export default async function SettingsPage({
   searchParams,
 }: {
-  readonly searchParams: Promise<{ readonly notice?: string }>;
+  readonly searchParams: Promise<{ readonly notice?: string; readonly noticeKind?: string }>;
 }) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -49,15 +49,13 @@ export default async function SettingsPage({
         <p className="text-muted text-sm">Signed in as {session.user.email}</p>
       </div>
       {params.notice ? (
-        <Alert>
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Description>{params.notice}</Alert.Description>
-          </Alert.Content>
-        </Alert>
+        <FlashToast
+          message={params.notice}
+          variant={params.noticeKind === "danger" ? "danger" : "success"}
+        />
       ) : null}
       <CountrySettings countries={countries} defaultCountry={profile?.country ?? null} />
-      <CalorieGoalSettings defaultCalories={goals.caloriesPerDay} />
+      <DailyGoalsSettings defaultGoals={goals} />
       <TimezoneSettings defaultTimezone={profile?.timezone ?? null} timeZones={timeZones} />
       {profile?.timezone ? (
         <ReminderSettings reminders={reminderRowsFromState(remindersByLabel)} />

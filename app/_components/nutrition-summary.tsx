@@ -1,6 +1,7 @@
 "use client";
 
 import { getNutritionSummaryAction } from "@/app/actions/summary";
+import { goalRingsForToday, type GoalRing } from "@/lib/goal-values";
 import type { MealView } from "@/lib/meals";
 import type { NutritionSummaryPayload, SummaryPeriod } from "@/lib/summary";
 import { isSummaryPeriod } from "@/lib/summary-range";
@@ -289,7 +290,7 @@ function NutritionSummaryView({
   readonly data: NutritionSummaryPayload;
   readonly isPending: boolean;
 }) {
-  const { calorieGoalKcal, period, summary, meals, timezone } = data;
+  const { goals, period, summary, meals, timezone } = data;
   const chartData = useMemo(
     () =>
       (summary.days ?? []).map((day) => ({
@@ -298,21 +299,22 @@ function NutritionSummaryView({
       })),
     [summary.days],
   );
+  const rings = useMemo(
+    () => (period === "today" ? goalRingsForToday(goals, summary.totals) : []),
+    [goals, period, summary.totals],
+  );
+  const ringIds = useMemo(() => new Set(rings.map((ring) => ring.id)), [rings]);
   const showChart = (summary.days?.length ?? 0) > 1;
   const empty = summary.mealCount === 0;
   const isToday = period === "today";
-  const showRing = isToday && calorieGoalKcal !== null;
+  const showRing = rings.length > 0;
 
   return (
     <div className={cn("flex flex-col", compact ? "gap-3" : "gap-4", isPending && "opacity-60")}>
       <div className="grid grid-cols-3 gap-2">
         {showRing ? (
           <div className="col-span-3 flex justify-center py-1">
-            <CalorieGoalRing
-              compact={compact}
-              consumed={summary.totals.energyKcal}
-              goal={calorieGoalKcal}
-            />
+            <GoalRings compact={compact} rings={rings} />
           </div>
         ) : (
           <div className="col-span-3 flex flex-col gap-1">
@@ -325,9 +327,16 @@ function NutritionSummaryView({
             {isToday ? <SetCalorieGoalHint compact={compact} /> : null}
           </div>
         )}
-        <SummaryKpi suffix="g" title="Protein" value={summary.totals.proteins} />
-        <SummaryKpi suffix="g" title="Carbs" value={summary.totals.carbohydrates} />
-        <SummaryKpi suffix="g" title="Fat" value={summary.totals.fat} />
+        {showRing && !ringIds.has("calories") ? (
+          <SummaryKpi suffix="kcal" title="Calories" value={summary.totals.energyKcal} />
+        ) : null}
+        {ringIds.has("protein") ? null : (
+          <SummaryKpi suffix="g" title="Protein" value={summary.totals.proteins} />
+        )}
+        {ringIds.has("carbs") ? null : (
+          <SummaryKpi suffix="g" title="Carbs" value={summary.totals.carbohydrates} />
+        )}
+        {ringIds.has("fat") ? null : <SummaryKpi suffix="g" title="Fat" value={summary.totals.fat} />}
       </div>
       {empty ? (
         <EmptyState className="bg-surface-secondary rounded-2xl" size="sm">
@@ -420,63 +429,98 @@ function NutritionSummaryView({
   );
 }
 
-function CalorieGoalRing({
+function GoalRings({
   compact,
-  consumed,
-  goal,
+  rings,
 }: {
   readonly compact: boolean;
-  readonly consumed: number | null;
-  readonly goal: number;
+  readonly rings: readonly GoalRing[];
 }) {
-  const eaten = consumed === null ? 0 : Math.round(consumed);
-  const fill = Math.min(eaten, goal);
-  const over = Math.max(0, eaten - goal);
-  const left = Math.max(0, goal - eaten);
+  const calorie = rings.find((ring) => ring.id === "calories");
   const size = compact ? 160 : 200;
+  const count = rings.length;
+  const innerRadius = `${Math.max(40, 100 - count * 14)}%`;
+  const barSize = count <= 2 ? 12 : count <= 4 ? 10 : 8;
   const data = useMemo(
-    () => [{ fill: "var(--chart-3)", name: "Calories", value: fill }],
-    [fill],
+    () => rings.map((ring) => ({ fill: ring.fill, name: ring.name, value: ring.value })),
+    [rings],
   );
-  const label =
-    over > 0
-      ? `${eaten} of ${goal} kilocalories, ${over} over`
-      : `${eaten} of ${goal} kilocalories, ${left} left`;
+  const legend = useMemo(() => [...rings].reverse(), [rings]);
+  const label = rings
+    .map((ring) => `${ring.name}: ${ring.consumed} of ${ring.goal} ${ring.unit}, ${goalRemainder(ring.consumed, ring.goal, ring.unit)}`)
+    .join(". ");
 
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className="flex w-full flex-col items-center gap-3">
       <div aria-label={label} className="relative" role="img">
         <RadialChart
-          barSize={12}
+          barSize={barSize}
           data={data}
           height={size}
-          innerRadius="86%"
+          innerRadius={innerRadius}
           outerRadius="100%"
           width={size}
         >
-          <RadialChart.AngleAxis angleAxisId={0} domain={[0, goal]} tick={false} type="number" />
+          <RadialChart.AngleAxis angleAxisId={0} domain={[0, 100]} tick={false} type="number" />
           <RadialChart.Bar background angleAxisId={0} cornerRadius={12} dataKey="value" />
         </RadialChart>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-muted text-xs">Calories</span>
-          <span className="text-foreground text-xl font-semibold tabular-nums">{eaten} kcal</span>
-          <span className="text-muted text-xs">
-            {over > 0 ? `${over} kcal over` : left > 0 ? `${left} kcal left` : "Goal reached"}
-          </span>
+          {calorie ? (
+            <>
+              <span className="text-muted text-xs">Calories</span>
+              <span className="text-foreground text-xl font-semibold tabular-nums">
+                {calorie.consumed} kcal
+              </span>
+              <span className="text-muted text-xs">
+                {goalRemainder(calorie.consumed, calorie.goal, calorie.unit)}
+              </span>
+            </>
+          ) : (
+            <span className="text-muted text-xs">Goals</span>
+          )}
         </div>
       </div>
+      <ul className={cn("m-0 flex w-full list-none flex-col p-0", compact ? "max-w-xs gap-1" : "max-w-sm gap-1.5")}>
+        {legend.map((ring) => (
+          <li className="flex items-center gap-2 text-sm" key={ring.id}>
+            <span
+              className="size-2.5 shrink-0 rounded-full"
+              style={{ backgroundColor: ring.fill }}
+            />
+            <span className="text-foreground min-w-0 flex-1">{ring.name}</span>
+            <span className="text-foreground shrink-0 tabular-nums">
+              {ring.consumed} / {ring.goal} {ring.unit}
+            </span>
+            <span className="text-muted w-[5.75rem] shrink-0 text-right text-xs tabular-nums">
+              {goalRemainder(ring.consumed, ring.goal, ring.unit)}
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
 
+function goalRemainder(consumed: number, goal: number, unit: string): string {
+  const over = Math.max(0, consumed - goal);
+  const left = Math.max(0, goal - consumed);
+  if (over > 0) {
+    return `${over} ${unit} over`;
+  }
+  if (left > 0) {
+    return `${left} ${unit} left`;
+  }
+  return "Goal reached";
+}
+
 function SetCalorieGoalHint({ compact }: { readonly compact: boolean }) {
   if (compact) {
-    return <p className="text-muted px-1 text-sm">Set a daily calorie goal in chat to track it here.</p>;
+    return <p className="text-muted px-1 text-sm">Set daily goals in chat to track them here.</p>;
   }
   return (
     <p className="text-muted px-1 text-sm">
-      <Link href="/settings">Set a daily calorie goal</Link>
-      {" to fill a ring as you eat."}
+      <Link href="/settings">Set daily goals</Link>
+      {" to fill rings as you eat."}
     </p>
   );
 }

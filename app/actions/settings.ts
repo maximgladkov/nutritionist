@@ -3,8 +3,8 @@
 import { auth } from "@/auth";
 import { consumeLinkCode, createLinkCode } from "@/lib/identity";
 import { normalizeCountryCode } from "@/lib/countries";
-import { GoalError } from "@/lib/goal-values";
-import { saveCalorieGoal } from "@/lib/goals";
+import { GoalError, type GoalsView } from "@/lib/goal-values";
+import { saveGoals } from "@/lib/goals";
 import { prisma } from "@/lib/prisma";
 import {
   REMINDER_LABELS,
@@ -30,8 +30,9 @@ async function requireUserId(): Promise<string> {
   return current.user.id;
 }
 
-function noticeRedirect(message: string): never {
-  redirect(`/settings?notice=${encodeURIComponent(message)}`);
+function noticeRedirect(message: string, variant: "danger" | "success" = "success"): never {
+  const params = new URLSearchParams({ notice: message, noticeKind: variant });
+  redirect(`/settings?${params.toString()}`);
 }
 
 export async function saveCountryAction(raw: string) {
@@ -39,7 +40,7 @@ export async function saveCountryAction(raw: string) {
   const trimmed = raw.trim();
   const country = trimmed === "" ? null : normalizeCountryCode(trimmed);
   if (trimmed !== "" && !country) {
-    noticeRedirect("Choose a valid country.");
+    noticeRedirect("Choose a valid country.", "danger");
   }
   await prisma.userProfile.upsert({
     where: { userId },
@@ -51,19 +52,18 @@ export async function saveCountryAction(raw: string) {
   );
 }
 
-export async function saveCalorieGoalAction(raw: number | null) {
+export async function saveGoalsAction(patch: GoalsView) {
   const userId = await requireUserId();
   try {
-    const goals = await saveCalorieGoal(userId, raw);
-    noticeRedirect(
-      goals.caloriesPerDay === null
-        ? "Daily calorie goal cleared."
-        : `Daily calorie goal saved: ${goals.caloriesPerDay} kcal.`,
-    );
+    await saveGoals(userId, patch);
   } catch (error) {
-    const message = error instanceof GoalError ? error.message : "Could not save that goal.";
-    noticeRedirect(message);
+    const message =
+      error instanceof GoalError || (error instanceof Error && error.name === "GoalError")
+        ? error.message
+        : "Could not save those goals.";
+    noticeRedirect(message, "danger");
   }
+  noticeRedirect("Daily goals saved.");
 }
 
 export async function saveTimezoneAction(raw: string) {
@@ -71,7 +71,7 @@ export async function saveTimezoneAction(raw: string) {
   const trimmed = raw.trim();
   const timezone = trimmed === "" ? null : normalizeTimezone(trimmed);
   if (trimmed !== "" && !timezone) {
-    noticeRedirect("Choose a valid time zone.");
+    noticeRedirect("Choose a valid time zone.", "danger");
   }
   await prisma.userProfile.upsert({
     where: { userId },
@@ -109,7 +109,7 @@ export async function saveRemindersAction(
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not save reminders.";
-    noticeRedirect(message);
+    noticeRedirect(message, "danger");
   }
   noticeRedirect("Reminders saved.");
 }
@@ -123,6 +123,7 @@ export async function generateLinkCodeAction() {
 export async function consumeLinkCodeAction(code: string) {
   const userId = await requireUserId();
   const result = await consumeLinkCode(code, userId);
+  const ok = result.status === "merged" || result.status === "linked" || result.status === "already";
   const notice =
     result.status === "merged" || result.status === "linked"
       ? "Accounts linked. Memory now follows you across channels."
@@ -133,5 +134,5 @@ export async function consumeLinkCodeAction(code: string) {
           : result.status === "both-have-email"
             ? "Those accounts both have email sign-in and cannot be merged."
             : "That code is not valid.";
-  noticeRedirect(notice);
+  noticeRedirect(notice, ok ? "success" : "danger");
 }

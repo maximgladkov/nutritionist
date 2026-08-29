@@ -1,4 +1,4 @@
-import { getGoals } from "./goals.ts";
+import { getGoals, type GoalsView } from "./goals.ts";
 import { listMeals, summarizeNutrition, type MealView, type NutritionSummary } from "./meals.ts";
 import { emptyNutrients } from "./nutrition.ts";
 import { prisma } from "./prisma.ts";
@@ -8,9 +8,9 @@ import { listLocalDates, normalizeTimezone } from "./timezone.ts";
 export { CUSTOM_RANGE_MAX_DAYS, isSummaryPeriod, SUMMARY_PERIODS, type SummaryPeriod } from "./summary-range.ts";
 
 export type NutritionSummaryPayload = {
-  calorieGoalKcal: number | null;
   customFrom: string | null;
   customTo: string | null;
+  goals: GoalsView;
   meals: MealView[] | null;
   period: SummaryPeriod;
   summary: NutritionSummary;
@@ -55,8 +55,8 @@ export async function loadNutritionSummary(input: {
       : null;
   const goals = await getGoals(input.userId);
   return {
-    calorieGoalKcal: goals.caloriesPerDay,
     customFrom: input.customFrom ?? null,
+    goals,
     customTo: input.customTo ?? null,
     meals,
     period: input.period,

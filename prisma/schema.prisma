@@ -117,6 +117,10 @@ model UserProfile {
 
 enum GoalKind {
   calories_per_day
+  protein_g_per_day
+  carbs_g_per_day
+  fat_g_per_day
+  fiber_g_per_day
 }
 
 model UserGoal {

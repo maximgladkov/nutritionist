@@ -3,13 +3,13 @@
 import {
   consumeLinkCodeAction,
   generateLinkCodeAction,
-  saveCalorieGoalAction,
   saveCountryAction,
+  saveGoalsAction,
   saveRemindersAction,
   saveTimezoneAction,
 } from "@/app/actions/settings";
 import type { CountryOption } from "@/lib/countries";
-import { CALORIE_GOAL_MAX, CALORIE_GOAL_MIN } from "@/lib/goal-values";
+import { GOAL_FIELDS, GOAL_SPECS, type GoalField, type GoalsView } from "@/lib/goal-values";
 import {
   REMINDER_LABELS,
   type ReminderClock,
@@ -105,54 +105,115 @@ export function CountrySettings({
   );
 }
 
-export function CalorieGoalSettings({
-  defaultCalories,
+type GoalRowState = {
+  enabled: boolean;
+  value: number | undefined;
+};
+
+function rowsFromGoals(goals: GoalsView): Record<GoalField, GoalRowState> {
+  return Object.fromEntries(
+    GOAL_FIELDS.map((field) => [
+      field,
+      { enabled: goals[field] !== null, value: goals[field] ?? undefined },
+    ]),
+  ) as Record<GoalField, GoalRowState>;
+}
+
+export function DailyGoalsSettings({
+  defaultGoals,
 }: {
-  readonly defaultCalories: number | null;
+  readonly defaultGoals: GoalsView;
 }) {
-  const [kcal, setKcal] = useState<number | undefined>(defaultCalories ?? undefined);
+  const [rows, setRows] = useState<Record<GoalField, GoalRowState>>(() => rowsFromGoals(defaultGoals));
   const [isPending, startTransition] = useTransition();
 
   return (
     <Card>
       <Card.Header>
-        <Card.Title>Daily Calories</Card.Title>
+        <Card.Title>Daily Goals</Card.Title>
         <Card.Description>
-          The summary ring fills toward this target. Leave empty to clear it.
+          Turn on a nutrient to track it on the summary rings. Off or empty clears that target.
         </Card.Description>
       </Card.Header>
-      <Card.Content className="flex items-end gap-2">
-        <NumberField
-          className="min-w-[8.5rem] max-w-[12rem] flex-1"
-          formatOptions={{ maximumFractionDigits: 0, useGrouping: false }}
-          fullWidth
-          step={100}
-          maxValue={CALORIE_GOAL_MAX}
-          minValue={CALORIE_GOAL_MIN}
-          value={kcal ?? Number.NaN}
-          variant="secondary"
-          onChange={(value) => {
-            setKcal(value === undefined || Number.isNaN(value) ? undefined : value);
-          }}
-        >
-          <Label className="sr-only">Daily calorie goal</Label>
-          <NumberField.Group>
-            <NumberField.DecrementButton />
-            <NumberField.Input placeholder="kcal per day" />
-            <NumberField.IncrementButton />
-          </NumberField.Group>
-        </NumberField>
+      <Card.Content className="flex flex-col gap-4">
+        {GOAL_FIELDS.map((field) => {
+          const spec = GOAL_SPECS[field];
+          const row = rows[field];
+          return (
+            <div className="flex items-center justify-between gap-3" key={field}>
+              <span className="text-foreground text-sm">{spec.label}</span>
+              <div className="flex items-center gap-3">
+                <NumberField
+                  className="w-36"
+                  formatOptions={{ maximumFractionDigits: 0, useGrouping: false }}
+                  isDisabled={!row.enabled}
+                  maxValue={spec.max}
+                  minValue={spec.min}
+                  step={spec.step}
+                  value={row.value ?? Number.NaN}
+                  variant="secondary"
+                  onChange={(value) => {
+                    setRows((current) => ({
+                      ...current,
+                      [field]: {
+                        ...current[field],
+                        value: value === undefined || Number.isNaN(value) ? undefined : value,
+                      },
+                    }));
+                  }}
+                >
+                  <Label className="sr-only">{spec.label} goal</Label>
+                  <NumberField.Group>
+                    <NumberField.DecrementButton />
+                    <NumberField.Input placeholder={spec.unit === "kcal" ? "kcal / day" : "g / day"} />
+                    <NumberField.IncrementButton />
+                  </NumberField.Group>
+                </NumberField>
+                <Switch
+                  aria-label={`Enable ${spec.label} goal`}
+                  isSelected={row.enabled}
+                  onChange={(enabled) => {
+                    setRows((current) => ({
+                      ...current,
+                      [field]: { ...current[field], enabled },
+                    }));
+                  }}
+                >
+                  <Switch.Content>
+                    <Switch.Control>
+                      <Switch.Thumb />
+                    </Switch.Control>
+                  </Switch.Content>
+                </Switch>
+              </div>
+            </div>
+          );
+        })}
+      </Card.Content>
+      <Card.Footer>
         <Button
           isPending={isPending}
           onPress={() => {
             startTransition(() => {
-              void saveCalorieGoalAction(kcal ?? null);
+              void saveGoalsAction(
+                Object.fromEntries(
+                  GOAL_FIELDS.map((field) => {
+                    const amount = rows[field].value;
+                    return [
+                      field,
+                      rows[field].enabled && amount !== undefined && Number.isInteger(amount)
+                        ? amount
+                        : null,
+                    ];
+                  }),
+                ) as GoalsView,
+              );
             });
           }}
         >
-          Save
+          Save goals
         </Button>
-      </Card.Content>
+      </Card.Footer>
     </Card>
   );
 }

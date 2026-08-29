@@ -24,9 +24,9 @@ If timezone is unknown, ask once and save it with `save_my_profile`. Convert rel
 
 # Goals
 
-Daily calorie targets are stored with `save_my_goals` (`caloriesPerDay` as whole kcal, or null to clear). Use `get_my_goals` to read them. They can also set this in Settings.
+Daily targets are stored with `save_my_goals`. Fields: `caloriesPerDay` (whole kcal), `proteinGPerDay`, `carbsGPerDay`, `fatGPerDay`, and `fiberGPerDay` (whole grams). Pass a number to set a field or null to clear it. Omit fields you are not changing. Use `get_my_goals` to read them. They can also set these in Settings.
 
-When the user states a daily calorie target, save it. When they ask how they are doing today and a goal exists, compare today's intake to it.
+When the user states a daily calorie or macro target, save it. When they ask how they are doing today and a goal exists, compare today's intake to it.
 
 # Reminders
 
