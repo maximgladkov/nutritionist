@@ -45,7 +45,7 @@ describe("withSniffedImageType", () => {
 });
 
 describe("inlineTelegramImages", () => {
-  it("converts telegram file parts into image parts", async () => {
+  it("converts telegram file parts into inline image file parts", async () => {
     const url = "telegram-file:AgACAgIAphoto?filename=photo.jpg&mediaType=image%2Fjpeg";
     const content = await inlineTelegramImages(
       [
@@ -60,7 +60,12 @@ describe("inlineTelegramImages", () => {
 
     assert.deepEqual(content, [
       { type: "text", text: "Add 100 ml" },
-      { type: "image", image: jpeg, mediaType: "image/jpeg" },
+      {
+        type: "file",
+        mediaType: "image/jpeg",
+        filename: "photo.jpg",
+        data: { type: "data", data: jpeg.toString("base64") },
+      },
     ]);
   });
 
@@ -117,6 +122,45 @@ describe("inlineTelegramImages", () => {
       {},
     );
 
-    assert.equal((result as { message: Array<{ type: string }> }).message[0]?.type, "image");
+    const message = (result as { message: Array<{ type: string; data?: { type: string } }> }).message[0];
+    assert.equal(message?.type, "file");
+    assert.equal(message?.data?.type, "data");
+  });
+
+  it("emits JSON-serializable file parts so eve can snapshot the turn", async () => {
+    const content = await inlineTelegramImages(
+      [
+        {
+          type: "file",
+          mediaType: "image/jpeg",
+          filename: "photo.jpg",
+          data: "telegram-file:AgACAgIAphoto",
+        },
+      ],
+      async () => ({ bytes: jpeg, mediaType: "image/jpeg" }),
+    );
+
+    assert.deepEqual(JSON.parse(JSON.stringify(content)), content);
+    assert.equal(isJsonValue(content), true);
   });
 });
+
+function isJsonValue(value: unknown): boolean {
+  if (value === null || typeof value === "boolean" || typeof value === "string") {
+    return true;
+  }
+  if (typeof value === "number") {
+    return Number.isFinite(value);
+  }
+  if (Array.isArray(value)) {
+    return value.every(isJsonValue);
+  }
+  if (typeof value !== "object") {
+    return false;
+  }
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== null && proto !== Object.prototype) {
+    return false;
+  }
+  return Object.values(value).every((entry) => entry === undefined || isJsonValue(entry));
+}

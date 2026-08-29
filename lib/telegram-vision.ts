@@ -1,4 +1,4 @@
-import type { FilePart, ImagePart, UserContent } from "ai";
+import type { FilePart, UserContent } from "ai";
 import { isImageMediaType, looksLikeImageFilename, sniffImageMediaType } from "./image-bytes.ts";
 
 const EVE_URL_PREFIX = "eve-url:";
@@ -101,13 +101,13 @@ async function inlineTelegramImagePart(part: unknown, fetchFile: TelegramFileFet
     if (mediaType === undefined) {
       return part;
     }
-    return imagePart(bytes, mediaType);
+    return visionFilePart(bytes, mediaType, part.filename);
   } catch {
     return part;
   }
 }
 
-function inlineLocalFilePart(part: FilePart): FilePart | ImagePart {
+function inlineLocalFilePart(part: FilePart): FilePart {
   const bytes = localFileBytes(part.data);
   if (bytes === null || !shouldInlineAsImage(part.mediaType, part.filename)) {
     return part;
@@ -116,11 +116,16 @@ function inlineLocalFilePart(part: FilePart): FilePart | ImagePart {
   if (mediaType === undefined) {
     return part;
   }
-  return imagePart(bytes, mediaType);
+  return visionFilePart(bytes, mediaType, part.filename);
 }
 
-function imagePart(image: Uint8Array, mediaType: string): ImagePart {
-  return { type: "image", image, mediaType };
+function visionFilePart(bytes: Uint8Array, mediaType: string, filename?: string): FilePart {
+  return {
+    type: "file",
+    mediaType,
+    ...(filename === undefined ? {} : { filename }),
+    data: { type: "data", data: Buffer.from(bytes).toString("base64") },
+  };
 }
 
 function shouldInlineAsImage(mediaType: string | undefined, filename: string | undefined) {

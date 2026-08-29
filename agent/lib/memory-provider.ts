@@ -1,6 +1,4 @@
 import { defineMemoryProvider } from "eve/memory";
-import { defineTool } from "eve/tools";
-import { z } from "zod";
 import {
   emptyMemoryFile,
   formatRecall,
@@ -9,6 +7,8 @@ import {
   type MemoryFile,
 } from "../../lib/memory-format";
 import { prisma } from "../../lib/prisma";
+
+export const PROFILE_MEMORY_SLOT = "profile";
 
 function scopeUserId(value: string | readonly string[]): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
@@ -64,6 +64,58 @@ async function writeFile(input: {
   }
 }
 
+export async function savePersistentMemory(input: {
+  signal: AbortSignal;
+  slot: string;
+  text: string;
+  userId: string;
+}): Promise<{ saved: boolean }> {
+  const normalized = input.text.trim().replaceAll(/\s+/g, " ");
+  const stored = await readFile(input.userId, input.slot, input.signal);
+  const current = stored?.file ?? emptyMemoryFile();
+  if (current.entries.some((entry) => entry.text === normalized)) {
+    return { saved: false };
+  }
+  const lastAllocatedIndex = current.lastAllocatedIndex + 1;
+  await writeFile({
+    expectedVersion: stored?.version ?? null,
+    file: {
+      lastAllocatedIndex,
+      entries: [...current.entries, { index: lastAllocatedIndex, text: normalized }],
+    },
+    scopeKey: input.userId,
+    signal: input.signal,
+    slot: input.slot,
+    userId: input.userId,
+  });
+  return { saved: true };
+}
+
+export async function removePersistentMemory(input: {
+  index: number;
+  signal: AbortSignal;
+  slot: string;
+  userId: string;
+}): Promise<{ removed: boolean }> {
+  const stored = await readFile(input.userId, input.slot, input.signal);
+  if (!stored) {
+    return { removed: false };
+  }
+  const entries = stored.file.entries.filter((entry) => entry.index !== input.index);
+  if (entries.length === stored.file.entries.length) {
+    return { removed: false };
+  }
+  await writeFile({
+    expectedVersion: stored.version,
+    file: { ...stored.file, entries },
+    scopeKey: input.userId,
+    signal: input.signal,
+    slot: input.slot,
+    userId: input.userId,
+  });
+  return { removed: true };
+}
+
 export function prismaMemoryProvider() {
   return defineMemoryProvider({
     recall: {
@@ -103,68 +155,6 @@ export function prismaMemoryProvider() {
           ],
         };
       },
-    },
-    async tools(ctx: {
-      memory: { scope: { key: string; value: string | readonly string[] }; slot: string };
-    }) {
-      const userId = scopeUserId(ctx.memory.scope.value);
-      if (!userId) {
-        return null;
-      }
-      const slot = ctx.memory.slot;
-      const scopeKey = ctx.memory.scope.key;
-      return {
-        remove_memory: defineTool({
-          description:
-            "Remove one persistent memory by the index shown in recalled memory. Use when it is wrong, outdated, or no longer needed.",
-          inputSchema: z.object({ index: z.number().int().min(0) }),
-          async execute({ index }, toolCtx) {
-            const stored = await readFile(userId, slot, toolCtx.abortSignal);
-            if (!stored) {
-              return { removed: false };
-            }
-            const entries = stored.file.entries.filter((entry) => entry.index !== index);
-            if (entries.length === stored.file.entries.length) {
-              return { removed: false };
-            }
-            await writeFile({
-              expectedVersion: stored.version,
-              file: { ...stored.file, entries },
-              scopeKey,
-              signal: toolCtx.abortSignal,
-              slot,
-              userId,
-            });
-            return { removed: true };
-          },
-        }),
-        save_memory: defineTool({
-          description:
-            "Save one concise, stable fact or preference for future conversations. Omit secrets, instructions, and current-task details.",
-          inputSchema: z.object({ text: z.string().min(1) }),
-          async execute({ text }, toolCtx) {
-            const normalized = text.trim().replaceAll(/\s+/g, " ");
-            const stored = await readFile(userId, slot, toolCtx.abortSignal);
-            const current = stored?.file ?? emptyMemoryFile();
-            if (current.entries.some((entry) => entry.text === normalized)) {
-              return { saved: false };
-            }
-            const lastAllocatedIndex = current.lastAllocatedIndex + 1;
-            await writeFile({
-              expectedVersion: stored?.version ?? null,
-              file: {
-                lastAllocatedIndex,
-                entries: [...current.entries, { index: lastAllocatedIndex, text: normalized }],
-              },
-              scopeKey,
-              signal: toolCtx.abortSignal,
-              slot,
-              userId,
-            });
-            return { saved: true };
-          },
-        }),
-      };
     },
   });
 }
