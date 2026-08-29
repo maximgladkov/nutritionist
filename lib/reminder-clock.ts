@@ -7,6 +7,30 @@ export const DEFAULT_REMINDER_TIMES: Record<ReminderLabel, { hour: number; minut
   dinner: { hour: 21, minute: 0 },
 };
 
+export type ReminderClock = {
+  readonly enabled: boolean;
+  readonly hour: number;
+  readonly minute: number;
+};
+
+export function reminderRowsFromState(
+  remindersByLabel: ReadonlyMap<ReminderLabel, ReminderClock>,
+): Record<ReminderLabel, ReminderClock> {
+  return Object.fromEntries(
+    REMINDER_LABELS.map((label) => {
+      const row = remindersByLabel.get(label) ?? DEFAULT_REMINDER_TIMES[label];
+      return [
+        label,
+        {
+          enabled: "enabled" in row ? row.enabled : true,
+          hour: row.hour,
+          minute: row.minute,
+        },
+      ];
+    }),
+  ) as Record<ReminderLabel, ReminderClock>;
+}
+
 export function isReminderLabel(value: string): value is ReminderLabel {
   return (REMINDER_LABELS as readonly string[]).includes(value);
 }

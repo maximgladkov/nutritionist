@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import type { ReactNode } from "react";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { AppShell } from "@/app/_components/app-shell";
+import { auth } from "@/auth";
 import { cn } from "@/lib/utils";
 import "./globals.css";
 
@@ -24,11 +25,12 @@ export const metadata: Metadata = {
   description: "A nutritionist agent with web, Telegram, and WhatsApp chat.",
 };
 
-export default function RootLayout({ children }: { readonly children: ReactNode }) {
+export default async function RootLayout({ children }: { readonly children: ReactNode }) {
+  const session = await auth();
   return (
-    <html className={cn(sans.variable, mono.variable)} lang="en">
-      <body>
-        <TooltipProvider>{children}</TooltipProvider>
+    <html className={cn(sans.variable, mono.variable)} lang="en" suppressHydrationWarning>
+      <body className="bg-background text-foreground antialiased">
+        <AppShell email={session?.user?.email ?? undefined}>{children}</AppShell>
       </body>
     </html>
   );

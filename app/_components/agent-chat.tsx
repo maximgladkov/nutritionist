@@ -1,48 +1,36 @@
 "use client";
 
 import type { FileUIPart, UserContent } from "ai";
-import { useEveAgent } from "eve/react";
+import { ArrowUp, CircleExclamation, Paperclip, Square } from "@gravity-ui/icons";
+import { Alert } from "@heroui/react";
 import {
-  AlertCircleIcon,
-  BrainIcon,
-  PaperclipIcon,
-  PlusIcon,
-  SettingsIcon,
-  SquareIcon,
-  XIcon,
-} from "lucide-react";
-import { signOutAction } from "@/app/actions/auth";
-import { useEffect, useState } from "react";
-import {
-  Conversation,
-  ConversationContent,
-  ConversationScrollButton,
-  ConversationTopFade,
-} from "@/components/ai-elements/conversation";
-import { Message, MessageContent } from "@/components/ai-elements/message";
-import {
+  ChatAttachment,
+  ChatAttachmentGroup,
+  ChatAttachmentInput,
+  ChatConversation,
+  ChatLoader,
+  ChatMessage,
+  EmptyState,
   PromptInput,
-  PromptInputButton,
-  PromptInputFooter,
-  PromptInputHeader,
-  type PromptInputMessage,
-  PromptInputSubmit,
-  PromptInputTextarea,
-  PromptInputTools,
-  usePromptInputAttachments,
-} from "@/components/ai-elements/prompt-input";
-import { Shimmer } from "@/components/ai-elements/shimmer";
-import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
-import { prepareImageFiles } from "@/lib/heic";
-import { cn } from "@/lib/utils";
+  TextShimmer,
+} from "@heroui-pro/react";
+import { useEveAgent } from "eve/react";
+import { useEffect, useState } from "react";
 import { AgentMessage } from "./agent-message";
+import { prepareImageFiles } from "@/lib/heic";
 
 const AGENT_NAME = "Nutritionist";
 const IMAGE_ACCEPT =
   "image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif,.heic,.heif";
 const MAX_ATTACHMENT_FILES = 5;
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+
+type PendingAttachment = {
+  readonly id: string;
+  readonly filename: string;
+  readonly mediaType: string;
+  readonly url: string;
+};
 
 export function AgentChat({
   sessionId,
@@ -52,8 +40,10 @@ export function AgentChat({
   readonly sessionless?: boolean;
 }) {
   const [cancellationError, setCancellationError] = useState<string>();
-  const [hasInputText, setHasInputText] = useState(false);
+  const [value, setValue] = useState("");
+  const [attachments, setAttachments] = useState<readonly PendingAttachment[]>([]);
   const [optimisticFiles, setOptimisticFiles] = useState<readonly FileUIPart[]>([]);
+  const [isPreparing, setIsPreparing] = useState(false);
   const agent = useEveAgent({
     initialSession:
       sessionId === undefined
@@ -65,7 +55,6 @@ export function AgentChat({
     resume: sessionId !== undefined,
     onSessionChange(session) {
       if (sessionId === undefined && session !== undefined) {
-        // Next patches window.history to navigate, which would detach the active stream.
         History.prototype.replaceState.call(
           window.history,
           window.history.state,
@@ -90,7 +79,15 @@ export function AgentChat({
   const errorMessage = cancellationError ?? agent.error?.message ?? turnFailure;
   const hasConversationContent = sessionless || !isEmpty || errorMessage !== undefined;
   const showConversationLayout = isResuming || hasConversationContent;
-  const activeSessionId = sessionId ?? agent.session?.sessionId;
+  const canSubmit = value.trim().length > 0 || attachments.length > 0;
+  const promptStatus =
+    isResuming || isPreparing
+      ? "submitted"
+      : isBusy && !canSubmit
+        ? agent.status === "streaming"
+          ? "streaming"
+          : "submitted"
+        : "ready";
 
   useEffect(() => {
     if (!agent.data.messages.some((message) => message.metadata?.optimistic)) {
@@ -105,16 +102,49 @@ export function AgentChat({
     });
   };
 
-  const handleSubmit = async (message: PromptInputMessage) => {
-    const text = message.text.trim();
-    if ((text.length === 0 && message.files.length === 0) || isResuming) return;
-
-    setHasInputText(false);
+  const handleFilesSelected = async (files: File[]) => {
     setCancellationError(undefined);
-    setOptimisticFiles(message.files);
+    const remaining = MAX_ATTACHMENT_FILES - attachments.length;
+    if (remaining <= 0) {
+      setCancellationError(`You can attach up to ${MAX_ATTACHMENT_FILES} photos.`);
+      return;
+    }
+    const selected = files.slice(0, remaining);
+    if (selected.some((file) => file.size > MAX_ATTACHMENT_BYTES)) {
+      setCancellationError("Each photo must be 10 MB or smaller.");
+      return;
+    }
+    setIsPreparing(true);
+    try {
+      const prepared = await prepareImageFiles(selected);
+      const next = await Promise.all(prepared.map(fileToPendingAttachment));
+      setAttachments((current) => [...current, ...next]);
+    } catch (error: unknown) {
+      setCancellationError(toErrorMessage(error));
+    } finally {
+      setIsPreparing(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    const text = value.trim();
+    if ((text.length === 0 && attachments.length === 0) || isResuming || isPreparing) {
+      return;
+    }
+
+    setValue("");
+    setCancellationError(undefined);
+    const files = attachments.map((file) => ({
+      filename: file.filename,
+      mediaType: file.mediaType,
+      type: "file" as const,
+      url: file.url,
+    }));
+    setOptimisticFiles(files);
+    setAttachments([]);
     const options = isBusy ? { turnPolicy: "steer" as const } : undefined;
 
-    if (message.files.length === 0) {
+    if (files.length === 0) {
       await agent.send(text, options);
       return;
     }
@@ -123,7 +153,7 @@ export function AgentChat({
     if (text.length > 0) {
       parts.push({ text, type: "text" });
     }
-    for (const file of message.files) {
+    for (const file of files) {
       parts.push({
         data: file.url,
         filename: file.filename,
@@ -137,276 +167,197 @@ export function AgentChat({
 
   const composer = (
     <PromptInput
-      accept={IMAGE_ACCEPT}
-      maxFiles={MAX_ATTACHMENT_FILES}
-      maxFileSize={MAX_ATTACHMENT_BYTES}
-      multiple
-      onError={(error) => setCancellationError(error.message)}
-      onSubmit={handleSubmit}
-      prepareFiles={prepareImageFiles}
+      status={promptStatus}
+      value={value}
+      onStop={requestCancellation}
+      onSubmit={() => {
+        void handleSubmit();
+      }}
+      onValueChange={setValue}
     >
-      <ComposerHeader />
-      <PromptInputTextarea
-        className="min-h-12"
-        disabled={isResuming}
-        onChange={(event) => setHasInputText(event.currentTarget.value.trim().length > 0)}
-        placeholder="Ask about a meal or attach a photo…"
-      />
-      <PromptInputFooter>
-        <PromptInputTools>
-          <ComposerAttachButton disabled={isResuming} />
-        </PromptInputTools>
-        <ComposerAction
-          hasInputText={hasInputText}
-          isBusy={isBusy}
-          isResuming={isResuming}
-          onCancel={requestCancellation}
+      <ChatAttachmentInput
+        accept={IMAGE_ACCEPT}
+        disabled={isResuming || isPreparing}
+        multiple
+        onFilesSelected={(files) => {
+          void handleFilesSelected(files);
+        }}
+      >
+        <ChatAttachmentInput.Dropzone
+          render={(dropzoneProps) => (
+            <PromptInput.Shell {...dropzoneProps}>
+              <PromptInput.Content>
+                {attachments.length > 0 ? (
+                  <PromptInput.Attachments>
+                    <ChatAttachmentGroup>
+                      {attachments.map((file) => (
+                        <ChatAttachment
+                          key={file.id}
+                          mediaType="image"
+                          mimeType={file.mediaType}
+                          name={file.filename}
+                          src={file.url}
+                        >
+                          <ChatAttachment.Preview />
+                          <ChatAttachment.Remove
+                            aria-label={`Remove ${file.filename}`}
+                            onPress={() =>
+                              setAttachments((current) =>
+                                current.filter((item) => item.id !== file.id),
+                              )
+                            }
+                          />
+                        </ChatAttachment>
+                      ))}
+                    </ChatAttachmentGroup>
+                  </PromptInput.Attachments>
+                ) : null}
+                <PromptInput.TextArea
+                  disabled={isResuming}
+                  placeholder="Ask about a meal or attach a photo…"
+                />
+              </PromptInput.Content>
+              <PromptInput.Toolbar>
+                <PromptInput.ToolbarStart>
+                  <ChatAttachmentInput.Trigger
+                    render={(triggerProps) => (
+                      <PromptInput.Action
+                        {...triggerProps}
+                        aria-label="Add photo"
+                        isDisabled={isResuming || isPreparing}
+                        tooltip="Add photo"
+                      >
+                        <Paperclip className="size-4" />
+                      </PromptInput.Action>
+                    )}
+                  />
+                </PromptInput.ToolbarStart>
+                <PromptInput.ToolbarEnd>
+                  <PromptInput.Send aria-label={isBusy && !canSubmit ? "Stop" : "Send"}>
+                    {isBusy && !canSubmit ? (
+                      <Square className="size-3 fill-current" />
+                    ) : (
+                      <ArrowUp className="size-4" />
+                    )}
+                  </PromptInput.Send>
+                </PromptInput.ToolbarEnd>
+              </PromptInput.Toolbar>
+            </PromptInput.Shell>
+          )}
         />
-      </PromptInputFooter>
+      </ChatAttachmentInput>
     </PromptInput>
   );
 
   return (
-    <main className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
-      <ChatHeader canStartNewChat={activeSessionId !== undefined} />
-
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
       {showConversationLayout ? (
-        <Conversation
-          className="min-h-0 flex-1"
-          initial={sessionId === undefined ? undefined : false}
-          resize={activeSessionId === undefined ? "smooth" : "instant"}
-          scrollRestorationKey={
-            isEmpty || activeSessionId === undefined
-              ? undefined
-              : `eve:web-chat-scroll:${activeSessionId}`
-          }
-        >
-          <ConversationTopFade className="top-14" />
-          <ConversationContent className="mx-auto w-full max-w-3xl gap-6 px-4 pt-20 pb-44 sm:px-6">
-            {agent.data.messages.map((message, index) =>
-              showPendingThinking &&
-              isPendingAssistantShell &&
-              message.id === lastMessage.id ? null : (
-                <AgentMessage
-                  canRespond={!isBusy && !isResuming}
-                  extraFiles={
-                    message.metadata?.optimistic && optimisticFiles.length > 0
-                      ? optimisticFiles
-                      : undefined
-                  }
-                  isStreaming={
-                    agent.status === "streaming" && index === agent.data.messages.length - 1
-                  }
-                  key={message.id}
-                  message={message}
-                  onInputResponses={(inputResponses) => {
-                    setCancellationError(undefined);
-                    return agent.respond(inputResponses);
-                  }}
-                />
-              ),
-            )}
-            {showPendingThinking ? <PendingThinking /> : null}
-            {errorMessage ? <ErrorMessage message={errorMessage} /> : null}
-          </ConversationContent>
-          <ConversationScrollButton />
-        </Conversation>
-      ) : null}
-
-      <div
-        className={cn(
-          "mx-auto w-full px-4 sm:px-6",
-          showConversationLayout
-            ? "fixed bottom-0 left-1/2 z-20 max-w-3xl -translate-x-1/2 bg-gradient-to-t from-background via-background to-transparent pt-4 pb-6"
-            : "flex max-w-xl flex-1 flex-col items-center justify-center gap-8 pb-[10vh]",
-        )}
-      >
-        {showConversationLayout ? null : (
-          <div className="flex flex-col items-center gap-3 text-center">
-            <h1 className="font-medium text-5xl tracking-tighter">{AGENT_NAME}</h1>
-          </div>
-        )}
-        <div className="w-full">{composer}</div>
-      </div>
-    </main>
-  );
-}
-
-function ComposerAction({
-  hasInputText,
-  isBusy,
-  isResuming,
-  onCancel,
-}: {
-  readonly hasInputText: boolean;
-  readonly isBusy: boolean;
-  readonly isResuming: boolean;
-  readonly onCancel: () => void;
-}) {
-  const attachments = usePromptInputAttachments();
-  const canSubmit = hasInputText || attachments.files.length > 0;
-  const isPreparing = attachments.files.some((file) => file.status === "preparing");
-
-  if (!isBusy || canSubmit) {
-    return <PromptInputSubmit className="static" disabled={isResuming || isPreparing} />;
-  }
-
-  return (
-    <PromptInputButton
-      aria-label="Stop"
-      className="static"
-      onClick={onCancel}
-      variant="outline"
-    >
-      <SquareIcon className="size-3 fill-current" />
-    </PromptInputButton>
-  );
-}
-
-function ComposerAttachButton({ disabled }: { readonly disabled: boolean }) {
-  const attachments = usePromptInputAttachments();
-
-  return (
-    <PromptInputButton
-      aria-label="Add photo"
-      disabled={disabled}
-      onClick={() => attachments.openFileDialog()}
-      tooltip="Add photo"
-    >
-      <PaperclipIcon className="size-4" />
-    </PromptInputButton>
-  );
-}
-
-function ComposerHeader() {
-  const attachments = usePromptInputAttachments();
-  if (attachments.files.length === 0) {
-    return null;
-  }
-
-  return (
-    <PromptInputHeader>
-      <ComposerAttachments />
-    </PromptInputHeader>
-  );
-}
-
-function ComposerAttachments() {
-  const attachments = usePromptInputAttachments();
-  if (attachments.files.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="flex flex-wrap gap-2">
-      {attachments.files.map((file) => {
-        const isPreparing = file.status === "preparing";
-        return (
-          <span
-            aria-busy={isPreparing}
-            className="relative size-14 overflow-hidden rounded-md border bg-muted"
-            key={file.id}
-          >
-            {canPreviewAttachment(file.mediaType) ? (
-              <img
-                alt={file.filename ?? "Attachment"}
-                className="size-full object-cover"
-                src={file.url}
-              />
-            ) : null}
-            {isPreparing ? (
-              <span className="absolute inset-0 flex items-center justify-center bg-background/60">
-                <Spinner className="size-4" />
-              </span>
-            ) : null}
-            <button
-              aria-label={`Remove ${file.filename ?? "attachment"}`}
-              className="absolute top-0.5 right-0.5 z-10 flex size-5 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm"
-              onClick={() => attachments.remove(file.id)}
-              type="button"
-            >
-              <XIcon className="size-3" />
-            </button>
-          </span>
-        );
-      })}
+        <>
+          <ChatConversation className="min-h-0 flex-1">
+            <ChatConversation.Content className="mx-auto w-full max-w-3xl flex-col gap-8 px-4 pt-6 pb-8 sm:px-6">
+              {agent.data.messages.map((message, index) =>
+                showPendingThinking &&
+                isPendingAssistantShell &&
+                message.id === lastMessage.id ? null : (
+                  <AgentMessage
+                    canRespond={!isBusy && !isResuming}
+                    extraFiles={
+                      message.metadata?.optimistic && optimisticFiles.length > 0
+                        ? optimisticFiles
+                        : undefined
+                    }
+                    isStreaming={
+                      agent.status === "streaming" && index === agent.data.messages.length - 1
+                    }
+                    key={message.id}
+                    message={message}
+                    onInputResponses={(inputResponses) => {
+                      setCancellationError(undefined);
+                      return agent.respond(inputResponses);
+                    }}
+                  />
+                ),
+              )}
+              {showPendingThinking ? <PendingThinking /> : null}
+              {errorMessage ? <ErrorMessage message={errorMessage} /> : null}
+            </ChatConversation.Content>
+            <ChatConversation.ScrollButton
+              aria-label="Scroll to bottom"
+              tooltip="Scroll to bottom"
+            />
+          </ChatConversation>
+          <div className="mx-auto w-full max-w-3xl shrink-0 px-4 pt-3 pb-4 sm:px-6">{composer}</div>
+        </>
+      ) : (
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-8 px-4 pb-[10vh]">
+          <EmptyState className="max-w-xl">
+            <EmptyState.Header>
+              <EmptyState.Title>{AGENT_NAME}</EmptyState.Title>
+              <EmptyState.Description>
+                Ask about a meal or attach a photo to log what you ate.
+              </EmptyState.Description>
+            </EmptyState.Header>
+          </EmptyState>
+          <div className="w-full max-w-xl">{composer}</div>
+        </div>
+      )}
     </div>
   );
 }
 
-function canPreviewAttachment(mediaType: string | undefined): boolean {
-  if (!mediaType) {
-    return false;
-  }
-  const type = mediaType.toLowerCase();
-  return type.startsWith("image/") && !type.includes("heic") && !type.includes("heif");
-}
-
 function ErrorMessage({ message }: { readonly message: string }) {
   return (
-    <Message className="max-w-full" from="assistant">
-      <MessageContent>
-        <div
-          className="flex w-full items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm"
-          role="alert"
-        >
-          <AlertCircleIcon className="mt-0.5 size-4 shrink-0 text-destructive" />
-          <div>
-            <p className="font-medium">Request failed</p>
-            <p className="mt-0.5 text-muted-foreground">{message}</p>
-          </div>
-        </div>
-      </MessageContent>
-    </Message>
-  );
-}
-
-function ChatHeader({ canStartNewChat }: { readonly canStartNewChat: boolean }) {
-  return (
-    <header className="pointer-events-none fixed top-0 right-0 left-0 z-20 h-14">
-      <div className="relative mx-auto flex h-full w-full max-w-3xl items-center justify-center bg-background px-24">
-        <span className="truncate text-muted-foreground text-sm">{AGENT_NAME}</span>
-        <div className="pointer-events-auto fixed top-3 right-6 flex items-center gap-1">
-          <Button asChild size="sm" type="button" variant="ghost">
-            <a href="/settings">
-              <SettingsIcon className="size-4" />
-              <span className="hidden font-normal text-sm sm:inline">Settings</span>
-            </a>
-          </Button>
-          <form action={signOutAction}>
-            <Button size="sm" type="submit" variant="ghost">
-              Sign out
-            </Button>
-          </form>
-          {canStartNewChat ? (
-            <Button
-              aria-label="Start a new chat"
-              onClick={() => window.location.assign("/s")}
-              size="sm"
-              type="button"
-              variant="ghost"
-            >
-              <PlusIcon className="size-4" />
-              <span className="hidden font-normal text-sm sm:inline">New chat</span>
-            </Button>
-          ) : null}
-        </div>
-      </div>
-    </header>
+    <ChatMessage.Assistant>
+      <ChatMessage.Body>
+        <Alert status="danger">
+          <Alert.Indicator>
+            <CircleExclamation />
+          </Alert.Indicator>
+          <Alert.Content>
+            <Alert.Title>Request failed</Alert.Title>
+            <Alert.Description>{message}</Alert.Description>
+          </Alert.Content>
+        </Alert>
+      </ChatMessage.Body>
+    </ChatMessage.Assistant>
   );
 }
 
 function PendingThinking() {
   return (
-    <Message aria-live="polite" from="assistant">
-      <MessageContent>
-        <div className="mb-4 flex w-full items-center gap-2 text-muted-foreground text-sm">
-          <BrainIcon className="size-4" />
-          <Shimmer duration={1}>Thinking</Shimmer>
-        </div>
-      </MessageContent>
-    </Message>
+    <ChatMessage.Assistant>
+      <ChatMessage.Body>
+        <TextShimmer>Thinking</TextShimmer>
+        <ChatLoader.Dots label="Thinking" />
+      </ChatMessage.Body>
+    </ChatMessage.Assistant>
   );
+}
+
+async function fileToPendingAttachment(file: File): Promise<PendingAttachment> {
+  return {
+    filename: file.name,
+    id: `${file.name}-${file.lastModified}-${crypto.randomUUID()}`,
+    mediaType: file.type || "image/jpeg",
+    url: await fileToDataUrl(file),
+  };
+}
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error("Could not read the photo."));
+    };
+    reader.onerror = () => {
+      reject(new Error("Could not read the photo."));
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 function toErrorMessage(error: unknown): string {
