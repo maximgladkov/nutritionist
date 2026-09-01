@@ -2,8 +2,7 @@ import { createTelegramFetchFile, telegramChannel } from "eve/channels/telegram"
 import type { TelegramContext, TelegramMessage } from "eve/channels/telegram";
 import { handleChannelLink, resolveChannelUser, saveChannelThreadId } from "../lib/channel-identity";
 import { telegramSummaryMiniAppUrl } from "../../lib/app-url";
-import { TELEGRAM_ACK_TURN_CONTEXT, postTelegramAck, telegramAckFiles, telegramAckUserContent } from "../../lib/telegram-ack";
-import { appendTelegramAckHistory, loadTelegramAckHistory } from "../../lib/telegram-ack-history";
+import { TELEGRAM_ACK_TURN_CONTEXT, postTelegramAck, telegramAckFiles } from "../../lib/telegram-ack";
 import { applyTelegramHiddenMedia, telegramMessageHasInboundContent } from "../../lib/telegram-media";
 import { claimTelegramMessage } from "../../lib/telegram-message-claim";
 import { markdownToTelegramHtml, telegramHtmlMessage } from "../../lib/telegram-html";
@@ -34,9 +33,9 @@ export default attachTelegramVision(
         } catch {
           await channel.telegram.post(data.message);
         }
-        await appendTelegramAckHistory(channel.telegram.chatId, [
-          { role: "assistant", text: data.message },
-        ]);
+      },
+      "turn.completed"(_data, channel, ctx) {
+        channel.continuation?.rekey(`spent:${ctx.session.id}`);
       },
     },
     async onMessage(ctx, message) {
@@ -69,17 +68,13 @@ export default attachTelegramVision(
         return null;
       }
       void ctx.telegram.startTyping();
-      const historyKey = ctx.telegram.chatId;
       applyTelegramHiddenMedia(message);
       const files = telegramAckFiles(message.attachments);
-      const ackPosted = loadTelegramAckHistory(historyKey).then((history) =>
-        postTelegramAck(ctx.telegram, {
-          caption: message.caption,
-          files,
-          history,
-          text: message.text,
-        }),
-      );
+      const ackPosted = postTelegramAck(ctx.telegram, {
+        caption: message.caption,
+        files,
+        text: message.text,
+      });
       const user = await resolveChannelUser({
         provider: "telegram",
         providerUserId: from.id,
@@ -94,10 +89,6 @@ export default attachTelegramVision(
         void ensureSummaryMenuButton(ctx);
       }
       const ack = await ackPosted.catch(() => false);
-      void appendTelegramAckHistory(historyKey, [
-        { role: "user", text: telegramAckUserContent({ caption: message.caption, files, text: message.text }) },
-        ...(typeof ack === "string" ? [{ role: "assistant" as const, text: ack }] : []),
-      ]);
       return {
         auth: appPrincipal(user.id, "telegram"),
         ...(ack ? { context: [TELEGRAM_ACK_TURN_CONTEXT] } : {}),

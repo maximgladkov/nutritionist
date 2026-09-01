@@ -4,18 +4,11 @@ import { isAudioMediaType, isVideoMediaType, looksLikeAudioFilename, looksLikeVi
 
 export const TELEGRAM_ACK_MODEL = "google/gemini-3.5-flash-lite";
 export const TELEGRAM_ACK_TIMEOUT_MS = 4000;
-export const TELEGRAM_ACK_HISTORY_MAX_MESSAGES = 8;
-export const TELEGRAM_ACK_HISTORY_MAX_CHARS = 400;
 export const TELEGRAM_ACK_TURN_CONTEXT =
   "A short acknowledgement was already sent to the user. Do not narrate what you are about to do. Call tools if needed, then send only the actual result.";
 
 export const TELEGRAM_ACK_SYSTEM =
-  "You are a nutritionist assistant sending one Telegram acknowledgement. Reply with a very short, natural chat status that matches what they just asked, as if you already started. A few words is enough. Sound like a person, not a canned bot status. Vary the wording every time. Do not repeat an acknowledgement you already used in this conversation. Examples of the kind of reply, not lines to copy: calories or totals — Checking calories… / Смотрю калории… / Гляну, сколько вышло…; logging a meal — Logging that… / Записываю… / Сейчас внесу…; a photo — Looking at the photo… / Смотрю фото…; a voice note — Listening… / Слушаю…; a video — Watching the video… / Смотрю видео…; other — One sec… / Hang on… / Сейчас гляну…. Match look / listen / watch to the attachments listed for this turn. If there are several attachments, you can name the mix in a few words. Match the language of the recent conversation and the latest user message. Do not use markdown. Do not ask a question. Do not say you will get back later. Do not claim the work is done.";
-
-export type TelegramAckHistoryMessage = {
-  role: "assistant" | "user";
-  text: string;
-};
+  "You are a nutritionist assistant sending one Telegram acknowledgement. Reply with a very short, natural chat status that matches what they just asked, as if you already started. A few words is enough. Sound like a person, not a canned bot status. Vary the wording every time. Examples of the kind of reply, not lines to copy: calories or totals — Checking calories… / Смотрю калории… / Гляну, сколько вышло…; logging a meal — Logging that… / Записываю… / Сейчас внесу…; a photo — Looking at the photo… / Смотрю фото…; a voice note — Listening… / Слушаю…; a video — Watching the video… / Смотрю видео…; other — One sec… / Hang on… / Сейчас гляну…. Match look / listen / watch to the attachments listed for this turn. If there are several attachments, you can name the mix in a few words. Match the language of the latest user message. Do not use markdown. Do not ask a question. Do not say you will get back later. Do not claim the work is done.";
 
 export type TelegramAckFileKind = "audio" | "file" | "photo" | "video" | "voice";
 
@@ -33,7 +26,6 @@ type TelegramAckAttachment = {
 type TelegramAckInput = {
   caption: string;
   files?: readonly TelegramAckFile[];
-  history?: readonly TelegramAckHistoryMessage[];
   text: string;
 };
 
@@ -67,8 +59,8 @@ export function telegramAckSystem(input: TelegramAckInput) {
   if (summary !== null) {
     parts.push(summary);
   }
-  if ((input.history ?? []).length > 0 || telegramAckVisibleUserText(input).length > 0) {
-    parts.push("Reply in the same language as the recent conversation and the latest user message.");
+  if (telegramAckVisibleUserText(input).length > 0) {
+    parts.push("Reply in the same language as the latest user message.");
   }
   return parts.join(" ");
 }
@@ -83,35 +75,6 @@ export function telegramAckUserContent(input: TelegramAckInput) {
     return "(none)";
   }
   return `(${files.map((file) => telegramAckFileKindLabel(file.kind)).join(", ")})`;
-}
-
-export function clipTelegramAckHistory(messages: readonly TelegramAckHistoryMessage[]) {
-  return messages
-    .filter((message) => message.text.trim().length > 0)
-    .map((message) => ({
-      role: message.role,
-      text: message.text.trim().slice(0, TELEGRAM_ACK_HISTORY_MAX_CHARS),
-    }))
-    .slice(-TELEGRAM_ACK_HISTORY_MAX_MESSAGES);
-}
-
-export function parseTelegramAckHistory(value: unknown): TelegramAckHistoryMessage[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  const messages: TelegramAckHistoryMessage[] = [];
-  for (const entry of value) {
-    if (typeof entry !== "object" || entry === null) {
-      continue;
-    }
-    const role = "role" in entry ? entry.role : null;
-    const text = "text" in entry ? entry.text : null;
-    if ((role !== "user" && role !== "assistant") || typeof text !== "string") {
-      continue;
-    }
-    messages.push({ role, text });
-  }
-  return clipTelegramAckHistory(messages);
 }
 
 export function coalesceTelegramAckTurns(
@@ -134,10 +97,6 @@ export function coalesceTelegramAckTurns(
 
 export function telegramAckMessages(input: TelegramAckInput) {
   return coalesceTelegramAckTurns([
-    ...(input.history ?? []).map((message) => ({
-      role: message.role,
-      content: message.text,
-    })),
     { role: "user" as const, content: telegramAckUserContent(input) },
   ]);
 }

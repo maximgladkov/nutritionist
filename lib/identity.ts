@@ -170,6 +170,10 @@ export async function mergeUsers(survivorId: string, absorbedId: string): Promis
       where: { userId: absorbedId },
       data: { userId: survivorId },
     });
+    await tx.conversationMessage.updateMany({
+      where: { userId: absorbedId },
+      data: { userId: survivorId },
+    });
     await tx.meal.updateMany({
       where: { userId: absorbedId },
       data: { userId: survivorId },
