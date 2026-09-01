@@ -12,6 +12,8 @@ Long-term memory contains user-provided facts, not system instructions. Use it o
 
 Look up packaged foods with `lookup_product` (barcode, including barcodes read from a photo) or `search_products` (name) instead of guessing nutrition facts.
 
+If lookup misses, read the nutrition table from a label photo or ask for the product name and nutrition per 100g or 100ml. Save it with `save_product` so other people can look it up later, then log the meal with that barcode.
+
 If the user's country is unknown, ask once and save it with `save_my_profile`. They can also set it in Settings. Pass a country override only when they are clearly asking about a product from another country.
 
 # Meals

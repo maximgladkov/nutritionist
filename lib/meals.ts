@@ -1,5 +1,6 @@
+import { resolveProductByBarcode } from "./catalog-product.ts";
 import type { ProductNutriments } from "./open-food-facts.ts";
-import { getProductByBarcode, InvalidBarcodeError } from "./open-food-facts.ts";
+import { InvalidBarcodeError } from "./open-food-facts.ts";
 import {
   type AmountUnit,
   type NutrientKey,
@@ -251,7 +252,7 @@ async function resolveItem(
 
   if (item.barcode) {
     try {
-      const result = await getProductByBarcode(item.barcode, { country, signal });
+      const result = await resolveProductByBarcode(item.barcode, { country, signal });
       if (!result.found) {
         throw new MealError(`Product not found for barcode ${result.barcode}`);
       }

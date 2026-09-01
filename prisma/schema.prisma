@@ -23,6 +23,7 @@ model User {
   reminders     MealReminder[]
   goals         UserGoal[]
   conversationMessages ConversationMessage[]
+  catalogProducts CatalogProduct[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -94,6 +95,22 @@ model AgentSession {
   updatedAt    DateTime @updatedAt
 
   @@index([userId])
+}
+
+model CatalogProduct {
+  barcode         String   @id
+  name            String
+  brands          String?
+  quantity        String?
+  servingSize     String?
+  nutriments      Json
+  createdByUserId String?
+  createdBy       User?    @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([createdByUserId])
+  @@index([name])
 }
 
 model ConversationMessage {

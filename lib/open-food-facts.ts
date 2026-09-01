@@ -180,8 +180,12 @@ function applyCountry(url: URL, country: string | undefined): string | undefined
   return cc;
 }
 
-function normalizeBarcode(barcode: string): string {
+export function normalizeBarcode(barcode: string): string {
   return barcode.replace(/\s+/g, "");
+}
+
+export function isValidBarcode(barcode: string): boolean {
+  return BARCODE_PATTERN.test(normalizeBarcode(barcode));
 }
 
 function userAgent(): string {

@@ -2,15 +2,17 @@ import { prisma } from "./prisma.ts";
 import {
   clampConversationSearchLimit,
   conversationSearchQuery,
+  TELEGRAM_CONVERSATION_CHANNEL,
 } from "./conversation-query.ts";
-
-export const TELEGRAM_CONVERSATION_CHANNEL = "telegram";
 
 export {
   CONVERSATION_SEARCH_DEFAULT_LIMIT,
   CONVERSATION_SEARCH_MAX_LIMIT,
   clampConversationSearchLimit,
+  conversationMessageText,
   conversationSearchQuery,
+  isTelegramConversationChannel,
+  TELEGRAM_CONVERSATION_CHANNEL,
 } from "./conversation-query.ts";
 
 export type ConversationRole = "assistant" | "user";
@@ -41,6 +43,28 @@ export async function recordConversationMessage(input: {
       userId: input.userId,
     },
   });
+}
+
+export async function persistTelegramConversationMessage(input: {
+  role: ConversationRole;
+  sessionId: string;
+  text: string;
+  userId: string | undefined;
+}): Promise<void> {
+  if (!input.userId) {
+    return;
+  }
+  try {
+    await recordConversationMessage({
+      channel: TELEGRAM_CONVERSATION_CHANNEL,
+      role: input.role,
+      sessionId: input.sessionId,
+      text: input.text,
+      userId: input.userId,
+    });
+  } catch (error) {
+    console.error("telegram conversation persist failed", error);
+  }
 }
 
 export async function searchConversation(input: {

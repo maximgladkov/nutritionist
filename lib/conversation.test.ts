@@ -4,7 +4,9 @@ import {
   CONVERSATION_SEARCH_DEFAULT_LIMIT,
   CONVERSATION_SEARCH_MAX_LIMIT,
   clampConversationSearchLimit,
+  conversationMessageText,
   conversationSearchQuery,
+  isTelegramConversationChannel,
 } from "./conversation-query.ts";
 
 describe("clampConversationSearchLimit", () => {
@@ -22,5 +24,27 @@ describe("conversationSearchQuery", () => {
     assert.equal(conversationSearchQuery(undefined), undefined);
     assert.equal(conversationSearchQuery("   "), undefined);
     assert.equal(conversationSearchQuery("yogurt"), "yogurt");
+  });
+});
+
+describe("isTelegramConversationChannel", () => {
+  it("accepts eve adapter and instrumentation kinds", () => {
+    assert.equal(isTelegramConversationChannel("telegram"), true);
+    assert.equal(isTelegramConversationChannel("channel:telegram"), true);
+    assert.equal(isTelegramConversationChannel("web"), false);
+    assert.equal(isTelegramConversationChannel(undefined), false);
+  });
+});
+
+describe("conversationMessageText", () => {
+  it("flattens text and file parts", () => {
+    assert.equal(conversationMessageText("  yogurt  "), "yogurt");
+    assert.equal(
+      conversationMessageText([
+        { type: "text", text: "label" },
+        { type: "file", filename: "meal.jpg", mediaType: "image/jpeg" },
+      ]),
+      "label\n[file: meal.jpg (image/jpeg)]",
+    );
   });
 });
