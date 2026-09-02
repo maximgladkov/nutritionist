@@ -42,23 +42,23 @@ export function MealGroupsAccordion({ groups }: { readonly groups: readonly Meal
                   <span className="text-foreground min-w-0 flex-1 truncate text-left text-sm font-medium">
                     {MEAL_LABELS[group.label]}
                   </span>
-                  <NutrientMetricsRow totals={group.totals} />
                   <Accordion.Indicator />
                 </span>
+                <NutrientMetricsRow totals={group.totals} />
               </Accordion.Trigger>
             </Accordion.Heading>
             <Accordion.Panel>
               <Accordion.Body className="pt-0">
                 <ul className="m-0 flex list-none flex-col gap-3 p-0">
                   {group.items.map((item) => (
-                    <li className="flex flex-col gap-1.5" key={item.id}>
+                    <li className="flex flex-col gap-1.5 pt-1" key={item.id}>
                       <div className="flex min-w-0 items-baseline justify-between gap-3">
                         <span className="text-foreground min-w-0 truncate text-sm">{item.name}</span>
                         <span className="text-muted shrink-0 text-xs">
                           {formatAmount(item.amount, item.unit)}
                         </span>
                       </div>
-                      <NutrientMetricsRow totals={item.metrics} />
+                      <NutrientMetricsRow compact totals={item.metrics} />
                     </li>
                   ))}
                 </ul>

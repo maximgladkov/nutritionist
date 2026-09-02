@@ -173,10 +173,23 @@ export function goalRingsForToday(
     const meta = RING_META[id];
     const spec = GOAL_SPECS[meta.field];
     const goal = goals[meta.field];
+    const consumed = Math.round(totals[meta.nutrient] ?? 0);
     if (goal === null) {
+      if (id !== "fiber") {
+        continue;
+      }
+      rings.push({
+        consumed,
+        fill: meta.fill,
+        goal: 0,
+        id,
+        name: spec.label,
+        over: 0,
+        unit: spec.unit,
+        value: 0,
+      });
       continue;
     }
-    const consumed = Math.round(totals[meta.nutrient] ?? 0);
     const percent = goal === 0 ? (consumed > 0 ? 100 : 0) : (consumed / goal) * 100;
     rings.push({
       consumed,

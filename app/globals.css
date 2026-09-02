@@ -12,20 +12,20 @@ html {
   height: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  --goal-calories: oklch(0.58 0.22 290);
-  --goal-protein: oklch(0.62 0.23 15);
-  --goal-carbs: oklch(0.78 0.17 95);
-  --goal-fat: oklch(0.70 0.19 55);
-  --goal-fiber: oklch(0.66 0.17 155);
+  --goal-calories: oklch(0.48 0.26 290);
+  --goal-protein: oklch(0.52 0.26 15);
+  --goal-carbs: oklch(0.50 0.17 250);
+  --goal-fat: oklch(0.48 0.16 55);
+  --goal-fiber: oklch(0.50 0.19 155);
 }
 
 @media (prefers-color-scheme: dark) {
   html {
-    --goal-calories: oklch(0.72 0.18 290);
-    --goal-protein: oklch(0.72 0.20 15);
-    --goal-carbs: oklch(0.84 0.14 95);
-    --goal-fat: oklch(0.78 0.16 55);
-    --goal-fiber: oklch(0.76 0.14 155);
+    --goal-calories: oklch(0.80 0.22 290);
+    --goal-protein: oklch(0.80 0.24 15);
+    --goal-carbs: oklch(0.78 0.14 250);
+    --goal-fat: oklch(0.84 0.16 70);
+    --goal-fiber: oklch(0.84 0.18 155);
   }
 }
 

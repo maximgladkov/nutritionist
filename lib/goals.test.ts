@@ -149,11 +149,33 @@ describe("goalRingsForToday", () => {
         proteins: null,
       },
     );
-    assert.equal(rings.length, 1);
-    assert.equal(rings[0]?.id, "protein");
-    assert.equal(rings[0]?.value, 0);
-    assert.equal(rings[0]?.consumed, 0);
-    assert.equal(rings[0]?.over, 0);
+    assert.deepEqual(
+      rings.map((ring) => ({ consumed: ring.consumed, id: ring.id, over: ring.over, value: ring.value })),
+      [
+        { consumed: 0, id: "fiber", over: 0, value: 0 },
+        { consumed: 0, id: "protein", over: 0, value: 0 },
+      ],
+    );
+  });
+
+  it("always includes the fiber ring when the fiber goal is unset", () => {
+    const rings = goalRingsForToday(
+      { ...emptyGoalsView(), caloriesPerDay: 2000 },
+      {
+        carbohydrates: null,
+        energyKcal: 500,
+        fat: null,
+        fiber: 12,
+        proteins: null,
+      },
+    );
+    assert.deepEqual(
+      rings.map((ring) => ({ consumed: ring.consumed, goal: ring.goal, id: ring.id, value: ring.value })),
+      [
+        { consumed: 12, goal: 0, id: "fiber", value: 0 },
+        { consumed: 500, goal: 2000, id: "calories", value: 25 },
+      ],
+    );
   });
 
   it("caps the ring at 100 and records the overage wrap", () => {
@@ -167,9 +189,10 @@ describe("goalRingsForToday", () => {
         proteins: null,
       },
     );
-    assert.equal(rings[0]?.value, 100);
-    assert.equal(rings[0]?.over, 25);
-    assert.equal(rings[0]?.consumed, 2500);
+    const calories = rings.find((ring) => ring.id === "calories");
+    assert.equal(calories?.value, 100);
+    assert.equal(calories?.over, 25);
+    assert.equal(calories?.consumed, 2500);
   });
 });
 

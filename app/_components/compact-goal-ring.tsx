@@ -62,7 +62,7 @@ function GoalRingSvg({ rings }: { readonly rings: readonly GoalRing[] }) {
                 cy={cy}
                 fill="none"
                 r={radius}
-                stroke="color-mix(in oklch, var(--foreground) 12%, transparent)"
+                stroke={`color-mix(in oklch, ${ring.fill} 22%, transparent)`}
                 strokeWidth={barSize}
               />
               <circle

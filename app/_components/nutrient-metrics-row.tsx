@@ -25,6 +25,13 @@ const METRICS = [
     value: (totals: NutrientValues) => formatGrams(totals.proteins),
   },
   {
+    fill: "var(--goal-fiber)",
+    id: "fiber",
+    label: "Fiber",
+    suffix: "g",
+    value: (totals: NutrientValues) => formatGrams(totals.fiber),
+  },
+  {
     fill: "var(--goal-calories)",
     id: "calories",
     label: "Calories",
@@ -34,35 +41,45 @@ const METRICS = [
 ] as const;
 
 export function NutrientMetricsRow({
+  compact = false,
   showLabels = false,
   size = "sm",
   totals,
 }: {
+  readonly compact?: boolean;
   readonly showLabels?: boolean;
   readonly size?: "sm" | "md";
   readonly totals: NutrientValues;
 }) {
   return (
-    <div className={`flex items-center ${showLabels ? "justify-center gap-2" : "gap-1"}`}>
+    <div
+      className={
+        showLabels
+          ? "flex flex-wrap items-center justify-center gap-2"
+          : compact
+            ? "flex flex-wrap items-center gap-1"
+            : "flex flex-wrap items-center gap-1"
+      }
+    >
       {METRICS.map((metric) => {
         const value = metric.value(totals);
         return (
           <div className="flex min-w-0 flex-col items-center gap-0.5" key={metric.id}>
             {showLabels ? <span className="text-muted text-xs">{metric.label}</span> : null}
             <Chip
-              className="max-w-full border-0 tabular-nums"
-              size={size}
-              style={
-                value === "—"
-                  ? undefined
-                  : {
-                    backgroundColor: `color-mix(in oklch, ${metric.fill} 22%, transparent)`,
-                    color: metric.fill,
-                  }
+              className={
+                compact
+                  ? "max-w-full rounded-md border-0 px-1 py-0 leading-4 tabular-nums"
+                  : "max-w-full border-0 tabular-nums"
               }
+              size={compact ? "sm" : size}
+              style={{
+                backgroundColor: `color-mix(in oklch, ${metric.fill} 28%, transparent)`,
+                color: `light-dark(oklch(from ${metric.fill} 0.36 c h), oklch(from ${metric.fill} 0.86 c h))`,
+              }}
               variant="soft"
             >
-              <Chip.Label>
+              <Chip.Label className={compact ? "px-0" : undefined}>
                 {value}
                 {value !== "—" ? ` ${metric.suffix}` : null}
               </Chip.Label>
