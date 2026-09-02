@@ -90,7 +90,7 @@ export function NutritionSummaryApp({
   readonly initial?: NutritionDiaryPayload;
 }) {
   const [initData, setInitData] = useState<string | null>(embed ? null : "");
-  const [selectedDate, setSelectedDate] = useState<string | null>(initial?.day.date ?? null);
+  const [userSelectedDate, setUserSelectedDate] = useState<string | null>(null);
   const [visibleRange, setVisibleRange] = useState<{ end: number; start: number } | null>(null);
   const [daysByDate, setDaysByDate] = useState<Record<string, NutritionDayBucket>>(() =>
     bucketsFromDiary(initial),
@@ -115,13 +115,8 @@ export function NutritionSummaryApp({
   });
 
   const today = diary?.day.today ?? initial?.day.today ?? null;
-
-  useEffect(() => {
-    if (selectedDate || !today) {
-      return;
-    }
-    setSelectedDate(today);
-  }, [selectedDate, today]);
+  const selectedDate =
+    today && userSelectedDate && userSelectedDate <= today ? userSelectedDate : today;
 
   const dayKey: DaySWRKey | null =
     readyInit != null && selectedDate ? ["nutrition-day", selectedDate, readyInit] : null;
@@ -235,7 +230,7 @@ export function NutritionSummaryApp({
         goals={goals}
         selectedDate={selectedDate}
         today={today}
-        onSelectDate={setSelectedDate}
+        onSelectDate={setUserSelectedDate}
         onVisibleRange={onVisibleRange}
       />
       {timezoneIsFallback ? (

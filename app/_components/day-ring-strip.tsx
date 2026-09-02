@@ -32,7 +32,6 @@ export function DayRingStrip({
   readonly today: string | null;
 }) {
   const parentRef = useRef<HTMLDivElement>(null);
-  const didScroll = useRef(false);
   const growing = useRef(false);
   const [count, setCount] = useState(INITIAL_COUNT);
   const [aligned, setAligned] = useState(false);
@@ -43,6 +42,7 @@ export function DayRingStrip({
     getItemKey: (index) => count - 1 - index,
     getScrollElement: () => parentRef.current,
     horizontal: true,
+    initialOffset: (INITIAL_COUNT - 1) * CELL_WIDTH,
     overscan: 6,
     paddingEnd: edgePad,
     paddingStart: edgePad,
@@ -68,15 +68,24 @@ export function DayRingStrip({
   }, []);
 
   useLayoutEffect(() => {
-    if (didScroll.current || !today || !parentRef.current?.clientWidth) {
+    const element = parentRef.current;
+    if (aligned || !today || !element || element.clientWidth < CELL_WIDTH) {
       return;
     }
-    virtualizer.scrollToIndex(INITIAL_COUNT - 1, { align: "center" });
-    didScroll.current = true;
-    requestAnimationFrame(() => {
+    const target = selectedDate ?? today;
+    const index = count - 1 + ymdDelta(today, target);
+    if (index < 0 || index >= count) {
+      return;
+    }
+    const offset = index * CELL_WIDTH;
+    element.scrollLeft = offset;
+    const frame = requestAnimationFrame(() => {
       setAligned(true);
     });
-  }, [edgePad, today, virtualizer]);
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [aligned, count, edgePad, selectedDate, today]);
 
   useEffect(() => {
     if (!aligned || startIndex == null || startIndex > 12 || growing.current) {
@@ -107,7 +116,7 @@ export function DayRingStrip({
     if (index < 0 || index >= count) {
       return;
     }
-    virtualizer.scrollToIndex(index, { align: "center", behavior: "smooth" });
+    virtualizer.scrollToOffset(index * CELL_WIDTH, { behavior: "smooth" });
   };
 
   return (
