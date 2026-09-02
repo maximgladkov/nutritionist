@@ -40,6 +40,19 @@ const METRICS = [
   },
 ] as const;
 
+function metricChipStyle(fill: string, quiet: boolean) {
+  if (quiet) {
+    return {
+      backgroundColor: `color-mix(in oklch, ${fill} 12%, transparent)`,
+      color: `light-dark(oklch(from ${fill} 0.5 calc(c * 0.38) h), oklch(from ${fill} 0.74 calc(c * 0.35) h))`,
+    };
+  }
+  return {
+    backgroundColor: `color-mix(in oklch, ${fill} 28%, transparent)`,
+    color: `light-dark(oklch(from ${fill} 0.36 c h), oklch(from ${fill} 0.86 c h))`,
+  };
+}
+
 export function NutrientMetricsRow({
   compact = false,
   showLabels = false,
@@ -69,14 +82,11 @@ export function NutrientMetricsRow({
             <Chip
               className={
                 compact
-                  ? "max-w-full rounded-md border-0 px-1 py-0 leading-4 tabular-nums"
+                  ? "max-w-full rounded-md border-0 px-1 py-0 font-normal leading-4 tabular-nums"
                   : "max-w-full border-0 tabular-nums"
               }
               size={compact ? "sm" : size}
-              style={{
-                backgroundColor: `color-mix(in oklch, ${metric.fill} 28%, transparent)`,
-                color: `light-dark(oklch(from ${metric.fill} 0.36 c h), oklch(from ${metric.fill} 0.86 c h))`,
-              }}
+              style={metricChipStyle(metric.fill, compact)}
               variant="soft"
             >
               <Chip.Label className={compact ? "px-0" : undefined}>
