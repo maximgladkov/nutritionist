@@ -1,9 +1,14 @@
 import { toOpenFoodFactsCountry } from "./countries.ts";
+import {
+  pickProductName,
+  preferredLanguageForCountry,
+  PRODUCT_NAME_FIELDS,
+} from "./open-food-facts-name.ts";
 
 const BASE_URL = "https://world.openfoodfacts.org";
 const PRODUCT_FIELDS = [
   "code",
-  "product_name",
+  ...PRODUCT_NAME_FIELDS,
   "brands",
   "quantity",
   "serving_size",
@@ -93,7 +98,7 @@ type OffProduct = {
   product_name?: unknown;
   quantity?: unknown;
   serving_size?: unknown;
-};
+} & Record<string, unknown>;
 
 export async function getProductByBarcode(
   barcode: string,
@@ -120,7 +125,7 @@ export async function getProductByBarcode(
   if (!body.product) {
     return { found: false, barcode: normalizedBarcode };
   }
-  return { found: true, product: mapProduct(body.product, normalizedBarcode) };
+  return { found: true, product: mapProduct(body.product, normalizedBarcode, options.country) };
 }
 
 export async function searchProductsByName(
@@ -160,7 +165,9 @@ export async function searchProductsByName(
     page?: unknown;
     products?: OffProduct[];
   };
-  const products = Array.isArray(body.products) ? body.products.map((product) => mapProduct(product)) : [];
+  const products = Array.isArray(body.products)
+    ? body.products.map((product) => mapProduct(product, undefined, options.country))
+    : [];
   return {
     count: typeof body.count === "number" ? body.count : products.length,
     page: typeof body.page === "number" ? body.page : 1,
@@ -215,11 +222,11 @@ async function offFetch(url: URL, signal: AbortSignal | undefined): Promise<Resp
   });
 }
 
-function mapProduct(product: OffProduct, fallbackBarcode?: string): Product {
+function mapProduct(product: OffProduct, fallbackBarcode?: string, country?: string): Product {
   const barcode = stringOrNull(product.code) ?? fallbackBarcode ?? "";
   return {
     barcode,
-    name: stringOrNull(product.product_name),
+    name: pickProductName(product, preferredLanguageForCountry(country)),
     brands: stringOrNull(product.brands),
     quantity: stringOrNull(product.quantity),
     servingSize: stringOrNull(product.serving_size),

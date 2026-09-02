@@ -117,6 +117,25 @@ describe("getProductByBarcode", () => {
     assert.equal(result.found, true);
   });
 
+  it("falls back to a localized product name when product_name is empty", async () => {
+    mock.method(globalThis, "fetch", async () =>
+      jsonResponse({
+        product: {
+          code: "7622210103253",
+          product_name: "",
+          product_name_en: "PHILADELPHIA LIGHT",
+          product_name_es: "Philadelphia Light",
+        },
+      }),
+    );
+    const result = await getProductByBarcode("7622210103253", { country: "es" });
+    assert.equal(result.found, true);
+    if (!result.found) {
+      return;
+    }
+    assert.equal(result.product.name, "Philadelphia Light");
+  });
+
   it("returns not found on 404", async () => {
     mock.method(globalThis, "fetch", async () => new Response(null, { status: 404 }));
     const result = await getProductByBarcode("00000000");

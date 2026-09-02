@@ -1,4 +1,5 @@
 import { resolveProductByBarcode } from "./catalog-product.ts";
+import { choosePackagedFoodName } from "./open-food-facts-name.ts";
 import type { ProductNutriments } from "./open-food-facts.ts";
 import { InvalidBarcodeError } from "./open-food-facts.ts";
 import {
@@ -257,7 +258,11 @@ async function resolveItem(
         throw new MealError(`Product not found for barcode ${result.barcode}`);
       }
       barcode = result.product.barcode;
-      name = name ?? result.product.name ?? result.product.barcode;
+      name = choosePackagedFoodName({
+        barcode: result.product.barcode,
+        productName: result.product.name,
+        providedName: name,
+      });
       nutriments = result.product.nutriments;
       servingSize = result.product.servingSize;
     } catch (error) {
