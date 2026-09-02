@@ -10,7 +10,7 @@ import {
 } from "@/app/actions/summary";
 import { hasAnyGoal, type GoalsView } from "@/lib/goal-values";
 import { groupMealsByLabel } from "@/lib/meal-groups";
-import { dayIndexWindows } from "@/lib/summary-days";
+import { dayIndexWindows, ymdToDayIndex } from "@/lib/summary-days";
 import type {
   NutritionDayBucket,
   NutritionDayPayload,
@@ -90,6 +90,8 @@ export function NutritionSummaryApp({
   readonly initial?: NutritionDiaryPayload;
 }) {
   const [initData, setInitData] = useState<string | null>(embed ? null : "");
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState<{ from: string; to: string } | null>(null);
   const [userSelectedDate, setUserSelectedDate] = useState<string | null>(null);
   const [visibleRange, setVisibleRange] = useState<{ end: number; start: number } | null>(null);
   const [daysByDate, setDaysByDate] = useState<Record<string, NutritionDayBucket>>(() =>
@@ -140,7 +142,12 @@ export function NutritionSummaryApp({
     revalidateOnReconnect: true,
   });
 
-  const windows = today && visibleRange ? dayIndexWindows(today, visibleRange.start, visibleRange.end) : [];
+  const stripWindows = today && visibleRange ? dayIndexWindows(today, visibleRange.start, visibleRange.end) : [];
+  const monthWindows =
+    today && calendarMonth
+      ? dayIndexWindows(today, ymdToDayIndex(today, calendarMonth.from), ymdToDayIndex(today, calendarMonth.to))
+      : [];
+  const windows = mergeWindows(stripWindows, monthWindows);
   const missingWindows = windows.filter((window) => !windowIsCached(window, daysByDate));
   const daysKey: DaysSWRKey | null =
     readyInit != null && missingWindows.length > 0
@@ -226,21 +233,24 @@ export function NutritionSummaryApp({
         </div>
       )}
       <DayRingStrip
+        calendarOpen={calendarOpen}
         daysByDate={daysByDate}
         goals={goals}
         selectedDate={selectedDate}
         today={today}
+        onCalendarMonthChange={setCalendarMonth}
+        onCalendarOpenChange={setCalendarOpen}
         onSelectDate={setUserSelectedDate}
         onVisibleRange={onVisibleRange}
       />
-      {timezoneIsFallback ? (
+      {calendarOpen ? null : timezoneIsFallback ? (
         <p className="text-muted text-sm">Times use UTC until you save a time zone in Settings.</p>
       ) : null}
-      {errorMessage ? <p className="text-danger text-sm">{errorMessage}</p> : null}
-      {day ? (
+      {calendarOpen ? null : errorMessage ? <p className="text-danger text-sm">{errorMessage}</p> : null}
+      {calendarOpen ? null : day ? (
         <SelectedDayView compact={embed} day={day} goals={goals} groups={groups} isPending={isPending} />
       ) : null}
-      {!day && !errorMessage && ((embed && initData === null) || !today) ? (
+      {!calendarOpen && !day && !errorMessage && ((embed && initData === null) || !today) ? (
         <div className="flex justify-center py-8">
           <Spinner />
         </div>
@@ -314,6 +324,23 @@ function bucketFromDay(day: NutritionDayPayload): NutritionDayBucket {
     mealCount: day.mealCount,
     totals: day.totals,
   };
+}
+
+function mergeWindows(
+  left: readonly { from: string; to: string }[],
+  right: readonly { from: string; to: string }[],
+): { from: string; to: string }[] {
+  const seen = new Set<string>();
+  const windows: { from: string; to: string }[] = [];
+  for (const window of [...left, ...right]) {
+    const key = `${window.from}:${window.to}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    windows.push(window);
+  }
+  return windows;
 }
 
 function mergeBuckets(map: Record<string, NutritionDayBucket>, days: readonly NutritionDayBucket[]): void {

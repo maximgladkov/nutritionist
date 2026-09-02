@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { dayIndexWindows, NUTRITION_DAYS_MAX, NUTRITION_DAY_TODAY_INDEX, ymdForDayIndex } from "./summary-days.ts";
+import { dayIndexWindows, NUTRITION_DAYS_MAX, NUTRITION_DAY_TODAY_INDEX, ymdForDayIndex, ymdToDayIndex } from "./summary-days.ts";
 
 describe("ymdForDayIndex", () => {
   it("maps today and past indexes onto calendar dates", () => {
     assert.equal(ymdForDayIndex("2026-09-02", NUTRITION_DAY_TODAY_INDEX), "2026-09-02");
     assert.equal(ymdForDayIndex("2026-09-02", NUTRITION_DAY_TODAY_INDEX - 1), "2026-09-01");
+    assert.equal(ymdToDayIndex("2026-09-02", "2026-09-02"), NUTRITION_DAY_TODAY_INDEX);
+    assert.equal(ymdToDayIndex("2026-09-02", "2026-09-01"), NUTRITION_DAY_TODAY_INDEX - 1);
   });
 });
 

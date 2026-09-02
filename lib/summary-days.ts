@@ -8,6 +8,13 @@ export function ymdForDayIndex(today: string, index: number): string {
   return shiftYmd(today, index - NUTRITION_DAY_TODAY_INDEX);
 }
 
+export function ymdToDayIndex(today: string, date: string): number {
+  return (
+    NUTRITION_DAY_TODAY_INDEX +
+    Math.round((Date.parse(`${date}T00:00:00.000Z`) - Date.parse(`${today}T00:00:00.000Z`)) / 86_400_000)
+  );
+}
+
 export function dayIndexWindows(
   today: string,
   startIndex: number,

@@ -12,6 +12,7 @@ export {
   NUTRITION_DAY_TODAY_INDEX,
   dayIndexWindows,
   ymdForDayIndex,
+  ymdToDayIndex,
 } from "./summary-days.ts";
 
 export type NutritionDayBucket = {
