@@ -4,18 +4,11 @@ import { formatGrams, formatKcal } from "./nutrition-format";
 
 const METRICS = [
   {
-    fill: "var(--goal-fat)",
-    id: "fat",
-    label: "Fat",
-    suffix: "g",
-    value: (totals: NutrientValues) => formatGrams(totals.fat),
-  },
-  {
-    fill: "var(--goal-carbs)",
-    id: "carbs",
-    label: "Carbs",
-    suffix: "g",
-    value: (totals: NutrientValues) => formatGrams(totals.carbohydrates),
+    fill: "var(--goal-calories)",
+    id: "calories",
+    label: "Calories",
+    suffix: "kcal",
+    value: (totals: NutrientValues) => formatKcal(totals.energyKcal),
   },
   {
     fill: "var(--goal-protein)",
@@ -25,18 +18,25 @@ const METRICS = [
     value: (totals: NutrientValues) => formatGrams(totals.proteins),
   },
   {
+    fill: "var(--goal-carbs)",
+    id: "carbs",
+    label: "Carbs",
+    suffix: "g",
+    value: (totals: NutrientValues) => formatGrams(totals.carbohydrates),
+  },
+  {
+    fill: "var(--goal-fat)",
+    id: "fat",
+    label: "Fat",
+    suffix: "g",
+    value: (totals: NutrientValues) => formatGrams(totals.fat),
+  },
+  {
     fill: "var(--goal-fiber)",
     id: "fiber",
     label: "Fiber",
     suffix: "g",
     value: (totals: NutrientValues) => formatGrams(totals.fiber),
-  },
-  {
-    fill: "var(--goal-calories)",
-    id: "calories",
-    label: "Calories",
-    suffix: "kcal",
-    value: (totals: NutrientValues) => formatKcal(totals.energyKcal),
   },
 ] as const;
 

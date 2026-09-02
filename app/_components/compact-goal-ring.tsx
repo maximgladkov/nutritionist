@@ -28,9 +28,11 @@ function GoalRingSvg({ rings }: { readonly rings: readonly GoalRing[] }) {
   const cy = size / 2;
   const count = rings.length;
   const barSize = count <= 2 ? 5.5 : count <= 4 ? 4.5 : 3.5;
+  const caloriesBar = barSize + 2;
   const gap = 1.4;
   const outer = size / 2 - 2;
   const drawn = [...rings].reverse();
+  let cursor = outer;
 
   return (
     <svg aria-hidden="true" className="size-[72px]" viewBox={`0 0 ${size} ${size}`}>
@@ -50,8 +52,10 @@ function GoalRingSvg({ rings }: { readonly rings: readonly GoalRing[] }) {
         ))}
       </defs>
       <g transform={`rotate(-90 ${cx} ${cy})`}>
-        {drawn.map((ring, index) => {
-          const radius = outer - barSize / 2 - index * (barSize + gap);
+        {drawn.map((ring) => {
+          const stroke = ring.id === "calories" ? caloriesBar : barSize;
+          const radius = cursor - stroke / 2;
+          cursor = radius - stroke / 2 - gap;
           const circumference = 2 * Math.PI * radius;
           const progress = (ring.value / 100) * circumference;
           const over = (ring.over / 100) * circumference;
@@ -63,7 +67,7 @@ function GoalRingSvg({ rings }: { readonly rings: readonly GoalRing[] }) {
                 fill="none"
                 r={radius}
                 stroke={`color-mix(in oklch, ${ring.fill} 22%, transparent)`}
-                strokeWidth={barSize}
+                strokeWidth={stroke}
               />
               <circle
                 cx={cx}
@@ -73,7 +77,7 @@ function GoalRingSvg({ rings }: { readonly rings: readonly GoalRing[] }) {
                 stroke={ring.fill}
                 strokeDasharray={`${progress} ${circumference}`}
                 strokeLinecap="round"
-                strokeWidth={barSize}
+                strokeWidth={stroke}
               />
               {ring.over > 0 ? (
                 <circle
@@ -84,7 +88,7 @@ function GoalRingSvg({ rings }: { readonly rings: readonly GoalRing[] }) {
                   stroke={`url(#${overPatternId(reactId, ring.id)})`}
                   strokeDasharray={`${over} ${circumference}`}
                   strokeLinecap="round"
-                  strokeWidth={barSize}
+                  strokeWidth={stroke}
                 />
               ) : null}
             </g>
