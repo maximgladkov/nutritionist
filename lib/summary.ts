@@ -1,68 +1,169 @@
 import { getGoals, type GoalsView } from "./goals.ts";
 import { listMeals, summarizeNutrition, type MealView, type NutritionSummary } from "./meals.ts";
-import { emptyNutrients } from "./nutrition.ts";
+import { emptyNutrients, type NutrientKey, type NutrientValues } from "./nutrition.ts";
 import { prisma } from "./prisma.ts";
-import { resolveSummaryRange, type SummaryPeriod } from "./summary-range.ts";
-import { listLocalDates, normalizeTimezone } from "./timezone.ts";
+import { NUTRITION_DAYS_INITIAL, NUTRITION_DAYS_MAX } from "./summary-days.ts";
+import { formatDateInTimeZone, localInclusiveDateRange, listLocalDates, normalizeTimezone, shiftYmd } from "./timezone.ts";
 
 export { CUSTOM_RANGE_MAX_DAYS, isSummaryPeriod, SUMMARY_PERIODS, type SummaryPeriod } from "./summary-range.ts";
+export {
+  NUTRITION_DAYS_INITIAL,
+  NUTRITION_DAYS_MAX,
+  NUTRITION_DAY_TODAY_INDEX,
+  dayIndexWindows,
+  ymdForDayIndex,
+} from "./summary-days.ts";
 
-export type NutritionSummaryPayload = {
-  customFrom: string | null;
-  customTo: string | null;
+export type NutritionDayBucket = {
+  date: string;
+  incomplete: NutrientKey[];
+  itemCount: number;
+  mealCount: number;
+  totals: NutrientValues;
+};
+
+export type NutritionDaysPayload = {
+  days: NutritionDayBucket[];
+  from: string;
   goals: GoalsView;
-  meals: MealView[] | null;
-  period: SummaryPeriod;
-  summary: NutritionSummary;
+  to: string;
+  today: string;
   timezone: string;
   timezoneIsFallback: boolean;
 };
 
-export async function loadNutritionSummary(input: {
-  customFrom?: string;
-  customTo?: string;
-  now?: Date;
-  period: SummaryPeriod;
+export type NutritionDayPayload = {
+  date: string;
+  goals: GoalsView;
+  incomplete: NutrientKey[];
+  itemCount: number;
+  mealCount: number;
+  meals: MealView[];
+  timezone: string;
+  timezoneIsFallback: boolean;
+  today: string;
+  totals: NutrientValues;
+};
+
+export type NutritionDiaryPayload = {
+  day: NutritionDayPayload;
+  days: NutritionDaysPayload;
+};
+
+type SummaryContext = {
+  goals: GoalsView;
+  now: Date;
+  timezone: string;
+  timezoneIsFallback: boolean;
+  today: string;
   userId: string;
-}): Promise<NutritionSummaryPayload> {
+};
+
+export async function loadNutritionDays(input: {
+  from: string;
+  now?: Date;
+  to: string;
+  userId: string;
+}): Promise<NutritionDaysPayload> {
+  const ctx = await readSummaryContext(input.userId, input.now);
+  return loadDaysForContext(ctx, input.from, input.to);
+}
+
+export async function loadNutritionDay(input: {
+  date: string;
+  now?: Date;
+  userId: string;
+}): Promise<NutritionDayPayload> {
+  const ctx = await readSummaryContext(input.userId, input.now);
+  return loadDayForContext(ctx, input.date);
+}
+
+export async function loadNutritionDiary(input: {
+  now?: Date;
+  userId: string;
+}): Promise<NutritionDiaryPayload> {
+  const ctx = await readSummaryContext(input.userId, input.now);
+  const from = shiftYmd(ctx.today, -(NUTRITION_DAYS_INITIAL - 1));
+  const [days, day] = await Promise.all([
+    loadDaysForContext(ctx, from, ctx.today),
+    loadDayForContext(ctx, ctx.today),
+  ]);
+  return { day, days };
+}
+
+async function readSummaryContext(userId: string, now = new Date()): Promise<SummaryContext> {
   const profile = await prisma.userProfile.findUnique({
-    where: { userId: input.userId },
+    where: { userId },
     select: { timezone: true },
   });
   const normalized = profile?.timezone ? normalizeTimezone(profile.timezone) : null;
   const timezone = normalized ?? "UTC";
-  const now = input.now ?? new Date();
-  const range = resolveSummaryRange({
-    customFrom: input.customFrom,
-    customTo: input.customTo,
+  return {
+    goals: await getGoals(userId),
     now,
-    period: input.period,
-    timeZone: timezone,
-  });
+    timezone,
+    timezoneIsFallback: normalized === null,
+    today: formatDateInTimeZone(now, timezone),
+    userId,
+  };
+}
+
+async function loadDaysForContext(
+  ctx: SummaryContext,
+  from: string,
+  to: string,
+): Promise<NutritionDaysPayload> {
+  const clampedTo = to > ctx.today ? ctx.today : to;
+  if (from > clampedTo) {
+    throw new RangeError("from must be on or before to");
+  }
+  const range = localInclusiveDateRange(ctx.timezone, from, clampedTo, NUTRITION_DAYS_MAX);
   const summary = withFilledDays(
     await summarizeNutrition({
       from: range.from,
       groupBy: "day",
-      timezone,
+      timezone: ctx.timezone,
       to: range.to,
-      userId: input.userId,
+      userId: ctx.userId,
     }),
-    timezone,
+    ctx.timezone,
   );
-  const meals =
-    input.period === "today"
-      ? (await listMeals({ from: range.from, to: range.to, userId: input.userId })).meals
-      : null;
-  const goals = await getGoals(input.userId);
   return {
-    customFrom: input.customFrom ?? null,
-    goals,
-    customTo: input.customTo ?? null,
-    meals,
-    period: input.period,
-    summary,
-    timezone,
-    timezoneIsFallback: normalized === null,
+    days: summary.days ?? [],
+    from,
+    goals: ctx.goals,
+    to: clampedTo,
+    today: ctx.today,
+    timezone: ctx.timezone,
+    timezoneIsFallback: ctx.timezoneIsFallback,
+  };
+}
+
+async function loadDayForContext(ctx: SummaryContext, date: string): Promise<NutritionDayPayload> {
+  if (date > ctx.today) {
+    throw new RangeError("date cannot be in the future");
+  }
+  const range = localInclusiveDateRange(ctx.timezone, date, date, 1);
+  const [summary, listed] = await Promise.all([
+    summarizeNutrition({
+      from: range.from,
+      timezone: ctx.timezone,
+      to: range.to,
+      userId: ctx.userId,
+    }),
+    listMeals({ from: range.from, to: range.to, userId: ctx.userId }),
+  ]);
+  return {
+    date,
+    goals: ctx.goals,
+    incomplete: summary.incomplete,
+    itemCount: summary.itemCount,
+    mealCount: summary.mealCount,
+    meals: listed.meals,
+    timezone: ctx.timezone,
+    timezoneIsFallback: ctx.timezoneIsFallback,
+    today: ctx.today,
+    totals: summary.totals,
   };
 }
 

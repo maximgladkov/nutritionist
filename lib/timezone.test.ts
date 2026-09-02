@@ -10,6 +10,7 @@ import {
   nextLocalOccurrence,
   normalizeTimezone,
   parseYmd,
+  shiftYmd,
   zonedLocalToUtc,
 } from "./timezone.ts";
 
@@ -122,6 +123,19 @@ describe("parseYmd", () => {
     assert.deepEqual(parseYmd("2026-08-29"), { year: 2026, month: 8, day: 29 });
     assert.equal(parseYmd("2026-02-30"), null);
     assert.equal(parseYmd("29-08-2026"), null);
+  });
+});
+
+describe("shiftYmd", () => {
+  it("moves a calendar date by whole days", () => {
+    assert.equal(shiftYmd("2026-09-02", 0), "2026-09-02");
+    assert.equal(shiftYmd("2026-09-02", -1), "2026-09-01");
+    assert.equal(shiftYmd("2026-09-01", 1), "2026-09-02");
+    assert.equal(shiftYmd("2026-03-01", -1), "2026-02-28");
+  });
+
+  it("rejects invalid dates", () => {
+    assert.throws(() => shiftYmd("2026-02-30", 1), RangeError);
   });
 });
 

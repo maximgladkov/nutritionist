@@ -131,6 +131,17 @@ export function localRollingDaysRange(
   return rangeFromLocalStart(start, days, timeZone);
 }
 
+export function shiftYmd(value: string, days: number): string {
+  const parts = parseYmd(value);
+  if (!parts) {
+    throw new RangeError("date must be a valid YYYY-MM-DD");
+  }
+  if (!Number.isInteger(days)) {
+    throw new RangeError("days must be an integer");
+  }
+  return formatYmd(addCalendarDays(parts, days));
+}
+
 export function parseYmd(value: string): { year: number; month: number; day: number } | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(value.trim());
   if (!match) {

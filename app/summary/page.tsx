@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { NutritionSummaryApp } from "@/app/_components/nutrition-summary";
 import { auth } from "@/auth";
-import { loadNutritionSummary } from "@/lib/summary";
+import { loadNutritionDiary } from "@/lib/summary";
 
 export const metadata: Metadata = {
   title: "Summary",
@@ -21,9 +21,6 @@ export default async function SummaryPage({
   if (!session?.user?.id) {
     redirect("/login?callbackUrl=/summary");
   }
-  const initial = await loadNutritionSummary({
-    period: "today",
-    userId: session.user.id,
-  });
+  const initial = await loadNutritionDiary({ userId: session.user.id });
   return <NutritionSummaryApp embed={false} initial={initial} />;
 }

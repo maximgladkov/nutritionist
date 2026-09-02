@@ -1,66 +1,33 @@
 "use client";
 
-import { getNutritionSummaryAction } from "@/app/actions/summary";
-import { goalRingsForToday, type GoalRing } from "@/lib/goal-values";
-import type { MealView } from "@/lib/meals";
-import type { NutritionSummaryPayload, SummaryPeriod } from "@/lib/summary";
-import { isSummaryPeriod } from "@/lib/summary-range";
-import { formatDateInTimeZone } from "@/lib/timezone";
-import { cn } from "@/lib/utils";
-import { CircleDashed, Cup, Moon, Sun } from "@gravity-ui/icons";
-import { ChartTooltip, EmptyState, Segment, Timeline, Widget } from "@heroui-pro/react";
-import { BarChart } from "@heroui-pro/react/bar-chart";
-import { KPI } from "@heroui-pro/react/kpi";
-import { RadialChart } from "@heroui-pro/react/radial-chart";
+import { DayRingStrip } from "@/app/_components/day-ring-strip";
+import { DayTotalsRow } from "@/app/_components/day-totals-row";
+import { MealGroupsAccordion } from "@/app/_components/meal-groups-accordion";
 import {
-  DateField,
-  DateRangePicker,
-  Label,
-  Link,
-  RangeCalendar,
-  Spinner,
-} from "@heroui/react";
-import type { DateValue } from "@internationalized/date";
-import { parseDate } from "@internationalized/date";
-import { useEffect, useMemo, useState } from "react";
-import { I18nProvider } from "react-aria-components";
+  getNutritionDayAction,
+  getNutritionDaysAction,
+  getNutritionDiaryAction,
+} from "@/app/actions/summary";
+import { hasAnyGoal, type GoalsView } from "@/lib/goal-values";
+import { groupMealsByLabel } from "@/lib/meal-groups";
+import { dayIndexWindows } from "@/lib/summary-days";
+import type {
+  NutritionDayBucket,
+  NutritionDayPayload,
+  NutritionDaysPayload,
+  NutritionDiaryPayload,
+} from "@/lib/summary";
+import { shiftYmd } from "@/lib/timezone";
+import { cn } from "@/lib/utils";
+import { CircleDashed } from "@gravity-ui/icons";
+import { EmptyState } from "@heroui-pro/react";
+import { Link, Spinner } from "@heroui/react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 
-const PERIODS: { id: SummaryPeriod; label: string }[] = [
-  { id: "today", label: "Today" },
-  { id: "week", label: "Week" },
-  { id: "days30", label: "30d" },
-  { id: "custom", label: "Custom" },
-];
-
-const MEAL_LABELS: Record<MealView["label"], string> = {
-  breakfast: "Breakfast",
-  dinner: "Dinner",
-  lunch: "Lunch",
-  other: "Other",
-  snack: "Snack",
-};
-
-const MEAL_ICONS: Record<MealView["label"], typeof CircleDashed> = {
-  breakfast: Cup,
-  dinner: Moon,
-  lunch: Sun,
-  other: CircleDashed,
-  snack: CircleDashed,
-};
-
-type DateRange = {
-  end: DateValue;
-  start: DateValue;
-};
-
-type SummarySWRKey = readonly [
-  "nutrition-summary",
-  SummaryPeriod,
-  string | undefined,
-  string | undefined,
-  string,
-];
+type DiarySWRKey = readonly ["nutrition-diary", string];
+type DaySWRKey = readonly ["nutrition-day", string, string];
+type DaysSWRKey = readonly ["nutrition-days", string, string];
 
 type TelegramWebApp = {
   expand: () => void;
@@ -70,44 +37,49 @@ type TelegramWebApp = {
   ready: () => void;
 };
 
-async function fetchNutritionSummary([
-  ,
-  period,
-  customFrom,
-  customTo,
-  initData,
-]: SummarySWRKey): Promise<NutritionSummaryPayload> {
-  const result = await getNutritionSummaryAction({
-    customFrom,
-    customTo,
-    initData: initData || undefined,
-    period,
-  });
+async function fetchDiary([, initData]: DiarySWRKey): Promise<NutritionDiaryPayload> {
+  const result = await getNutritionDiaryAction({ initData: initData || undefined });
   if (!result.ok) {
     throw new Error(result.error);
   }
   return result.data;
 }
 
-function summarySWRKey(input: {
-  customRange: DateRange | null;
-  embed: boolean;
-  initData: string | null;
-  period: SummaryPeriod;
-}): SummarySWRKey | null {
-  if (input.embed && !input.initData) {
-    return null;
+async function fetchDay([, date, initData]: DaySWRKey): Promise<NutritionDayPayload> {
+  const result = await getNutritionDayAction({ date, initData: initData || undefined });
+  if (!result.ok) {
+    throw new Error(result.error);
   }
-  if (input.period === "custom" && !input.customRange) {
-    return null;
+  return result.data;
+}
+
+async function fetchDaysWindows([, serialized, initData]: DaysSWRKey): Promise<NutritionDaysPayload> {
+  const windows = serialized.split("|").map((part) => {
+    const [from, to] = part.split(":");
+    return { from: from ?? "", to: to ?? "" };
+  });
+  const results = await Promise.all(
+    windows.map((window) =>
+      getNutritionDaysAction({
+        from: window.from,
+        initData: initData || undefined,
+        to: window.to,
+      }),
+    ),
+  );
+  const days: NutritionDayBucket[] = [];
+  let meta: NutritionDaysPayload | null = null;
+  for (const result of results) {
+    if (!result.ok) {
+      throw new Error(result.error);
+    }
+    days.push(...result.data.days);
+    meta = result.data;
   }
-  return [
-    "nutrition-summary",
-    input.period,
-    input.period === "custom" ? input.customRange?.start.toString() : undefined,
-    input.period === "custom" ? input.customRange?.end.toString() : undefined,
-    input.embed ? (input.initData ?? "") : "",
-  ];
+  if (!meta) {
+    throw new Error("Could not load those days.");
+  }
+  return { ...meta, days };
 }
 
 export function NutritionSummaryApp({
@@ -115,11 +87,14 @@ export function NutritionSummaryApp({
   initial,
 }: {
   readonly embed: boolean;
-  readonly initial?: NutritionSummaryPayload;
+  readonly initial?: NutritionDiaryPayload;
 }) {
-  const [period, setPeriod] = useState<SummaryPeriod>(initial?.period ?? "today");
-  const [customRange, setCustomRange] = useState<DateRange | null>(() => defaultCustomRange(initial));
   const [initData, setInitData] = useState<string | null>(embed ? null : "");
+  const [selectedDate, setSelectedDate] = useState<string | null>(initial?.day.date ?? null);
+  const [visibleRange, setVisibleRange] = useState<{ end: number; start: number } | null>(null);
+  const [daysByDate, setDaysByDate] = useState<Record<string, NutritionDayBucket>>(() =>
+    bucketsFromDiary(initial),
+  );
 
   useEffect(() => {
     if (!embed) {
@@ -130,23 +105,76 @@ export function NutritionSummaryApp({
     });
   }, [embed]);
 
-  const key = summarySWRKey({ customRange, embed, initData, period });
-  const fallbackData =
-    initial &&
-      key &&
-      key[1] === initial.period &&
-      key[2] === (initial.customFrom ?? undefined) &&
-      key[3] === (initial.customTo ?? undefined)
-      ? initial
-      : undefined;
-  const { data, error, isLoading, isValidating, mutate } = useSWR(key, fetchNutritionSummary, {
-    fallbackData,
+  const readyInit = embed ? initData : "";
+  const diaryKey: DiarySWRKey | null = embed && readyInit != null ? ["nutrition-diary", readyInit] : null;
+  const { data: diary, error: diaryError, mutate: mutateDiary } = useSWR(diaryKey, fetchDiary, {
+    fallbackData: embed ? undefined : initial,
+    revalidateOnFocus: true,
+    revalidateOnMount: embed,
+    revalidateOnReconnect: true,
+  });
+
+  const today = diary?.day.today ?? initial?.day.today ?? null;
+
+  useEffect(() => {
+    if (selectedDate || !today) {
+      return;
+    }
+    setSelectedDate(today);
+  }, [selectedDate, today]);
+
+  const dayKey: DaySWRKey | null =
+    readyInit != null && selectedDate ? ["nutrition-day", selectedDate, readyInit] : null;
+  const dayFallback =
+    selectedDate && diary?.day.date === selectedDate
+      ? diary.day
+      : selectedDate && initial?.day.date === selectedDate
+        ? initial.day
+        : undefined;
+  const {
+    data: day,
+    error: dayError,
+    isValidating: dayValidating,
+    mutate: mutateDay,
+  } = useSWR(dayKey, fetchDay, {
+    fallbackData: dayFallback,
     focusThrottleInterval: 0,
     keepPreviousData: true,
     revalidateOnFocus: true,
     revalidateOnMount: true,
     revalidateOnReconnect: true,
   });
+
+  const windows = today && visibleRange ? dayIndexWindows(today, visibleRange.start, visibleRange.end) : [];
+  const missingWindows = windows.filter((window) => !windowIsCached(window, daysByDate));
+  const daysKey: DaysSWRKey | null =
+    readyInit != null && missingWindows.length > 0
+      ? ["nutrition-days", missingWindows.map((window) => `${window.from}:${window.to}`).join("|"), readyInit]
+      : null;
+  const { data: daysPayload, error: daysError, mutate: mutateDays } = useSWR(daysKey, fetchDaysWindows, {
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true,
+  });
+
+  useEffect(() => {
+    if (!diary && !daysPayload && !day) {
+      return;
+    }
+    setDaysByDate((prev) => {
+      const next = { ...prev };
+      if (diary) {
+        mergeBuckets(next, diary.days.days);
+        next[diary.day.date] = bucketFromDay(diary.day);
+      }
+      if (daysPayload) {
+        mergeBuckets(next, daysPayload.days);
+      }
+      if (day) {
+        next[day.date] = bucketFromDay(day);
+      }
+      return next;
+    });
+  }, [day, daysPayload, diary]);
 
   useEffect(() => {
     if (!embed || !initData) {
@@ -157,26 +185,36 @@ export function NutritionSummaryApp({
       return;
     }
     const revalidate = () => {
-      void mutate();
+      void mutateDiary();
+      void mutateDays();
+      void mutateDay();
     };
     webapp.onEvent("activated", revalidate);
     return () => {
       webapp.offEvent?.("activated", revalidate);
     };
-  }, [embed, initData, mutate]);
+  }, [embed, initData, mutateDay, mutateDays, mutateDiary]);
 
-  const timezone = data?.timezone ?? "UTC";
+  const onVisibleRange = useCallback((start: number, end: number) => {
+    setVisibleRange((prev) =>
+      prev && prev.start === start && prev.end === end ? prev : { end, start },
+    );
+  }, []);
+
+  const goals = day?.goals ?? diary?.day.goals ?? initial?.day.goals ?? null;
+  const groups = useMemo(() => groupMealsByLabel(day?.meals ?? []), [day?.meals]);
   const bootError = embed && initData === "" ? "Open this from the Telegram bot." : null;
+  const loadError = firstError(diaryError, dayError, daysError);
   const errorMessage =
     bootError ??
-    (error instanceof Error ? error.message : error ? "Could not load that summary." : null);
-  const isPending =
-    data != null &&
-    isValidating &&
-    (data.period !== period ||
-      (period === "custom" &&
-        (data.customFrom !== customRange?.start.toString() ||
-          data.customTo !== customRange?.end.toString())));
+    (loadError instanceof Error
+      ? loadError.message
+      : loadError
+        ? "Could not load that summary."
+        : null);
+  const isPending = Boolean(day && selectedDate && day.date !== selectedDate && dayValidating);
+  const timezoneIsFallback =
+    day?.timezoneIsFallback ?? diary?.day.timezoneIsFallback ?? initial?.day.timezoneIsFallback ?? false;
 
   return (
     <div
@@ -192,88 +230,22 @@ export function NutritionSummaryApp({
           <p className="text-muted text-sm">Calories and macros for the meals you have logged.</p>
         </div>
       )}
-      <Segment
-        className="w-full min-w-0"
-        selectedKey={period}
-        size="sm"
-        onSelectionChange={(key) => {
-          const next = String(key);
-          if (!isSummaryPeriod(next) || next === period) {
-            return;
-          }
-          const nextCustom =
-            next === "custom" ? (customRange ?? rangeForLastDays(timezone, 7)) : customRange;
-          setPeriod(next);
-          if (next === "custom" && !customRange) {
-            setCustomRange(nextCustom);
-          }
-        }}
-      >
-        {PERIODS.map((item) => (
-          <Segment.Item key={item.id} className="px-2" id={item.id}>
-            {item.label}
-          </Segment.Item>
-        ))}
-      </Segment>
-      {period === "custom" ? (
-        <I18nProvider locale="en-GB">
-          <DateRangePicker
-            className="max-w-sm"
-            maxValue={nutritionToday(timezone)}
-            value={customRange}
-            onChange={(value) => {
-              setCustomRange(value);
-            }}
-          >
-            <Label>Date range</Label>
-            <DateField.Group fullWidth>
-              <DateField.Input slot="start">
-                {(segment) => <DateField.Segment segment={segment} />}
-              </DateField.Input>
-              <DateRangePicker.RangeSeparator />
-              <DateField.Input slot="end">
-                {(segment) => <DateField.Segment segment={segment} />}
-              </DateField.Input>
-              <DateField.Suffix>
-                <DateRangePicker.Trigger>
-                  <DateRangePicker.TriggerIndicator />
-                </DateRangePicker.Trigger>
-              </DateField.Suffix>
-            </DateField.Group>
-            <DateRangePicker.Popover>
-              <RangeCalendar aria-label="Summary dates">
-                <RangeCalendar.Header>
-                  <RangeCalendar.YearPickerTrigger>
-                    <RangeCalendar.YearPickerTriggerHeading />
-                    <RangeCalendar.YearPickerTriggerIndicator />
-                  </RangeCalendar.YearPickerTrigger>
-                  <RangeCalendar.NavButton slot="previous" />
-                  <RangeCalendar.NavButton slot="next" />
-                </RangeCalendar.Header>
-                <RangeCalendar.Grid>
-                  <RangeCalendar.GridHeader>
-                    {(day) => <RangeCalendar.HeaderCell>{day}</RangeCalendar.HeaderCell>}
-                  </RangeCalendar.GridHeader>
-                  <RangeCalendar.GridBody>
-                    {(date) => <RangeCalendar.Cell date={date} />}
-                  </RangeCalendar.GridBody>
-                </RangeCalendar.Grid>
-                <RangeCalendar.YearPickerGrid>
-                  <RangeCalendar.YearPickerGridBody>
-                    {({ year }) => <RangeCalendar.YearPickerCell year={year} />}
-                  </RangeCalendar.YearPickerGridBody>
-                </RangeCalendar.YearPickerGrid>
-              </RangeCalendar>
-            </DateRangePicker.Popover>
-          </DateRangePicker>
-        </I18nProvider>
-      ) : null}
-      {data?.timezoneIsFallback ? (
+      <DayRingStrip
+        daysByDate={daysByDate}
+        goals={goals}
+        selectedDate={selectedDate}
+        today={today}
+        onSelectDate={setSelectedDate}
+        onVisibleRange={onVisibleRange}
+      />
+      {timezoneIsFallback ? (
         <p className="text-muted text-sm">Times use UTC until you save a time zone in Settings.</p>
       ) : null}
       {errorMessage ? <p className="text-danger text-sm">{errorMessage}</p> : null}
-      {data ? <NutritionSummaryView compact={embed} data={data} isPending={isPending} /> : null}
-      {!data && !errorMessage && (isLoading || (embed && initData === null)) ? (
+      {day ? (
+        <SelectedDayView compact={embed} day={day} goals={goals} groups={groups} isPending={isPending} />
+      ) : null}
+      {!day && !errorMessage && ((embed && initData === null) || !today) ? (
         <div className="flex justify-center py-8">
           <Spinner />
         </div>
@@ -282,63 +254,24 @@ export function NutritionSummaryApp({
   );
 }
 
-function NutritionSummaryView({
+function SelectedDayView({
   compact,
-  data,
+  day,
+  goals,
+  groups,
   isPending,
 }: {
   readonly compact: boolean;
-  readonly data: NutritionSummaryPayload;
+  readonly day: NutritionDayPayload;
+  readonly goals: GoalsView | null;
+  readonly groups: ReturnType<typeof groupMealsByLabel>;
   readonly isPending: boolean;
 }) {
-  const { goals, period, summary, meals, timezone } = data;
-  const chartData = useMemo(
-    () =>
-      (summary.days ?? []).map((day) => ({
-        date: day.date.slice(5),
-        kcal: day.totals.energyKcal ?? 0,
-      })),
-    [summary.days],
-  );
-  const rings = useMemo(
-    () => (period === "today" ? goalRingsForToday(goals, summary.totals) : []),
-    [goals, period, summary.totals],
-  );
-  const ringIds = useMemo(() => new Set(rings.map((ring) => ring.id)), [rings]);
-  const showChart = (summary.days?.length ?? 0) > 1;
-  const empty = summary.mealCount === 0;
-  const isToday = period === "today";
-  const showRing = rings.length > 0;
-
+  const empty = day.mealCount === 0;
   return (
     <div className={cn("flex flex-col", compact ? "gap-3" : "gap-4", isPending && "opacity-60")}>
-      <div className="grid grid-cols-3 gap-2">
-        {showRing ? (
-          <div className="col-span-3 flex justify-center py-1">
-            <GoalRings compact={compact} rings={rings} />
-          </div>
-        ) : (
-          <div className="col-span-3 flex flex-col gap-1">
-            <SummaryKpi
-              suffix="kcal"
-              title="Calories"
-              value={summary.totals.energyKcal}
-              valueClassName="text-2xl"
-            />
-            {isToday ? <SetCalorieGoalHint compact={compact} /> : null}
-          </div>
-        )}
-        {showRing && !ringIds.has("calories") ? (
-          <SummaryKpi suffix="kcal" title="Calories" value={summary.totals.energyKcal} />
-        ) : null}
-        {ringIds.has("protein") ? null : (
-          <SummaryKpi suffix="g" title="Protein" value={summary.totals.proteins} />
-        )}
-        {ringIds.has("carbs") ? null : (
-          <SummaryKpi suffix="g" title="Carbs" value={summary.totals.carbohydrates} />
-        )}
-        {ringIds.has("fat") ? null : <SummaryKpi suffix="g" title="Fat" value={summary.totals.fat} />}
-      </div>
+      <DayTotalsRow totals={day.totals} />
+      {goals && !hasAnyGoal(goals) ? <SetCalorieGoalHint compact={compact} /> : null}
       {empty ? (
         <EmptyState className="bg-surface-secondary rounded-2xl" size="sm">
           <EmptyState.Header>
@@ -349,247 +282,11 @@ function NutritionSummaryView({
             <EmptyState.Description>Log a meal in chat to see totals here.</EmptyState.Description>
           </EmptyState.Header>
         </EmptyState>
-      ) : null}
-      {showChart && !empty ? (
-        <Widget>
-          <Widget.Header>
-            <Widget.Title>Daily calories</Widget.Title>
-          </Widget.Header>
-          <Widget.Content>
-            <BarChart data={chartData} height={compact ? 156 : 200}>
-              <BarChart.Grid vertical={false} />
-              <BarChart.XAxis dataKey="date" tickMargin={6} />
-              <BarChart.YAxis width={36} />
-              <BarChart.Bar dataKey="kcal" fill="var(--accent)" name="Calories" radius={[4, 4, 0, 0]} />
-              <BarChart.Tooltip
-                content={({ active, label, payload }) => {
-                  if (!active || !payload?.length) {
-                    return null;
-                  }
-                  return (
-                    <ChartTooltip>
-                      <ChartTooltip.Header>{label}</ChartTooltip.Header>
-                      {payload.map((entry) => (
-                        <ChartTooltip.Item key={String(entry.dataKey)}>
-                          <ChartTooltip.Indicator color={entry.color ?? entry.fill} />
-                          <ChartTooltip.Label>{entry.name ?? "Calories"}</ChartTooltip.Label>
-                          <ChartTooltip.Value>
-                            {typeof entry.value === "number" ? `${Math.round(entry.value)} kcal` : "—"}
-                          </ChartTooltip.Value>
-                        </ChartTooltip.Item>
-                      ))}
-                    </ChartTooltip>
-                  );
-                }}
-              />
-            </BarChart>
-          </Widget.Content>
-        </Widget>
-      ) : null}
-      {meals && meals.length > 0 ? (
-        <Timeline density="compact" size="sm" className="mt-2">
-          {meals.map((meal) => {
-            const Icon = MEAL_ICONS[meal.label];
-            const hasItems = meal.items.length > 0;
-            return (
-              <Timeline.Item align={hasItems ? "start" : "center"} key={meal.id}>
-                <Timeline.Marker aria-hidden="true">
-                  <Icon />
-                </Timeline.Marker>
-                <Timeline.Content className="gap-1">
-                  <div className="flex min-w-0 items-baseline justify-between gap-3">
-                    <h3 className="text-foreground m-0 min-w-0 truncate text-sm font-medium leading-tight">
-                      {MEAL_LABELS[meal.label]}
-                      <time className="text-muted font-normal">
-                        {" · "}
-                        {formatMealTime(meal.eatenAt, timezone)}
-                      </time>
-                    </h3>
-                    <KcalText className="text-foreground m-0 shrink-0 text-sm" value={meal.totals.energyKcal} />
-                  </div>
-                  {hasItems ? (
-                    <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
-                      {meal.items.map((item) => (
-                        <li
-                          className="text-muted flex min-w-0 items-baseline justify-between gap-3 text-xs leading-snug"
-                          key={item.id}
-                        >
-                          <span className="truncate">{item.name}</span>
-                          <KcalText className="shrink-0" value={item.metrics.energyKcal} />
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </Timeline.Content>
-              </Timeline.Item>
-            );
-          })}
-        </Timeline>
-      ) : null}
+      ) : (
+        <MealGroupsAccordion groups={groups} />
+      )}
     </div>
   );
-}
-
-function GoalRings({
-  compact,
-  rings,
-}: {
-  readonly compact: boolean;
-  readonly rings: readonly GoalRing[];
-}) {
-  const calorie = rings.find((ring) => ring.id === "calories");
-  const size = 240;
-  const count = rings.length;
-  const barSize = count <= 2 ? 12 : count <= 4 ? 10 : 8;
-  const data = useMemo(
-    () => rings.map((ring) => ({ fill: ring.fill, name: ring.name, value: ring.value })),
-    [rings],
-  );
-  const overData = useMemo(
-    () => rings.map((ring) => ({ name: ring.name, over: ring.over })),
-    [rings],
-  );
-  const legend = useMemo(() => [...rings].reverse(), [rings]);
-  const hasOver = rings.some((ring) => ring.over > 0);
-  const calorieRemainder = calorie ? goalRemainder(calorie.consumed, calorie.goal, calorie.unit) : null;
-  const label = rings
-    .map((ring) => {
-      const remainder = goalRemainder(ring.consumed, ring.goal, ring.unit);
-      return `${ring.name}: ${ring.consumed} of ${ring.goal} ${ring.unit}, ${remainder.text}`;
-    })
-    .join(". ");
-
-  return (
-    <div className="flex w-full flex-col items-center gap-3">
-      <div aria-label={label} className="relative" role="img">
-        <GoalOverPatterns rings={rings} />
-        <RadialChart
-          barSize={barSize}
-          data={data}
-          height={size}
-          innerRadius="60%"
-          outerRadius="100%"
-          width={size}
-        >
-          <RadialChart.AngleAxis angleAxisId={0} domain={[0, 100]} tick={false} type="number" />
-          <RadialChart.Bar background angleAxisId={0} cornerRadius={12} dataKey="value" />
-        </RadialChart>
-        {hasOver ? (
-          <div className="pointer-events-none absolute inset-0">
-            <RadialChart
-              barSize={barSize}
-              data={overData}
-              height={size}
-              innerRadius="60%"
-              outerRadius="100%"
-              width={size}
-            >
-              <RadialChart.AngleAxis angleAxisId={0} domain={[0, 100]} tick={false} type="number" />
-              <RadialChart.Bar angleAxisId={0} cornerRadius={12} dataKey="over">
-                {rings.map((ring) => (
-                  <RadialChart.Cell
-                    key={ring.id}
-                    fill={ring.over > 0 ? `url(#${goalOverPatternId(ring.id)})` : "transparent"}
-                  />
-                ))}
-              </RadialChart.Bar>
-            </RadialChart>
-          </div>
-        ) : null}
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          {calorie && calorieRemainder ? (
-            <>
-              <span className="text-muted text-xs">Calories</span>
-              <span className="text-foreground text-xl font-semibold tabular-nums">
-                {calorie.consumed} kcal
-              </span>
-              <span className={cn("text-xs", calorieRemainder.over ? "text-danger" : "text-muted")}>
-                {calorieRemainder.text}
-              </span>
-            </>
-          ) : (
-            <span className="text-muted text-xs">Goals</span>
-          )}
-        </div>
-      </div>
-      <ul className={cn("m-0 flex w-full list-none flex-col p-0 px-2", compact ? "gap-1" : "max-w-sm gap-1.5")}>
-        {legend.map((ring) => {
-          const remainder = goalRemainder(ring.consumed, ring.goal, ring.unit);
-          return (
-            <li className="flex items-center gap-2 text-sm" key={ring.id}>
-              <span
-                className="size-2.5 shrink-0 rounded-full"
-                style={goalSwatchStyle(ring.fill, remainder.over)}
-              />
-              <span className="text-foreground min-w-0 flex-1">{ring.name}</span>
-              <span className="text-foreground shrink-0 tabular-nums">
-                {ring.consumed} / {ring.goal} {ring.unit}
-              </span>
-              <span
-                className={cn(
-                  "w-[5.75rem] shrink-0 text-right text-xs tabular-nums",
-                  remainder.over ? "text-danger" : "text-muted",
-                )}
-              >
-                {remainder.text}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
-
-function GoalOverPatterns({ rings }: { readonly rings: readonly GoalRing[] }) {
-  return (
-    <svg aria-hidden="true" className="pointer-events-none absolute" height={0} width={0}>
-      <defs>
-        {rings.map((ring) => (
-          <pattern
-            id={goalOverPatternId(ring.id)}
-            key={ring.id}
-            height="6"
-            patternTransform="rotate(45)"
-            patternUnits="userSpaceOnUse"
-            width="6"
-          >
-            <rect fill={ring.fill} height="6" width="6" />
-            <rect fill="var(--foreground)" fillOpacity="0.4" height="6" width="2.5" />
-          </pattern>
-        ))}
-      </defs>
-    </svg>
-  );
-}
-
-function goalOverPatternId(id: GoalRing["id"]): string {
-  return `goal-over-${id}`;
-}
-
-function goalSwatchStyle(fill: string, over: boolean): { backgroundColor?: string; backgroundImage?: string } {
-  if (!over) {
-    return { backgroundColor: fill };
-  }
-  return {
-    backgroundImage: `repeating-linear-gradient(135deg, ${fill} 0 3px, color-mix(in oklch, var(--foreground) 40%, ${fill}) 3px 6px)`,
-  };
-}
-
-function goalRemainder(
-  consumed: number,
-  goal: number,
-  unit: string,
-): { over: boolean; text: string } {
-  const over = Math.max(0, consumed - goal);
-  const left = Math.max(0, goal - consumed);
-  if (over > 0) {
-    return { over: true, text: `${over} ${unit} over` };
-  }
-  if (left > 0) {
-    return { over: false, text: `${left} ${unit} left` };
-  }
-  return { over: false, text: "Goal reached" };
 }
 
 function SetCalorieGoalHint({ compact }: { readonly compact: boolean }) {
@@ -604,83 +301,48 @@ function SetCalorieGoalHint({ compact }: { readonly compact: boolean }) {
   );
 }
 
-function SummaryKpi({
-  className,
-  suffix,
-  title,
-  value,
-  valueClassName,
-}: {
-  readonly className?: string;
-  readonly suffix?: string;
-  readonly title: string;
-  readonly value: number | null;
-  readonly valueClassName?: string;
-}) {
-  return (
-    <KPI className={cn("gap-1 p-3", className)}>
-      <KPI.Header>
-        <KPI.Title className="text-xs">{title}</KPI.Title>
-      </KPI.Header>
-      <KPI.Content>
-        {value === null ? (
-          <span className={valueClassName ?? "text-lg font-semibold"}>—</span>
-        ) : (
-          <KPI.Value className={valueClassName ?? "text-lg"} maximumFractionDigits={0} value={value}>
-            {(formatted) => (
-              <>
-                {formatted}
-                {suffix ? <span className="text-muted ml-1 text-sm font-normal">{suffix}</span> : null}
-              </>
-            )}
-          </KPI.Value>
-        )}
-      </KPI.Content>
-    </KPI>
-  );
-}
-
-function defaultCustomRange(initial: NutritionSummaryPayload | undefined): DateRange | null {
-  if (initial?.period === "custom" && initial.customFrom && initial.customTo) {
-    return { end: parseDate(initial.customTo), start: parseDate(initial.customFrom) };
+function bucketsFromDiary(diary: NutritionDiaryPayload | undefined): Record<string, NutritionDayBucket> {
+  const map: Record<string, NutritionDayBucket> = {};
+  if (!diary) {
+    return map;
   }
-  return null;
+  mergeBuckets(map, diary.days.days);
+  map[diary.day.date] = bucketFromDay(diary.day);
+  return map;
 }
 
-function nutritionToday(timeZone: string) {
-  return parseDate(formatDateInTimeZone(new Date(), timeZone));
+function bucketFromDay(day: NutritionDayPayload): NutritionDayBucket {
+  return {
+    date: day.date,
+    incomplete: day.incomplete,
+    itemCount: day.itemCount,
+    mealCount: day.mealCount,
+    totals: day.totals,
+  };
 }
 
-function rangeForLastDays(timeZone: string, days: number): DateRange {
-  const end = nutritionToday(timeZone);
-  return { end, start: end.subtract({ days: days - 1 }) };
-}
-
-function formatMealTime(iso: string, timeZone: string): string {
-  return new Intl.DateTimeFormat("en-GB", {
-    hour: "2-digit",
-    hourCycle: "h23",
-    minute: "2-digit",
-    timeZone,
-  }).format(new Date(iso));
-}
-
-function KcalText({
-  className,
-  value,
-}: {
-  readonly className?: string;
-  readonly value: number | null;
-}) {
-  if (value === null) {
-    return <span className={className}>—</span>;
+function mergeBuckets(map: Record<string, NutritionDayBucket>, days: readonly NutritionDayBucket[]): void {
+  for (const day of days) {
+    map[day.date] = day;
   }
-  return (
-    <span className={cn("tabular-nums", className)}>
-      {Math.round(value)}
-      <span className="text-muted font-normal"> kcal</span>
-    </span>
-  );
+}
+
+function windowIsCached(
+  window: { from: string; to: string },
+  map: Readonly<Record<string, NutritionDayBucket>>,
+): boolean {
+  let date = window.from;
+  while (date <= window.to) {
+    if (!map[date]) {
+      return false;
+    }
+    date = shiftYmd(date, 1);
+  }
+  return true;
+}
+
+function firstError(...errors: unknown[]): unknown {
+  return errors.find((error) => error != null);
 }
 
 function bootTelegramWebApp(onReady: (initData: string) => void): () => void {
@@ -689,7 +351,7 @@ function bootTelegramWebApp(onReady: (initData: string) => void): () => void {
     existing.ready();
     existing.expand();
     onReady(existing.initData);
-    return () => { };
+    return () => {};
   }
   const script = document.createElement("script");
   script.src = "https://telegram.org/js/telegram-web-app.js";
