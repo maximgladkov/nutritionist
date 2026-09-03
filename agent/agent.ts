@@ -1,6 +1,6 @@
 import { defineAgent } from "eve";
 
 export default defineAgent({
-  model: "alibaba/qwen3.8-flash",
+  model: "zai/glm-5.3-flash",
   reasoning: "minimal",
 });
