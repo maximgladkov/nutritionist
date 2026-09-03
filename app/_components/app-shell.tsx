@@ -6,9 +6,11 @@ import { AppLayout, Navbar, Sidebar } from "@heroui-pro/react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
+import { BrandMark } from "@/app/_components/brand-mark";
 import { useAppLocale } from "@/app/_components/lingui-client-provider";
 import { MiniAppShell } from "@/app/_components/mini-app-shell";
 import { signOutAction } from "@/app/actions/auth";
+import { APP_NAME } from "@/lib/brand";
 
 export function AppShell({
   children,
@@ -91,11 +93,9 @@ function SidebarBrand() {
   return (
     <Sidebar.Header>
       <div className="flex items-center gap-3 px-1 py-2">
-        <div className="bg-accent flex size-6 shrink-0 items-center justify-center rounded-md">
-          <span className="text-accent-foreground text-sm font-bold">N</span>
-        </div>
+        <BrandMark />
         <span className="text-foreground text-sm font-semibold" data-sidebar="label">
-          <Trans>Nutritionist</Trans>
+          {APP_NAME}
         </span>
       </div>
     </Sidebar.Header>

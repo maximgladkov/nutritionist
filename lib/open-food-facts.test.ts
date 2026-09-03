@@ -89,7 +89,7 @@ describe("getProductByBarcode", () => {
       });
     });
 
-    process.env.AUTH_EMAIL_FROM = "Nutritionist <nutritionist@example.com>";
+    process.env.AUTH_EMAIL_FROM = "BTR.me <hello@example.com>";
     const result = await getProductByBarcode("3017624010701", { country: "us" });
 
     assert.equal(result.found, true);
@@ -105,7 +105,7 @@ describe("getProductByBarcode", () => {
     assert.equal(fetchMock.mock.callCount(), 1);
     const [, init] = fetchMock.mock.calls[0]?.arguments ?? [];
     const headers = new Headers(init?.headers);
-    assert.equal(headers.get("User-Agent"), "Nutritionist/0.0.0 (nutritionist@example.com)");
+    assert.equal(headers.get("User-Agent"), "BTR.me/0.0.0 (hello@example.com)");
   });
 
   it("maps gb to uk in cc", async () => {

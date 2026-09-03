@@ -4,6 +4,7 @@ import type { Adapter } from "next-auth/adapters";
 import Credentials from "next-auth/providers/credentials";
 import Resend from "next-auth/providers/resend";
 import { authConfig } from "./auth.config";
+import { APP_NAME } from "./lib/brand";
 import { ensureEmailIdentity, resolveChannelUser } from "./lib/identity";
 import { prisma } from "./lib/prisma";
 import { verifyTelegramLoginWidget } from "./lib/telegram-login-widget";
@@ -13,7 +14,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma) as Adapter,
   providers: [
     Resend({
-      from: process.env.AUTH_EMAIL_FROM ?? "Nutritionist <onboarding@resend.dev>",
+      from: process.env.AUTH_EMAIL_FROM ?? `${APP_NAME} <onboarding@resend.dev>`,
     }),
     Credentials({
       id: "telegram",

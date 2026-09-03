@@ -13,11 +13,11 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
 
-#: app/_components/settings-forms.tsx:473
+#: app/_components/settings-forms.tsx:480
 msgid "{label} goal"
 msgstr "цель: {label}"
 
-#: app/_components/settings-forms.tsx:603
+#: app/_components/settings-forms.tsx:605
 msgid "{title} time"
 msgstr "время: {title}"
 
@@ -25,16 +25,12 @@ msgstr "время: {title}"
 msgid "<0>Set daily goals</0> to fill rings as you eat."
 msgstr "<0>Задайте дневные цели</0>, чтобы кольца заполнялись по мере еды."
 
-#: app/layout.tsx:42
-msgid "A nutritionist agent with web, Telegram, and WhatsApp chat."
-msgstr "Агент-нутрициолог с чатом в вебе, Telegram и WhatsApp."
-
 #: app/actions/settings.ts:279
 msgid "Accounts linked. Memory now follows you across channels."
 msgstr "Аккаунты связаны. Память теперь следует за вами между каналами."
 
-#: app/_components/agent-chat.tsx:234
 #: app/_components/agent-chat.tsx:236
+#: app/_components/agent-chat.tsx:238
 msgid "Add photo"
 msgstr "Добавить фото"
 
@@ -47,15 +43,11 @@ msgstr "Уже связано."
 msgid "Answer"
 msgstr "Ответ"
 
-#: app/_components/settings-forms.tsx:229
+#: app/_components/settings-forms.tsx:245
 msgid "App language, product lookups, meal times, and reminders."
 msgstr "Язык приложения, поиск продуктов, время приёмов пищи и напоминания."
 
-#: app/_components/agent-chat.tsx:307
-msgid "Ask about a meal or attach a photo to log what you ate."
-msgstr "Спросите про приём пищи или прикрепите фото, чтобы записать, что вы ели."
-
-#: app/_components/agent-chat.tsx:225
+#: app/_components/agent-chat.tsx:227
 msgid "Ask about a meal or attach a photo…"
 msgstr "Спросите про приём пищи или прикрепите фото…"
 
@@ -63,6 +55,12 @@ msgstr "Спросите про приём пищи или прикрепите 
 #: app/_components/agent-message.tsx:129
 msgid "Attachment"
 msgstr "Вложение"
+
+#: app/_components/agent-chat.tsx:310
+#: app/layout.tsx:42
+#: app/login/page.tsx:37
+msgid "Become a better version of yourself."
+msgstr "Стань лучшей версией себя."
 
 #: app/_components/i18n-labels.ts:21
 #: app/_components/i18n-labels.ts:29
@@ -81,16 +79,16 @@ msgstr "Калории и макронутриенты по записанным
 msgid "Carbs"
 msgstr "Углеводы"
 
-#: app/_components/app-shell.tsx:29
+#: app/_components/app-shell.tsx:31
 #: app/_components/app-shell.tsx:115
 msgid "Chat"
 msgstr "Чат"
 
-#: app/login/page.tsx:57
+#: app/login/page.tsx:56
 msgid "Check the address and try again."
 msgstr "Проверьте адрес и попробуйте ещё раз."
 
-#: app/_components/settings-forms.tsx:556
+#: app/_components/settings-forms.tsx:567
 msgid "Check-ins"
 msgstr "Напоминания"
 
@@ -122,7 +120,7 @@ msgstr "Задайте корректное время для каждого н�
 msgid "Choose a valid time zone."
 msgstr "Выберите корректный часовой пояс."
 
-#: app/_components/settings-forms.tsx:658
+#: app/_components/settings-forms.tsx:654
 msgid "Connect Telegram or WhatsApp with a one-time code."
 msgstr "Свяжите Telegram или WhatsApp одноразовым кодом."
 
@@ -143,7 +141,7 @@ msgstr "Не удалось загрузить сводку."
 msgid "Could not load those days."
 msgstr "Не удалось загрузить эти дни."
 
-#: app/_components/agent-chat.tsx:28
+#: app/_components/agent-chat.tsx:30
 msgid "Could not read the photo."
 msgstr "Не удалось прочитать фото."
 
@@ -156,16 +154,16 @@ msgstr "Не удалось сохранить напоминания."
 msgid "Could not save those goals."
 msgstr "Не удалось сохранить эти цели."
 
-#: app/login/page.tsx:50
+#: app/login/page.tsx:49
 msgid "Could not send a sign-in email"
 msgstr "Не удалось отправить письмо для входа"
 
-#: app/login/page.tsx:48
+#: app/login/page.tsx:47
 msgid "Could not sign in with Telegram"
 msgstr "Не удалось войти через Telegram"
 
-#: app/_components/settings-forms.tsx:295
-#: app/_components/settings-forms.tsx:316
+#: app/_components/settings-forms.tsx:309
+#: app/_components/settings-forms.tsx:330
 msgid "Country"
 msgstr "Страна"
 
@@ -189,7 +187,7 @@ msgstr "Дневные калории должны быть целым числ�
 msgid "Daily carbs must be a whole number from {0} to {1} grams."
 msgstr "Дневные углеводы должны быть целым числом от {0} до {1} г."
 
-#: app/_components/settings-forms.tsx:560
+#: app/_components/settings-forms.tsx:562
 msgid "Daily check-ins use your time zone."
 msgstr "Ежедневные напоминания используют ваш часовой пояс."
 
@@ -205,7 +203,7 @@ msgstr "Дневной жир должен быть целым числом от
 msgid "Daily fiber must be a whole number from {0} to {1} grams."
 msgstr "Дневная клетчатка должна быть целым числом от {0} до {1} г."
 
-#: app/_components/settings-forms.tsx:430
+#: app/_components/settings-forms.tsx:442
 msgid "Daily Goals"
 msgstr "Дневные цели"
 
@@ -228,27 +226,27 @@ msgstr "Итоги дня"
 msgid "Dinner"
 msgstr "Ужин"
 
-#: app/_components/agent-chat.tsx:120
+#: app/_components/agent-chat.tsx:122
 msgid "Each photo must be 10 MB or smaller."
 msgstr "Каждое фото должно быть не больше 10 МБ."
 
-#: app/login/page.tsx:76
+#: app/login/page.tsx:75
 msgid "Email"
 msgstr "Email"
 
-#: app/login/page.tsx:81
+#: app/login/page.tsx:80
 msgid "Email me a sign-in link"
 msgstr "Прислать ссылку для входа"
 
-#: app/_components/settings-forms.tsx:481
+#: app/_components/settings-forms.tsx:488
 msgid "Enable {label} goal"
 msgstr "Включить цель: {label}"
 
-#: app/_components/settings-forms.tsx:611
+#: app/_components/settings-forms.tsx:613
 msgid "Enable {title} reminder"
 msgstr "Включить напоминание: {title}"
 
-#: app/_components/settings-forms.tsx:695
+#: app/_components/settings-forms.tsx:690
 msgid "Enter a code from chat"
 msgstr "Введите код из чата"
 
@@ -264,11 +262,11 @@ msgstr "Клетчатка"
 msgid "Food"
 msgstr "Еда"
 
-#: app/_components/settings-forms.tsx:685
+#: app/_components/settings-forms.tsx:680
 msgid "Generate"
 msgstr "Создать"
 
-#: app/_components/settings-forms.tsx:668
+#: app/_components/settings-forms.tsx:663
 msgid "Generate a code"
 msgstr "Создать код"
 
@@ -289,12 +287,12 @@ msgstr "Перейти к дате"
 msgid "kilocalories per day"
 msgstr "килокалории в день"
 
-#: app/_components/settings-forms.tsx:240
-#: app/_components/settings-forms.tsx:265
+#: app/_components/settings-forms.tsx:254
+#: app/_components/settings-forms.tsx:279
 msgid "Language"
 msgstr "Язык"
 
-#: app/_components/settings-forms.tsx:226
+#: app/_components/settings-forms.tsx:246
 msgid "Language & location"
 msgstr "Язык и местоположение"
 
@@ -302,11 +300,11 @@ msgstr "Язык и местоположение"
 msgid "Language saved."
 msgstr "Язык сохранён."
 
-#: app/_components/settings-forms.tsx:719
+#: app/_components/settings-forms.tsx:714
 msgid "Link"
 msgstr "Связать"
 
-#: app/_components/settings-forms.tsx:702
+#: app/_components/settings-forms.tsx:697
 msgid "Link code"
 msgstr "Код связи"
 
@@ -335,7 +333,7 @@ msgstr "Мини-приложение"
 msgid "Navigation"
 msgstr "Навигация"
 
-#: app/_components/app-shell.tsx:60
+#: app/_components/app-shell.tsx:62
 msgid "New chat"
 msgstr "Новый чат"
 
@@ -343,20 +341,13 @@ msgstr "Новый чат"
 msgid "No meals logged"
 msgstr "Нет записей о еде"
 
-#: app/_components/settings-forms.tsx:220
+#: app/_components/settings-forms.tsx:241
 msgid "Not set"
 msgstr "Не задано"
 
-#: app/_components/settings-forms.tsx:219
+#: app/_components/settings-forms.tsx:240
 msgid "Not set (worldwide)"
 msgstr "Не задано (весь мир)"
-
-#: app/_components/agent-chat.tsx:304
-#: app/_components/app-shell.tsx:98
-#: app/layout.tsx:41
-#: app/login/page.tsx:33
-msgid "Nutritionist"
-msgstr "Нутрициолог"
 
 #: app/_components/nutrition-summary.tsx:205
 #: app/actions/settings.ts:75
@@ -364,7 +355,7 @@ msgstr "Нутрициолог"
 msgid "Open this from the Telegram bot."
 msgstr "Откройте это из Telegram-бота."
 
-#: app/login/page.tsx:89
+#: app/login/page.tsx:88
 msgid "or"
 msgstr "или"
 
@@ -389,11 +380,11 @@ msgid "Reminders saved."
 msgstr "Напоминания сохранены."
 
 #. placeholder {0}: file.filename
-#: app/_components/agent-chat.tsx:211
+#: app/_components/agent-chat.tsx:213
 msgid "Remove {0}"
 msgstr "Удалить {0}"
 
-#: app/_components/agent-chat.tsx:328
+#: app/_components/agent-chat.tsx:331
 msgid "Request failed"
 msgstr "Запрос не выполнен"
 
@@ -410,25 +401,25 @@ msgstr "Сначала сохраните часовой пояс, чтобы м
 msgid "Saved food groups will show up here so you can log them in one tap."
 msgstr "Сохранённые группы продуктов появятся здесь, чтобы добавлять их одним нажатием."
 
-#: app/_components/agent-chat.tsx:293
-#: app/_components/agent-chat.tsx:294
+#: app/_components/agent-chat.tsx:295
+#: app/_components/agent-chat.tsx:296
 msgid "Scroll to bottom"
 msgstr "Прокрутить вниз"
 
-#: app/_components/settings-forms.tsx:319
-#: app/_components/settings-forms.tsx:375
+#: app/_components/settings-forms.tsx:333
+#: app/_components/settings-forms.tsx:389
 msgid "Search…"
 msgstr "Поиск…"
 
-#: app/_components/agent-chat.tsx:244
+#: app/_components/agent-chat.tsx:246
 msgid "Send"
 msgstr "Отправить"
 
-#: app/_components/settings-forms.tsx:671
+#: app/_components/settings-forms.tsx:666
 msgid "Send /link CODE in a private chat with the bot."
 msgstr "Отправьте /link CODE в личный чат с ботом."
 
-#: app/_components/settings-forms.tsx:562
+#: app/_components/settings-forms.tsx:564
 msgid "Set a time zone first to turn reminders on."
 msgstr "Сначала задайте часовой пояс, чтобы включить напоминания."
 
@@ -436,11 +427,11 @@ msgstr "Сначала задайте часовой пояс, чтобы вкл
 msgid "Set daily goals in chat to track them here."
 msgstr "Задайте дневные цели в чате, чтобы отслеживать их здесь."
 
-#: app/_components/app-shell.tsx:29
+#: app/_components/app-shell.tsx:31
 #: app/_components/app-shell.tsx:117
 #: app/_components/mini-app-settings.tsx:72
 #: app/_components/mini-app-tab-bar.tsx:51
-#: app/_components/settings-forms.tsx:186
+#: app/_components/settings-forms.tsx:207
 msgid "Settings"
 msgstr "Настройки"
 
@@ -452,11 +443,7 @@ msgstr "Войдите, чтобы продолжить."
 msgid "Sign in to view your summary."
 msgstr "Войдите, чтобы увидеть сводку."
 
-#: app/login/page.tsx:36
-msgid "Sign in with a magic link to chat on the web and link Telegram or WhatsApp."
-msgstr "Войдите по волшебной ссылке, чтобы общаться в вебе и связать Telegram или WhatsApp."
-
-#: app/_components/telegram-login-widget.tsx:69
+#: app/_components/telegram-login-widget.tsx:80
 msgid "Sign in with Telegram"
 msgstr "Войти через Telegram"
 
@@ -464,7 +451,7 @@ msgstr "Войти через Telegram"
 msgid "Sign out"
 msgstr "Выйти"
 
-#: app/_components/settings-forms.tsx:190
+#: app/_components/settings-forms.tsx:211
 msgid "Signed in as {email}"
 msgstr "Вы вошли как {email}"
 
@@ -472,15 +459,15 @@ msgstr "Вы вошли как {email}"
 msgid "Snack"
 msgstr "Перекус"
 
-#: app/_components/app-shell.tsx:53
+#: app/_components/app-shell.tsx:55
 msgid "Start a new chat"
 msgstr "Начать новый чат"
 
-#: app/_components/agent-chat.tsx:244
+#: app/_components/agent-chat.tsx:246
 msgid "Stop"
 msgstr "Стоп"
 
-#: app/_components/app-shell.tsx:29
+#: app/_components/app-shell.tsx:31
 #: app/_components/app-shell.tsx:116
 #: app/_components/nutrition-summary.tsx:229
 #: app/summary/page.tsx:15
@@ -505,11 +492,11 @@ msgstr "Этот код истёк."
 msgid "That code is not valid."
 msgstr "Этот код недействителен."
 
-#: app/_components/agent-chat.tsx:29
+#: app/_components/agent-chat.tsx:31
 msgid "The model is temporarily unavailable. Please try again."
 msgstr "Модель временно недоступна. Попробуйте ещё раз."
 
-#: app/_components/agent-chat.tsx:340
+#: app/_components/agent-chat.tsx:343
 #: app/_components/agent-message.tsx:205
 msgid "Thinking"
 msgstr "Думаю"
@@ -518,8 +505,8 @@ msgstr "Думаю"
 msgid "Those accounts both have email sign-in and cannot be merged."
 msgstr "У обоих аккаунтов вход по email, их нельзя объединить."
 
-#: app/_components/settings-forms.tsx:346
-#: app/_components/settings-forms.tsx:372
+#: app/_components/settings-forms.tsx:360
+#: app/_components/settings-forms.tsx:386
 msgid "Time zone"
 msgstr "Часовой пояс"
 
@@ -539,11 +526,11 @@ msgstr "Время считается по UTC, пока вы не сохран�
 msgid "Today"
 msgstr "Сегодня"
 
-#: app/login/page.tsx:55
+#: app/login/page.tsx:54
 msgid "Try the Telegram button again, or use a magic link."
 msgstr "Попробуйте кнопку Telegram ещё раз или войдите по ссылке из письма."
 
-#: app/_components/settings-forms.tsx:433
+#: app/_components/settings-forms.tsx:441
 msgid "Turn on a nutrient to track it on the summary rings."
 msgstr "Включите нутриент, чтобы отслеживать его на кольцах сводки."
 
@@ -551,7 +538,7 @@ msgstr "Включите нутриент, чтобы отслеживать е�
 msgid "Type your answer…"
 msgstr "Введите ответ…"
 
-#: app/_components/agent-chat.tsx:30
+#: app/_components/agent-chat.tsx:32
 msgid "Unable to cancel the response."
 msgstr "Не удалось отменить ответ."
 
@@ -563,7 +550,7 @@ msgstr "Инструмент: "
 msgid "Yesterday"
 msgstr "Вчера"
 
-#: app/_components/agent-chat.tsx:115
+#: app/_components/agent-chat.tsx:117
 msgid "You can attach up to {MAX_ATTACHMENT_FILES} photos."
 msgstr "Можно прикрепить до {MAX_ATTACHMENT_FILES} фото."
 

@@ -1,6 +1,8 @@
+import { BrandMark } from "@/app/_components/brand-mark";
 import { TelegramLoginWidget } from "@/app/_components/telegram-login-widget";
 import { signIn } from "@/auth";
 import { readAuthJwt } from "@/lib/auth-cookies";
+import { APP_NAME } from "@/lib/brand";
 import { initLingui } from "@/lib/i18n/init-lingui";
 import { resolveRequestLocale } from "@/lib/i18n/request-locale";
 import { telegramLoginBotUsername } from "@/lib/telegram-login-widget";
@@ -28,14 +30,11 @@ export default async function LoginPage({
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-6">
       <Card>
+        <BrandMark size="md" />
         <Card.Header>
-          <Card.Title>
-            <Trans>Nutritionist</Trans>
-          </Card.Title>
+          <Card.Title>{APP_NAME}</Card.Title>
           <Card.Description>
-            <Trans>
-              Sign in with a magic link to chat on the web and link Telegram or WhatsApp.
-            </Trans>
+            <Trans>Become a better version of yourself.</Trans>
           </Card.Description>
         </Card.Header>
         <Card.Content className="flex flex-col gap-4">

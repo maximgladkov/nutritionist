@@ -1,3 +1,4 @@
+import { APP_NAME } from "./brand.ts";
 import { toOpenFoodFactsCountry } from "./countries.ts";
 import {
   pickProductName,
@@ -198,7 +199,7 @@ export function isValidBarcode(barcode: string): boolean {
 function userAgent(): string {
   const from = process.env.AUTH_EMAIL_FROM?.trim();
   const contact = emailFromAddress(from) ?? from ?? "local";
-  return `Nutritionist/0.0.0 (${contact})`;
+  return `${APP_NAME}/0.0.0 (${contact})`;
 }
 
 function emailFromAddress(value: string | undefined): string | undefined {

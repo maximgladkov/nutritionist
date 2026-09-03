@@ -17,6 +17,8 @@ import {
 import { useEveAgent } from "eve/react";
 import { useEffect, useState } from "react";
 import { AgentMessage } from "./agent-message";
+import { BrandMark } from "@/app/_components/brand-mark";
+import { APP_NAME } from "@/lib/brand";
 import { prepareImageFiles } from "@/lib/heic";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { msg } from "@lingui/core/macro";
@@ -300,11 +302,12 @@ export function AgentChat({
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-8 px-4 pb-[10vh]">
           <EmptyState className="max-w-xl">
             <EmptyState.Header>
-              <EmptyState.Title>
-                <Trans>Nutritionist</Trans>
-              </EmptyState.Title>
+              <EmptyState.Media>
+                <BrandMark size="md" />
+              </EmptyState.Media>
+              <EmptyState.Title>{APP_NAME}</EmptyState.Title>
               <EmptyState.Description>
-                <Trans>Ask about a meal or attach a photo to log what you ate.</Trans>
+                <Trans>Become a better version of yourself.</Trans>
               </EmptyState.Description>
             </EmptyState.Header>
           </EmptyState>

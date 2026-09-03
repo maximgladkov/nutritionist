@@ -1,4 +1,6 @@
-# nutritionist
+# BTR.me
+
+Become a better version of yourself.
 
 This is an [eve](https://eve.dev) agent bootstrapped with [`eve init`](https://eve.dev/docs/reference/cli#eve-init).
 

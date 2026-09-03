@@ -3,10 +3,11 @@ import type { Message, Thread } from "chat";
 import { chatSdkChannel, messageToUserContent } from "eve/channels/chat-sdk";
 import { handleChannelLink, resolveChannelUser, saveChannelThreadId } from "../lib/channel-identity";
 import { createPrismaChatState } from "../lib/chat-sdk-state";
+import { APP_NAME } from "../../lib/brand";
 import { appPrincipal } from "../../lib/principal";
 
 export const { bot, channel, send } = chatSdkChannel({
-  userName: "Nutritionist",
+  userName: APP_NAME,
   adapters: {
     whatsapp: createWhatsAppAdapter({
       accessToken: process.env.WHATSAPP_ACCESS_TOKEN || "unconfigured",
