@@ -15,6 +15,15 @@ type TelegramWidgetUser = {
   username?: string;
 };
 
+function styleTelegramIframe(iframe: HTMLIFrameElement) {
+  iframe.style.backgroundColor = "Canvas";
+  iframe.style.borderRadius = "9999px";
+  iframe.style.colorScheme = "light";
+  iframe.style.display = "block";
+  iframe.style.overflow = "hidden";
+  iframe.setAttribute("allowTransparency", "true");
+}
+
 export function TelegramLoginWidget({
   botUsername,
   callbackUrl,
@@ -57,15 +66,14 @@ export function TelegramLoginWidget({
     script.setAttribute("data-telegram-login", botUsername);
     container.replaceChildren(script);
 
-    const applyLightScheme = () => {
+    const applyIframeStyles = () => {
       for (const iframe of container.querySelectorAll("iframe")) {
-        iframe.style.backgroundColor = "transparent";
-        iframe.style.colorScheme = "light";
+        styleTelegramIframe(iframe);
       }
     };
-    const observer = new MutationObserver(applyLightScheme);
+    const observer = new MutationObserver(applyIframeStyles);
     observer.observe(container, { childList: true, subtree: true });
-    applyLightScheme();
+    applyIframeStyles();
 
     return () => {
       observer.disconnect();
@@ -78,7 +86,7 @@ export function TelegramLoginWidget({
     <div
       ref={containerRef}
       aria-label={t(msg`Sign in with Telegram`)}
-      className="flex justify-center scheme-light [&_iframe]:scheme-light [&_iframe]:bg-transparent"
+      className="mx-auto w-fit overflow-hidden rounded-full leading-none scheme-light [&_iframe]:block [&_iframe]:rounded-full [&_iframe]:bg-surface [&_iframe]:[color-scheme:light]"
     />
   );
 }
