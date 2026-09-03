@@ -82,7 +82,7 @@ export function AppShell({
       }
       sidebarCollapsible="icon"
     >
-      <div className="flex h-full min-h-0 flex-col">{children}</div>
+      {isChat ? <div className="flex h-full min-h-0 flex-col">{children}</div> : children}
     </AppLayout>
   );
 }

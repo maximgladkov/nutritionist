@@ -43,7 +43,7 @@ export default async function SettingsPage({
   );
 
   return (
-    <div className="mx-auto flex w-full max-w-lg flex-col gap-6 overflow-y-auto px-6 py-8">
+    <div className="@container mx-auto flex w-full min-w-0 max-w-4xl flex-col gap-8 px-6 py-8 sm:px-8">
       <SettingsHeading email={session.user.email ?? undefined} />
       {params.notice ? (
         <FlashToast

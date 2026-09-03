@@ -29,6 +29,7 @@ const mono = Geist_Mono({
 });
 
 export const viewport: Viewport = {
+  colorScheme: "light",
   viewportFit: "cover",
   width: "device-width",
 };

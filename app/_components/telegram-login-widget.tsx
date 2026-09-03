@@ -57,7 +57,18 @@ export function TelegramLoginWidget({
     script.setAttribute("data-telegram-login", botUsername);
     container.replaceChildren(script);
 
+    const applyLightScheme = () => {
+      for (const iframe of container.querySelectorAll("iframe")) {
+        iframe.style.backgroundColor = "transparent";
+        iframe.style.colorScheme = "light";
+      }
+    };
+    const observer = new MutationObserver(applyLightScheme);
+    observer.observe(container, { childList: true, subtree: true });
+    applyLightScheme();
+
     return () => {
+      observer.disconnect();
       Reflect.deleteProperty(window, "onTelegramAuth");
       container.replaceChildren();
     };
@@ -67,7 +78,7 @@ export function TelegramLoginWidget({
     <div
       ref={containerRef}
       aria-label={t(msg`Sign in with Telegram`)}
-      className="flex justify-center"
+      className="flex justify-center scheme-light [&_iframe]:scheme-light [&_iframe]:bg-transparent"
     />
   );
 }
