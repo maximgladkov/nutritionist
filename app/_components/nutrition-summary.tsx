@@ -1,5 +1,6 @@
 "use client";
 
+import { DayGoalProgress } from "@/app/_components/day-goal-progress";
 import { DayRingStrip } from "@/app/_components/day-ring-strip";
 import { DayTotalsRow } from "@/app/_components/day-totals-row";
 import { MealGroupsAccordion } from "@/app/_components/meal-groups-accordion";
@@ -10,7 +11,7 @@ import {
   getNutritionDaysAction,
   getNutritionDiaryAction,
 } from "@/app/actions/summary";
-import { hasAnyGoal, type GoalsView } from "@/lib/goal-values";
+import { goalRingsForToday, hasAnyGoal, type GoalsView } from "@/lib/goal-values";
 import { groupMealsByLabel } from "@/lib/meal-groups";
 import { dayIndexWindows, ymdToDayIndex } from "@/lib/summary-days";
 import type {
@@ -237,7 +238,6 @@ export function NutritionSummaryApp({
         active={foodActive}
         calendarOpen={calendarOpen}
         daysByDate={daysByDate}
-        goals={goals}
         selectedDate={selectedDate}
         today={today}
         onCalendarMonthChange={setCalendarMonth}
@@ -277,9 +277,10 @@ function SelectedDayView({
   readonly isPending: boolean;
 }) {
   const empty = day.mealCount === 0;
+  const rings = goals && hasAnyGoal(goals) ? goalRingsForToday(goals, day.totals) : [];
   return (
     <div className={cn("flex flex-col", compact ? "gap-3" : "gap-4", isPending && "opacity-60")}>
-      <DayTotalsRow totals={day.totals} />
+      {rings.length > 0 ? <DayGoalProgress rings={rings} /> : <DayTotalsRow totals={day.totals} />}
       {goals && !hasAnyGoal(goals) ? <SetCalorieGoalHint compact={compact} /> : null}
       {empty ? (
         <EmptyState className="bg-surface-secondary rounded-2xl" size="sm">
@@ -313,7 +314,7 @@ function SetCalorieGoalHint({ compact }: { readonly compact: boolean }) {
   return (
     <p className="text-muted px-1 text-sm">
       <Trans>
-        <Link href="/settings">Set daily goals</Link> to fill rings as you eat.
+        <Link href="/settings">Set daily goals</Link> to track them as you eat.
       </Trans>
     </p>
   );

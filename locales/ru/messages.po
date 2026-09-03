@@ -21,9 +21,9 @@ msgstr "цель: {label}"
 msgid "{title} time"
 msgstr "время: {title}"
 
-#: app/_components/nutrition-summary.tsx:315
-msgid "<0>Set daily goals</0> to fill rings as you eat."
-msgstr "<0>Задайте дневные цели</0>, чтобы кольца заполнялись по мере еды."
+#: app/_components/nutrition-summary.tsx:316
+msgid "<0>Set daily goals</0> to track them as you eat."
+msgstr "<0>Задайте дневные цели</0>, чтобы отслеживать их по мере еды."
 
 #: app/actions/settings.ts:279
 msgid "Accounts linked. Memory now follows you across channels."
@@ -78,7 +78,7 @@ msgstr "BTR.me"
 msgid "Calories"
 msgstr "Калории"
 
-#: app/_components/nutrition-summary.tsx:232
+#: app/_components/nutrition-summary.tsx:233
 msgid "Calories and macros for the meals you have logged."
 msgstr "Калории и макронутриенты по записанным приёмам пищи."
 
@@ -99,7 +99,7 @@ msgstr "Проверьте адрес и попробуйте ещё раз."
 msgid "Check-ins"
 msgstr "Напоминания"
 
-#: app/_components/day-ring-strip.tsx:442
+#: app/_components/day-ring-strip.tsx:439
 msgid "Choose a date"
 msgstr "Выбрать дату"
 
@@ -139,7 +139,7 @@ msgstr "Не удалось загрузить настройки."
 msgid "Could not load that day."
 msgstr "Не удалось загрузить этот день."
 
-#: app/_components/nutrition-summary.tsx:212
+#: app/_components/nutrition-summary.tsx:213
 #: app/actions/summary.ts:40
 msgid "Could not load that summary."
 msgstr "Не удалось загрузить сводку."
@@ -277,6 +277,10 @@ msgstr "Создать"
 msgid "Generate a code"
 msgstr "Создать код"
 
+#: app/_components/day-goal-progress.tsx:87
+msgid "Goal"
+msgstr "Цель"
+
 #: app/_components/i18n-labels.ts:16
 msgid "grams per day"
 msgstr "граммы в день"
@@ -286,7 +290,7 @@ msgstr "граммы в день"
 msgid "Groups"
 msgstr "Группы"
 
-#: app/_components/day-ring-strip.tsx:294
+#: app/_components/day-ring-strip.tsx:290
 msgid "Jump to date"
 msgstr "Перейти к дате"
 
@@ -319,11 +323,11 @@ msgstr "Код связи"
 msgid "Linked Accounts"
 msgstr "Связанные аккаунты"
 
-#: app/_components/day-ring-strip.tsx:397
+#: app/_components/day-ring-strip.tsx:387
 msgid "Loading day"
 msgstr "Загрузка дня"
 
-#: app/_components/nutrition-summary.tsx:294
+#: app/_components/nutrition-summary.tsx:295
 msgid "Log a meal in chat to see totals here."
 msgstr "Запишите приём пищи в чате, чтобы увидеть итоги здесь."
 
@@ -344,7 +348,7 @@ msgstr "Навигация"
 msgid "New chat"
 msgstr "Новый чат"
 
-#: app/_components/nutrition-summary.tsx:291
+#: app/_components/nutrition-summary.tsx:292
 msgid "No meals logged"
 msgstr "Нет записей о еде"
 
@@ -356,7 +360,7 @@ msgstr "Не задано"
 msgid "Not set (worldwide)"
 msgstr "Не задано (весь мир)"
 
-#: app/_components/nutrition-summary.tsx:205
+#: app/_components/nutrition-summary.tsx:206
 #: app/actions/settings.ts:75
 #: app/actions/summary.ts:109
 msgid "Open this from the Telegram bot."
@@ -430,7 +434,7 @@ msgstr "Отправьте /link CODE в личный чат с ботом."
 msgid "Set a time zone first to turn reminders on."
 msgstr "Сначала задайте часовой пояс, чтобы включить напоминания."
 
-#: app/_components/nutrition-summary.tsx:309
+#: app/_components/nutrition-summary.tsx:310
 msgid "Set daily goals in chat to track them here."
 msgstr "Задайте дневные цели в чате, чтобы отслеживать их здесь."
 
@@ -450,7 +454,7 @@ msgstr "Войдите, чтобы продолжить."
 msgid "Sign in to view your summary."
 msgstr "Войдите, чтобы увидеть сводку."
 
-#: app/_components/telegram-login-widget.tsx:80
+#: app/_components/telegram-login-widget.tsx:88
 msgid "Sign in with Telegram"
 msgstr "Войти через Telegram"
 
@@ -476,7 +480,7 @@ msgstr "Стоп"
 
 #: app/_components/app-shell.tsx:30
 #: app/_components/app-shell.tsx:115
-#: app/_components/nutrition-summary.tsx:229
+#: app/_components/nutrition-summary.tsx:230
 #: app/summary/page.tsx:15
 msgid "Summary"
 msgstr "Сводка"
@@ -529,7 +533,8 @@ msgstr "Часовой пояс сохранён."
 msgid "Times use UTC until you save a time zone in Settings."
 msgstr "Время считается по UTC, пока вы не сохраните часовой пояс в Настройках."
 
-#: app/_components/day-ring-strip.tsx:389
+#: app/_components/day-goal-progress.tsx:83
+#: app/_components/day-ring-strip.tsx:379
 msgid "Today"
 msgstr "Сегодня"
 
@@ -538,8 +543,8 @@ msgid "Try the Telegram button again, or use a magic link."
 msgstr "Попробуйте кнопку Telegram ещё раз или войдите по ссылке из письма."
 
 #: app/_components/settings-forms.tsx:441
-msgid "Turn on a nutrient to track it on the summary rings."
-msgstr "Включите нутриент, чтобы отслеживать его на кольцах сводки."
+msgid "Turn on a nutrient to track it in the summary."
+msgstr "Включите нутриент, чтобы отслеживать его в сводке."
 
 #: app/_components/agent-message.tsx:331
 msgid "Type your answer…"
@@ -553,7 +558,7 @@ msgstr "Не удалось отменить ответ."
 msgid "Used tool: "
 msgstr "Инструмент: "
 
-#: app/_components/day-ring-strip.tsx:390
+#: app/_components/day-ring-strip.tsx:380
 msgid "Yesterday"
 msgstr "Вчера"
 

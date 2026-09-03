@@ -21,9 +21,9 @@ msgstr "{label} goal"
 msgid "{title} time"
 msgstr "{title} time"
 
-#: app/_components/nutrition-summary.tsx:315
-msgid "<0>Set daily goals</0> to fill rings as you eat."
-msgstr "<0>Set daily goals</0> to fill rings as you eat."
+#: app/_components/nutrition-summary.tsx:316
+msgid "<0>Set daily goals</0> to track them as you eat."
+msgstr "<0>Set daily goals</0> to track them as you eat."
 
 #: app/actions/settings.ts:279
 msgid "Accounts linked. Memory now follows you across channels."
@@ -78,7 +78,7 @@ msgstr "BTR.me"
 msgid "Calories"
 msgstr "Calories"
 
-#: app/_components/nutrition-summary.tsx:232
+#: app/_components/nutrition-summary.tsx:233
 msgid "Calories and macros for the meals you have logged."
 msgstr "Calories and macros for the meals you have logged."
 
@@ -99,7 +99,7 @@ msgstr "Check the address and try again."
 msgid "Check-ins"
 msgstr "Check-ins"
 
-#: app/_components/day-ring-strip.tsx:442
+#: app/_components/day-ring-strip.tsx:439
 msgid "Choose a date"
 msgstr "Choose a date"
 
@@ -139,7 +139,7 @@ msgstr "Could not load settings."
 msgid "Could not load that day."
 msgstr "Could not load that day."
 
-#: app/_components/nutrition-summary.tsx:212
+#: app/_components/nutrition-summary.tsx:213
 #: app/actions/summary.ts:40
 msgid "Could not load that summary."
 msgstr "Could not load that summary."
@@ -277,6 +277,10 @@ msgstr "Generate"
 msgid "Generate a code"
 msgstr "Generate a code"
 
+#: app/_components/day-goal-progress.tsx:87
+msgid "Goal"
+msgstr "Goal"
+
 #: app/_components/i18n-labels.ts:16
 msgid "grams per day"
 msgstr "grams per day"
@@ -286,7 +290,7 @@ msgstr "grams per day"
 msgid "Groups"
 msgstr "Groups"
 
-#: app/_components/day-ring-strip.tsx:294
+#: app/_components/day-ring-strip.tsx:290
 msgid "Jump to date"
 msgstr "Jump to date"
 
@@ -319,11 +323,11 @@ msgstr "Link code"
 msgid "Linked Accounts"
 msgstr "Linked Accounts"
 
-#: app/_components/day-ring-strip.tsx:397
+#: app/_components/day-ring-strip.tsx:387
 msgid "Loading day"
 msgstr "Loading day"
 
-#: app/_components/nutrition-summary.tsx:294
+#: app/_components/nutrition-summary.tsx:295
 msgid "Log a meal in chat to see totals here."
 msgstr "Log a meal in chat to see totals here."
 
@@ -344,7 +348,7 @@ msgstr "Navigation"
 msgid "New chat"
 msgstr "New chat"
 
-#: app/_components/nutrition-summary.tsx:291
+#: app/_components/nutrition-summary.tsx:292
 msgid "No meals logged"
 msgstr "No meals logged"
 
@@ -356,7 +360,7 @@ msgstr "Not set"
 msgid "Not set (worldwide)"
 msgstr "Not set (worldwide)"
 
-#: app/_components/nutrition-summary.tsx:205
+#: app/_components/nutrition-summary.tsx:206
 #: app/actions/settings.ts:75
 #: app/actions/summary.ts:109
 msgid "Open this from the Telegram bot."
@@ -430,7 +434,7 @@ msgstr "Send /link CODE in a private chat with the bot."
 msgid "Set a time zone first to turn reminders on."
 msgstr "Set a time zone first to turn reminders on."
 
-#: app/_components/nutrition-summary.tsx:309
+#: app/_components/nutrition-summary.tsx:310
 msgid "Set daily goals in chat to track them here."
 msgstr "Set daily goals in chat to track them here."
 
@@ -450,7 +454,7 @@ msgstr "Sign in to continue."
 msgid "Sign in to view your summary."
 msgstr "Sign in to view your summary."
 
-#: app/_components/telegram-login-widget.tsx:80
+#: app/_components/telegram-login-widget.tsx:88
 msgid "Sign in with Telegram"
 msgstr "Sign in with Telegram"
 
@@ -476,7 +480,7 @@ msgstr "Stop"
 
 #: app/_components/app-shell.tsx:30
 #: app/_components/app-shell.tsx:115
-#: app/_components/nutrition-summary.tsx:229
+#: app/_components/nutrition-summary.tsx:230
 #: app/summary/page.tsx:15
 msgid "Summary"
 msgstr "Summary"
@@ -529,7 +533,8 @@ msgstr "Time zone saved."
 msgid "Times use UTC until you save a time zone in Settings."
 msgstr "Times use UTC until you save a time zone in Settings."
 
-#: app/_components/day-ring-strip.tsx:389
+#: app/_components/day-goal-progress.tsx:83
+#: app/_components/day-ring-strip.tsx:379
 msgid "Today"
 msgstr "Today"
 
@@ -538,8 +543,8 @@ msgid "Try the Telegram button again, or use a magic link."
 msgstr "Try the Telegram button again, or use a magic link."
 
 #: app/_components/settings-forms.tsx:441
-msgid "Turn on a nutrient to track it on the summary rings."
-msgstr "Turn on a nutrient to track it on the summary rings."
+msgid "Turn on a nutrient to track it in the summary."
+msgstr "Turn on a nutrient to track it in the summary."
 
 #: app/_components/agent-message.tsx:331
 msgid "Type your answer…"
@@ -553,7 +558,7 @@ msgstr "Unable to cancel the response."
 msgid "Used tool: "
 msgstr "Used tool: "
 
-#: app/_components/day-ring-strip.tsx:390
+#: app/_components/day-ring-strip.tsx:380
 msgid "Yesterday"
 msgstr "Yesterday"
 

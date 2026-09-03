@@ -438,7 +438,7 @@ export function DailyGoalsSettings({
 
   return (
     <SettingsSection
-      description={<Trans>Turn on a nutrient to track it on the summary rings.</Trans>}
+      description={<Trans>Turn on a nutrient to track it in the summary.</Trans>}
       title={<Trans>Daily Goals</Trans>}
     >
         {GOAL_FIELDS.map((field, index) => {

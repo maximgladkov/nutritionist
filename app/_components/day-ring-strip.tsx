@@ -1,22 +1,21 @@
 "use client";
 
-import { CompactGoalRing, DAY_RING_SIZE } from "@/app/_components/compact-goal-ring";
 import { useAppLocale } from "@/app/_components/lingui-client-provider";
 import { formatDayRingLabel } from "@/app/_components/nutrition-format";
-import { goalRingsForToday, hasAnyGoal, type GoalsView } from "@/lib/goal-values";
 import { NUTRITION_DAY_TODAY_INDEX } from "@/lib/summary-days";
 import type { NutritionDayBucket } from "@/lib/summary";
 import { shiftYmd } from "@/lib/timezone";
 import { cn } from "@/lib/utils";
-import { Calendar as CalendarIcon } from "@gravity-ui/icons";
+import { Calendar as CalendarIcon, CircleCheckFill } from "@gravity-ui/icons";
 import { endOfMonth, parseDate, startOfMonth, type CalendarDate } from "@internationalized/date";
 import { Calendar, Card, ScrollShadow, Skeleton } from "@heroui/react";
 import { useLingui } from "@lingui/react/macro";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
-const CELL_WIDTH = 88;
-const CELL_HEIGHT = 124;
+const CELL_WIDTH = 72;
+const CELL_HEIGHT = 88;
+const MARKER_SIZE = 32;
 const INITIAL_COUNT = 90;
 const GROW_BY = 90;
 const DOUBLE_TAP_MS = 400;
@@ -26,7 +25,6 @@ export function DayRingStrip({
   active = true,
   calendarOpen,
   daysByDate,
-  goals,
   onCalendarMonthChange,
   onCalendarOpenChange,
   onSelectDate,
@@ -37,7 +35,6 @@ export function DayRingStrip({
   readonly active?: boolean;
   readonly calendarOpen: boolean;
   readonly daysByDate: Readonly<Record<string, NutritionDayBucket>>;
-  readonly goals: GoalsView | null;
   readonly onCalendarMonthChange: (range: { from: string; to: string } | null) => void;
   readonly onCalendarOpenChange: (open: boolean) => void;
   readonly onSelectDate: (date: string) => void;
@@ -275,7 +272,6 @@ export function DayRingStrip({
                   <DayRingCell
                     bucket={bucket}
                     date={date}
-                    goals={goals}
                     onSelect={selectDate}
                     selected={selected}
                     today={today}
@@ -363,25 +359,19 @@ function toGlobalIndex(index: number, count: number): number {
 function DayRingCell({
   bucket,
   date,
-  goals,
   onSelect,
   selected,
   today,
 }: {
   readonly bucket: NutritionDayBucket | undefined;
   readonly date: string | null;
-  readonly goals: GoalsView | null;
   readonly onSelect: (date: string) => void;
   readonly selected: boolean;
   readonly today: string | null;
 }) {
   const { i18n, t } = useLingui();
   const loading = !date || !bucket;
-  const empty = bucket != null && bucket.mealCount === 0;
-  const rings =
-    bucket && goals && hasAnyGoal(goals) && bucket.mealCount > 0
-      ? goalRingsForToday(goals, bucket.totals)
-      : [];
+  const recorded = (bucket?.mealCount ?? 0) > 0;
 
   const label = date && today
     ? formatDayRingLabel(date, today, {
@@ -410,10 +400,17 @@ function DayRingCell({
       {loading ? (
         <Skeleton
           className={cn("rounded-full", selected && "!bg-black/20 dark:!bg-black/40")}
-          style={{ height: DAY_RING_SIZE, width: DAY_RING_SIZE }}
+          style={{ height: MARKER_SIZE, width: MARKER_SIZE }}
         />
       ) : (
-        <CompactGoalRing empty={empty} rings={rings} selected={selected} />
+        <span
+          className="flex items-center justify-center"
+          style={{ height: MARKER_SIZE, width: MARKER_SIZE }}
+        >
+          {recorded ? (
+            <CircleCheckFill className={cn("size-6", selected ? "text-accent" : "text-accent/80")} />
+          ) : null}
+        </span>
       )}
       <span className="flex min-h-8 flex-col items-center leading-tight">
         <span className={cn("text-[11px] font-medium", selected ? "text-foreground" : "text-muted")}>
@@ -447,8 +444,11 @@ function CalendarDayCell({
       type="button"
       onClick={onToggle}
     >
-      <span className="bg-surface-secondary text-muted flex size-[72px] items-center justify-center rounded-full">
-        <CalendarIcon className="size-5" />
+      <span
+        className="text-muted flex items-center justify-center"
+        style={{ height: MARKER_SIZE, width: MARKER_SIZE }}
+      >
+        <CalendarIcon className="size-6" />
       </span>
       <span className="flex min-h-8 flex-col items-center leading-tight">
         <span className={cn("text-[11px] font-medium", open ? "text-foreground" : "text-muted")}>
