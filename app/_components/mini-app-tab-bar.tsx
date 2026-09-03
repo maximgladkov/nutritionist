@@ -2,10 +2,28 @@
 
 import { useAppLocale } from "@/app/_components/lingui-client-provider";
 import { cn } from "@/lib/utils";
-import { Cup, Gear, PersonFill } from "@gravity-ui/icons";
+import { Gear, PersonFill } from "@gravity-ui/icons";
 import { Segment } from "@heroui-pro/react";
 import { useLingui } from "@lingui/react/macro";
 import type { ComponentType, SVGProps } from "react";
+
+function Utensils(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={16}
+      height={16}
+      fill="none"
+      viewBox="0 0 16 16"
+      {...props}
+    >
+      <path
+        fill="currentColor"
+        d="M7.333 6H6V1.333H4.667v4.667H3.333V1.333H2v4.667c0 1.413 1.107 2.56 2.5 2.647V14.667h1.667V8.647C7.56 8.56 8.667 7.413 8.667 6V1.333H7.333zm3.334-2v5.333h1.666v5.334H14V1.333c-1.84 0-3.333 1.494-3.333 2.667"
+      />
+    </svg>
+  );
+}
 
 export const MINI_APP_TABS = ["food", "groups", "settings"] as const;
 export type MiniAppTab = (typeof MINI_APP_TABS)[number];
@@ -28,7 +46,7 @@ export function MiniAppTabBar({
     label: string;
     icon: ComponentType<SVGProps<SVGSVGElement>>;
   }[] = [
-    { id: "food", label: t`Food`, icon: Cup },
+    { id: "food", label: t`Food`, icon: Utensils },
     { id: "groups", label: t`Groups`, icon: PersonFill },
     { id: "settings", label: t`Settings`, icon: Gear },
   ];
