@@ -2,7 +2,6 @@ import { BrandMark } from "@/app/_components/brand-mark";
 import { TelegramLoginWidget } from "@/app/_components/telegram-login-widget";
 import { signIn } from "@/auth";
 import { readAuthJwt } from "@/lib/auth-cookies";
-import { APP_NAME } from "@/lib/brand";
 import { initLingui } from "@/lib/i18n/init-lingui";
 import { resolveRequestLocale } from "@/lib/i18n/request-locale";
 import { telegramLoginBotUsername } from "@/lib/telegram-login-widget";
@@ -32,7 +31,9 @@ export default async function LoginPage({
       <Card>
         <BrandMark size="md" />
         <Card.Header>
-          <Card.Title>{APP_NAME}</Card.Title>
+          <Card.Title>
+            <Trans>BTR.me</Trans>
+          </Card.Title>
           <Card.Description>
             <Trans>Become a better version of yourself.</Trans>
           </Card.Description>

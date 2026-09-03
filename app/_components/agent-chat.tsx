@@ -18,7 +18,6 @@ import { useEveAgent } from "eve/react";
 import { useEffect, useState } from "react";
 import { AgentMessage } from "./agent-message";
 import { BrandMark } from "@/app/_components/brand-mark";
-import { APP_NAME } from "@/lib/brand";
 import { prepareImageFiles } from "@/lib/heic";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { msg } from "@lingui/core/macro";
@@ -305,7 +304,9 @@ export function AgentChat({
               <EmptyState.Media>
                 <BrandMark size="md" />
               </EmptyState.Media>
-              <EmptyState.Title>{APP_NAME}</EmptyState.Title>
+              <EmptyState.Title>
+                <Trans>BTR.me</Trans>
+              </EmptyState.Title>
               <EmptyState.Description>
                 <Trans>Become a better version of yourself.</Trans>
               </EmptyState.Description>

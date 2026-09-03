@@ -7,7 +7,6 @@ import { AppShell } from "@/app/_components/app-shell";
 import { LinguiClientProvider } from "@/app/_components/lingui-client-provider";
 import { ToastHost } from "@/app/_components/toast-host";
 import { auth } from "@/auth";
-import { APP_NAME } from "@/lib/brand";
 import { getI18nInstance } from "@/lib/i18n/app-router-i18n";
 import { getDirection } from "@/lib/i18n/locales";
 import { initLingui } from "@/lib/i18n/init-lingui";
@@ -39,15 +38,16 @@ export async function generateMetadata(): Promise<Metadata> {
   const session = await auth();
   const locale = await resolveRequestLocale(session?.user?.id);
   const i18n = getI18nInstance(locale);
+  const title = t(i18n)`BTR.me`;
   const description = t(i18n)`Become a better version of yourself.`;
   return {
-    applicationName: APP_NAME,
-    title: APP_NAME,
+    applicationName: title,
+    title,
     description,
     openGraph: {
       description,
-      siteName: APP_NAME,
-      title: APP_NAME,
+      siteName: title,
+      title,
       type: "website",
     },
   };

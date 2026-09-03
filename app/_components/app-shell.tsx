@@ -10,7 +10,6 @@ import { BrandMark } from "@/app/_components/brand-mark";
 import { useAppLocale } from "@/app/_components/lingui-client-provider";
 import { MiniAppShell } from "@/app/_components/mini-app-shell";
 import { signOutAction } from "@/app/actions/auth";
-import { APP_NAME } from "@/lib/brand";
 
 export function AppShell({
   children,
@@ -95,7 +94,7 @@ function SidebarBrand() {
       <div className="flex items-center gap-3 px-1 py-2">
         <BrandMark />
         <span className="text-foreground text-sm font-semibold" data-sidebar="label">
-          {APP_NAME}
+          <Trans>BTR.me</Trans>
         </span>
       </div>
     </Sidebar.Header>
