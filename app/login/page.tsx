@@ -1,9 +1,11 @@
-import { Trans } from "@lingui/react/macro";
-import { Alert, Button, Card, Form, Input, Label, TextField } from "@heroui/react";
+import { TelegramLoginWidget } from "@/app/_components/telegram-login-widget";
 import { signIn } from "@/auth";
 import { readAuthJwt } from "@/lib/auth-cookies";
 import { initLingui } from "@/lib/i18n/init-lingui";
 import { resolveRequestLocale } from "@/lib/i18n/request-locale";
+import { telegramLoginBotUsername } from "@/lib/telegram-login-widget";
+import { Alert, Button, Card, Form, Input, Label, Separator, TextField } from "@heroui/react";
+import { Trans } from "@lingui/react/macro";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -20,6 +22,8 @@ export default async function LoginPage({
   initLingui(locale);
   const params = await searchParams;
   const callbackUrl = params.callbackUrl ?? "/s";
+  const telegramBotUsername = telegramLoginBotUsername();
+  const telegramError = params.error === "CredentialsSignin";
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-6">
@@ -40,10 +44,18 @@ export default async function LoginPage({
               <Alert.Indicator />
               <Alert.Content>
                 <Alert.Title>
-                  <Trans>Could not send a sign-in email</Trans>
+                  {telegramError ? (
+                    <Trans>Could not sign in with Telegram</Trans>
+                  ) : (
+                    <Trans>Could not send a sign-in email</Trans>
+                  )}
                 </Alert.Title>
                 <Alert.Description>
-                  <Trans>Check the address and try again.</Trans>
+                  {telegramError ? (
+                    <Trans>Try the Telegram button again, or use a magic link.</Trans>
+                  ) : (
+                    <Trans>Check the address and try again.</Trans>
+                  )}
                 </Alert.Description>
               </Alert.Content>
             </Alert>
@@ -69,6 +81,22 @@ export default async function LoginPage({
               <Trans>Email me a sign-in link</Trans>
             </Button>
           </Form>
+          {telegramBotUsername ? (
+            <>
+              <div className="flex items-center gap-3">
+                <Separator className="flex-1" />
+                <span className="text-muted text-sm">
+                  <Trans>or</Trans>
+                </span>
+                <Separator className="flex-1" />
+              </div>
+              <TelegramLoginWidget
+                botUsername={telegramBotUsername}
+                callbackUrl={callbackUrl}
+                lang={locale}
+              />
+            </>
+          ) : null}
         </Card.Content>
       </Card>
     </main>

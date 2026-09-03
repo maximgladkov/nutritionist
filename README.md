@@ -2,6 +2,16 @@
 
 This is an [eve](https://eve.dev) agent bootstrapped with [`eve init`](https://eve.dev/docs/reference/cli#eve-init).
 
+## Telegram web sign-in
+
+The login page shows a Telegram Login Widget below the magic-link form when `TELEGRAM_BOT_USERNAME` is set.
+
+1. In [@BotFather](https://t.me/BotFather), run `/setdomain` and register the hostname from `AUTH_URL` (for example `app.example.com`). Telegram does not accept `localhost`; use a public tunnel with that same domain while developing.
+2. Set these environment variables:
+   - `TELEGRAM_BOT_TOKEN` — already used by the Telegram bot channel
+   - `TELEGRAM_BOT_USERNAME` — bot username without `@`
+   - `AUTH_SECRET` and `AUTH_URL`
+
 ## Getting started
 
 First, run the development server:
