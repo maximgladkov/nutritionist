@@ -7,9 +7,11 @@ import type {
 } from "eve/channels";
 import {
   conversationMessageText,
+  loadRecentConversation,
   persistTelegramConversationMessage,
+  TELEGRAM_CONVERSATION_CHANNEL,
 } from "./conversation.ts";
-import { wrapTelegramLastMessageSend } from "./telegram-last-message-turn.ts";
+import { settleTelegramTurn, wrapTelegramLastMessageSend } from "./telegram-last-message-turn.ts";
 
 export function wrapTelegramLastMessageChannel<TState, TReceiveTarget, TMetadata extends Record<string, unknown>>(
   channel: Channel<TState, TReceiveTarget, TMetadata>,
@@ -21,8 +23,18 @@ export function wrapTelegramLastMessageChannel<TState, TReceiveTarget, TMetadata
   };
 }
 
-export function wrapTelegramLastMessageSource<TState>(source: ChannelSource<TState>): ChannelSource<TState> {
-  const lastMessage = wrapTelegramLastMessageSend(source);
+export function wrapTelegramLastMessageSource<TState>(
+  source: ChannelSource<TState>,
+  address: string,
+): ChannelSource<TState> {
+  const lastMessage = wrapTelegramLastMessageSend(source, {
+    address,
+    loadRecentContext: (userId) =>
+      loadRecentConversation({
+        channel: TELEGRAM_CONVERSATION_CHANNEL,
+        userId,
+      }),
+  });
   return {
     ...lastMessage,
     async send(message, options) {
@@ -38,6 +50,8 @@ export function wrapTelegramLastMessageSource<TState>(source: ChannelSource<TSta
     },
   };
 }
+
+export { settleTelegramTurn };
 
 function wrapTelegramReceive<TState, TReceiveTarget>(
   receive: Channel<TState, TReceiveTarget>["receive"],
@@ -67,5 +81,5 @@ function wrapTelegramRoute<TState>(route: RouteDefinition<TState>): RouteDefinit
 }
 
 function wrapTelegramFrom<TState>(from: ChannelFrom<TState>): ChannelFrom<TState> {
-  return (address) => wrapTelegramLastMessageSource(from(address));
+  return (address) => wrapTelegramLastMessageSource(from(address), address);
 }

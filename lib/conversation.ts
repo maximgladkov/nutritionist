@@ -2,15 +2,21 @@ import { prisma } from "./prisma.ts";
 import {
   clampConversationSearchLimit,
   conversationSearchQuery,
+  formatRecentConversation,
+  RECENT_CONVERSATION_LIMIT,
   TELEGRAM_CONVERSATION_CHANNEL,
 } from "./conversation-query.ts";
 
 export {
   CONVERSATION_SEARCH_DEFAULT_LIMIT,
   CONVERSATION_SEARCH_MAX_LIMIT,
+  RECENT_CONVERSATION_LIMIT,
+  RECENT_CONVERSATION_MAX_CHARS,
   clampConversationSearchLimit,
   conversationMessageText,
   conversationSearchQuery,
+  conversationTextWithoutMediaStubs,
+  formatRecentConversation,
   isTelegramConversationChannel,
   TELEGRAM_CONVERSATION_CHANNEL,
 } from "./conversation-query.ts";
@@ -91,4 +97,16 @@ export async function searchConversation(input: {
       text: row.text,
     }))
     .reverse();
+}
+
+export async function loadRecentConversation(input: {
+  channel: string;
+  userId: string;
+}): Promise<string | undefined> {
+  const messages = await searchConversation({
+    channel: input.channel,
+    limit: RECENT_CONVERSATION_LIMIT,
+    userId: input.userId,
+  });
+  return formatRecentConversation(messages);
 }

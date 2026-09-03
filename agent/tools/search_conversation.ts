@@ -10,7 +10,7 @@ import { requireUser } from "../lib/require-user";
 
 export default defineTool({
   description:
-    "Search earlier Telegram chat with this caller. Prior Telegram turns are not in context. Pass a query for matching text, or omit it to list the most recent turns. Use list_meals or get_nutrition_summary for what they ate.",
+    "Search older Telegram chat with this caller. The last few turns are already in context. Pass a query for matching text, or omit it to list the most recent turns. Use list_meals or get_nutrition_summary for what they ate.",
   inputSchema: z.object({
     query: z.string().optional(),
     limit: z.number().int().min(1).max(CONVERSATION_SEARCH_MAX_LIMIT).optional(),

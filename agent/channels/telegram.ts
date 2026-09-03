@@ -7,7 +7,7 @@ import { applyTelegramHiddenMedia, telegramMessageHasInboundContent } from "../.
 import { claimTelegramMessage } from "../../lib/telegram-message-claim";
 import { markdownToTelegramHtml, telegramHtmlMessage } from "../../lib/telegram-html";
 import { attachTelegramVision } from "../../lib/telegram-vision";
-import { wrapTelegramLastMessageChannel } from "../../lib/telegram-last-message";
+import { wrapTelegramLastMessageChannel, settleTelegramTurn } from "../../lib/telegram-last-message";
 import { persistTelegramConversationMessage } from "../../lib/conversation";
 import { appPrincipal } from "../../lib/principal";
 import { getLiveUserId } from "../lib/require-user";
@@ -44,6 +44,12 @@ export default wrapTelegramLastMessageChannel(
             text: data.message,
             userId: (await getLiveUserId(ctx)) ?? (caller?.principalType === "user" ? caller.principalId : undefined),
           });
+        },
+        "session.waiting"(_data, channel) {
+          settleTelegramTurn(channel.continuation?.token);
+        },
+        "session.failed"(_data, channel) {
+          settleTelegramTurn(channel.continuation?.token);
         },
       },
       async onMessage(ctx, message) {
