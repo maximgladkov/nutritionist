@@ -455,7 +455,7 @@ export function DailyGoalsSettings({
                 <ItemCard.Action>
                   <div className="flex items-center gap-2">
                     <NumberField
-                      className="w-40"
+                      className="w-36"
                       formatOptions={{ maximumFractionDigits: 0, useGrouping: false }}
                       isDisabled={!row.enabled}
                       key={`${field}-${locale}`}
