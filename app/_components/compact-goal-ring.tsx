@@ -1,6 +1,7 @@
 "use client";
 
 import type { GoalRing } from "@/lib/goal-values";
+import { cn } from "@/lib/utils";
 import { useId } from "react";
 
 export const DAY_RING_SIZE = 72;
@@ -8,12 +9,21 @@ export const DAY_RING_SIZE = 72;
 export function CompactGoalRing({
   empty,
   rings,
+  selected = false,
 }: {
   readonly empty: boolean;
   readonly rings: readonly GoalRing[];
+  readonly selected?: boolean;
 }) {
   if (empty) {
-    return <div className="bg-surface-secondary size-[72px] rounded-full" />;
+    return (
+      <div
+        className={cn(
+          "size-[72px] rounded-full",
+          selected ? "bg-black/20 dark:bg-black/40" : "bg-surface-secondary",
+        )}
+      />
+    );
   }
   if (rings.length === 0) {
     return <div className="bg-accent/15 size-[72px] rounded-full" />;

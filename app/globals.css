@@ -12,6 +12,8 @@ html {
   height: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   --goal-calories: oklch(0.48 0.26 290);
   --goal-protein: oklch(0.52 0.26 15);
   --goal-carbs: oklch(0.50 0.17 250);
@@ -33,6 +35,19 @@ body {
   min-height: 100%;
   margin: 0;
   font-family: var(--font-sans);
+}
+
+.tg-embed input,
+.tg-embed textarea,
+.tg-embed select {
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: 16px;
+}
+
+.tg-embed .date-input-group__input,
+.tg-embed .date-input-group__segment {
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: 16px;
 }
 
 .markdown {

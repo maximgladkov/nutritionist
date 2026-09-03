@@ -396,9 +396,12 @@ function DayRingCell({
       }}
     >
       {loading ? (
-        <Skeleton className="rounded-full" style={{ height: DAY_RING_SIZE, width: DAY_RING_SIZE }} />
+        <Skeleton
+          className={cn("rounded-full", selected && "!bg-black/20 dark:!bg-black/40")}
+          style={{ height: DAY_RING_SIZE, width: DAY_RING_SIZE }}
+        />
       ) : (
-        <CompactGoalRing empty={empty} rings={rings} />
+        <CompactGoalRing empty={empty} rings={rings} selected={selected} />
       )}
       <span className="flex min-h-8 flex-col items-center leading-tight">
         <span className={cn("text-[11px] font-medium", selected ? "text-foreground" : "text-muted")}>

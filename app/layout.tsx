@@ -36,7 +36,11 @@ export default async function RootLayout({ children }: { readonly children: Reac
   const session = await auth();
   const embed = (await headers()).get("x-tg-embed") === "1";
   return (
-    <html className={cn(sans.variable, mono.variable)} lang="en" suppressHydrationWarning>
+    <html
+      className={cn(sans.variable, mono.variable, embed && "tg-embed")}
+      lang="en"
+      suppressHydrationWarning
+    >
       <body className="bg-background text-foreground antialiased">
         <ToastHost />
         <AppShell email={session?.user?.email ?? undefined} embed={embed}>
