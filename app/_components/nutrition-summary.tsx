@@ -3,6 +3,7 @@
 import { DayGoalProgress } from "@/app/_components/day-goal-progress";
 import { DayRingStrip } from "@/app/_components/day-ring-strip";
 import { DayTotalsRow } from "@/app/_components/day-totals-row";
+import { useDesktopWorkspace } from "@/app/_components/desktop-workspace-context";
 import { MealGroupsAccordion } from "@/app/_components/meal-groups-accordion";
 import { useMiniAppFoodActive } from "@/app/_components/mini-app-shell";
 import { bootTelegramWebApp, telegramWebApp } from "@/app/_components/telegram-webapp-client";
@@ -79,9 +80,11 @@ async function fetchDaysWindows([, serialized, initData]: DaysSWRKey): Promise<N
 }
 
 export function NutritionSummaryApp({
+  compact = false,
   embed,
   initial,
 }: {
+  readonly compact?: boolean;
   readonly embed: boolean;
   readonly initial?: NutritionDiaryPayload;
 }) {
@@ -106,11 +109,13 @@ export function NutritionSummaryApp({
   }, [embed]);
 
   const readyInit = embed ? initData : "";
-  const diaryKey: DiarySWRKey | null = embed && readyInit != null ? ["nutrition-diary", readyInit] : null;
+  const diaryKey: DiarySWRKey | null =
+    readyInit != null && (embed || initial == null) ? ["nutrition-diary", readyInit] : null;
+  const tight = embed || compact;
   const { data: diary, error: diaryError, mutate: mutateDiary } = useSWR(diaryKey, fetchDiary, {
     fallbackData: embed ? undefined : initial,
     revalidateOnFocus: true,
-    revalidateOnMount: embed,
+    revalidateOnMount: embed || initial == null,
     revalidateOnReconnect: true,
   });
 
@@ -221,10 +226,12 @@ export function NutritionSummaryApp({
       className={
         embed
           ? "mx-auto flex w-full max-w-lg flex-col gap-3 px-3 py-3"
-          : "mx-auto flex w-full max-w-lg flex-col gap-5 overflow-y-auto px-4 py-6 sm:px-6 sm:py-8"
+          : compact
+            ? "flex h-full min-h-0 w-full flex-col gap-3 overflow-y-auto px-3 py-3"
+            : "mx-auto flex w-full max-w-lg flex-col gap-5 overflow-y-auto px-4 py-6 sm:px-6 sm:py-8"
       }
     >
-      {embed ? null : (
+      {embed || compact ? null : (
         <div className="flex flex-col gap-1">
           <h1 className="text-foreground text-xl font-semibold">
             <Trans>Summary</Trans>
@@ -252,7 +259,7 @@ export function NutritionSummaryApp({
       ) : null}
       {calendarOpen ? null : errorMessage ? <p className="text-danger text-sm">{errorMessage}</p> : null}
       {calendarOpen ? null : day ? (
-        <SelectedDayView compact={embed} day={day} goals={goals} groups={groups} isPending={isPending} />
+        <SelectedDayView compact={tight} day={day} goals={goals} groups={groups} isPending={isPending} />
       ) : null}
       {!calendarOpen && !day && !errorMessage && ((embed && initData === null) || !today) ? (
         <div className="flex justify-center py-8">
@@ -304,7 +311,8 @@ function SelectedDayView({
 }
 
 function SetCalorieGoalHint({ compact }: { readonly compact: boolean }) {
-  if (compact) {
+  const desktop = useDesktopWorkspace();
+  if (compact && !desktop) {
     return (
       <p className="text-muted px-1 text-sm">
         <Trans>Set daily goals in chat to track them here.</Trans>
@@ -314,7 +322,15 @@ function SetCalorieGoalHint({ compact }: { readonly compact: boolean }) {
   return (
     <p className="text-muted px-1 text-sm">
       <Trans>
-        <Link href="/settings">Set daily goals</Link> to track them as you eat.
+        <Link
+          href={desktop ? undefined : "/settings"}
+          onPress={() => {
+            desktop?.focusWidget("settings");
+          }}
+        >
+          Set daily goals
+        </Link>{" "}
+        to track them as you eat.
       </Trans>
     </p>
   );

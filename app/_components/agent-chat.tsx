@@ -1,8 +1,7 @@
 "use client";
 
-import type { FileUIPart, UserContent } from "ai";
+import { prepareImageFiles } from "@/lib/heic";
 import { ArrowUp, CircleExclamation, Paperclip, Square } from "@gravity-ui/icons";
-import { Alert } from "@heroui/react";
 import {
   ChatAttachment,
   ChatAttachmentGroup,
@@ -10,17 +9,16 @@ import {
   ChatConversation,
   ChatLoader,
   ChatMessage,
-  EmptyState,
   PromptInput,
-  TextShimmer,
+  TextShimmer
 } from "@heroui-pro/react";
+import { Alert } from "@heroui/react";
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
+import type { FileUIPart, UserContent } from "ai";
 import { useEveAgent } from "eve/react";
 import { useEffect, useState } from "react";
 import { AgentMessage } from "./agent-message";
-import { BrandMark } from "@/app/_components/brand-mark";
-import { prepareImageFiles } from "@/lib/heic";
-import { Trans, useLingui } from "@lingui/react/macro";
-import { msg } from "@lingui/core/macro";
 
 const IMAGE_ACCEPT =
   "image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif,.heic,.heif";
@@ -38,9 +36,11 @@ type PendingAttachment = {
 };
 
 export function AgentChat({
+  compact = false,
   sessionId,
   sessionless = false,
 }: {
+  readonly compact?: boolean;
   readonly sessionId?: string;
   readonly sessionless?: boolean;
 }) {
@@ -55,9 +55,9 @@ export function AgentChat({
       sessionId === undefined
         ? undefined
         : {
-            sessionId,
-            streamIndex: 0,
-          },
+          sessionId,
+          streamIndex: 0,
+        },
     resume: sessionId !== undefined,
     onSessionChange(session) {
       if (sessionId === undefined && session !== undefined) {
@@ -178,6 +178,7 @@ export function AgentChat({
     <PromptInput
       status={promptStatus}
       value={value}
+      variant="secondary"
       onStop={requestCancellation}
       onSubmit={() => {
         void handleSubmit();
@@ -235,6 +236,7 @@ export function AgentChat({
                         aria-label={t`Add photo`}
                         isDisabled={isResuming || isPreparing}
                         tooltip={t`Add photo`}
+                        variant="ghost"
                       >
                         <Paperclip className="size-4" />
                       </PromptInput.Action>
@@ -263,11 +265,17 @@ export function AgentChat({
       {showConversationLayout ? (
         <>
           <ChatConversation className="min-h-0 flex-1">
-            <ChatConversation.Content className="mx-auto w-full max-w-3xl flex-col gap-8 px-4 pt-6 pb-8 sm:px-6">
+            <ChatConversation.Content
+              className={
+                compact
+                  ? "min-h-0 w-full flex-col gap-6 px-3 pt-4 pb-6"
+                  : "mx-auto w-full max-w-3xl flex-col gap-8 px-4 pt-6 pb-8 sm:px-6"
+              }
+            >
               {agent.data.messages.map((message, index) =>
                 showPendingThinking &&
-                isPendingAssistantShell &&
-                message.id === lastMessage.id ? null : (
+                  isPendingAssistantShell &&
+                  message.id === lastMessage.id ? null : (
                   <AgentMessage
                     canRespond={!isBusy && !isResuming}
                     extraFiles={
@@ -295,23 +303,24 @@ export function AgentChat({
               tooltip={t`Scroll to bottom`}
             />
           </ChatConversation>
-          <div className="mx-auto w-full max-w-3xl shrink-0 px-4 pt-3 pb-4 sm:px-6">{composer}</div>
+          <div
+            className={
+              compact
+                ? "w-full shrink-0 px-3 pt-2 pb-3"
+                : "mx-auto w-full max-w-3xl shrink-0 px-4 pt-3 pb-4 sm:px-6"
+            }
+          >
+            {composer}
+          </div>
         </>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-8 px-4 pb-[10vh]">
-          <EmptyState className="max-w-xl">
-            <EmptyState.Header>
-              <EmptyState.Media>
-                <BrandMark size="md" />
-              </EmptyState.Media>
-              <EmptyState.Title>
-                <Trans>BTR.me</Trans>
-              </EmptyState.Title>
-              <EmptyState.Description>
-                <Trans>Become a better version of yourself.</Trans>
-              </EmptyState.Description>
-            </EmptyState.Header>
-          </EmptyState>
+        <div
+          className={
+            compact
+              ? "flex min-h-0 flex-1 flex-col items-center justify-end gap-6 px-3 pb-3"
+              : "flex min-h-0 flex-1 flex-col items-center justify-end gap-8 px-4 pb-4"
+          }
+        >
           <div className="w-full max-w-xl">{composer}</div>
         </div>
       )}

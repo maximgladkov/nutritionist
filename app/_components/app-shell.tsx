@@ -7,6 +7,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { BrandMark } from "@/app/_components/brand-mark";
+import { DesktopWorkspace, useDesktopLayout } from "@/app/_components/desktop-workspace";
 import { useAppLocale } from "@/app/_components/lingui-client-provider";
 import { MiniAppShell } from "@/app/_components/mini-app-shell";
 import { signOutAction } from "@/app/actions/auth";
@@ -24,6 +25,7 @@ export function AppShell({
   const { locale } = useAppLocale();
   const pathname = usePathname();
   const router = useRouter();
+  const isDesktop = useDesktopLayout();
   const isChat = pathname === "/" || pathname === "/s" || pathname.startsWith("/s/");
   const isSettings = pathname.startsWith("/settings");
   const isSummary = pathname.startsWith("/summary");
@@ -35,6 +37,14 @@ export function AppShell({
 
   if (embed) {
     return <MiniAppShell>{children}</MiniAppShell>;
+  }
+
+  if (isDesktop === null) {
+    return <div className="bg-background h-dvh" />;
+  }
+
+  if (isDesktop) {
+    return <DesktopWorkspace email={email} key={locale} />;
   }
 
   return (
