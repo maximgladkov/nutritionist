@@ -2,19 +2,19 @@
 
 import { useAppLocale } from "@/app/_components/lingui-client-provider";
 import { formatDayRingLabel } from "@/app/_components/nutrition-format";
-import { NUTRITION_DAY_TODAY_INDEX } from "@/lib/summary-days";
 import type { NutritionDayBucket } from "@/lib/summary";
+import { NUTRITION_DAY_TODAY_INDEX } from "@/lib/summary-days";
 import { shiftYmd } from "@/lib/timezone";
 import { cn } from "@/lib/utils";
 import { Calendar as CalendarIcon, CircleCheckFill } from "@gravity-ui/icons";
-import { endOfMonth, parseDate, startOfMonth, type CalendarDate } from "@internationalized/date";
 import { Calendar, Card, ScrollShadow, Skeleton } from "@heroui/react";
+import { endOfMonth, parseDate, startOfMonth, type CalendarDate } from "@internationalized/date";
 import { useLingui } from "@lingui/react/macro";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
-const CELL_WIDTH = 72;
-const CELL_HEIGHT = 88;
+const CELL_WIDTH = 60;
+const CELL_HEIGHT = 72;
 const MARKER_SIZE = 32;
 const INITIAL_COUNT = 90;
 const GROW_BY = 90;
@@ -286,56 +286,56 @@ export function DayRingStrip({
         <div className="flex w-full justify-center">
           <Card className="w-fit">
             <Card.Content>
-            <Calendar
-              aria-label={t`Jump to date`}
-              focusedValue={focusedDate ?? calendarValue}
-              key={locale}
-              maxValue={parseDate(today)}
-              minValue={parseDate(calendarMin)}
-              value={calendarValue}
-              onChange={(next) => {
-                if (!next) {
-                  return;
-                }
-                jumpToDate(next.toString());
-              }}
-              onFocusChange={setFocusedDate}
-            >
-              <Calendar.Header>
-                <Calendar.YearPickerTrigger>
-                  <Calendar.YearPickerTriggerHeading />
-                  <Calendar.YearPickerTriggerIndicator />
-                </Calendar.YearPickerTrigger>
-                <Calendar.NavButton slot="previous" />
-                <Calendar.NavButton slot="next" />
-              </Calendar.Header>
-              <Calendar.Grid>
-                <Calendar.GridHeader>
-                  {(day) => <Calendar.HeaderCell>{day}</Calendar.HeaderCell>}
-                </Calendar.GridHeader>
-                <Calendar.GridBody>
-                  {(date) => (
-                    <Calendar.Cell date={date}>
-                      {({ formattedDate, isOutsideMonth }) => (
-                        <>
-                          {formattedDate}
-                          {!isOutsideMonth && (daysByDate[date.toString()]?.mealCount ?? 0) > 0 ? (
-                            <Calendar.CellIndicator />
-                          ) : null}
-                        </>
-                      )}
-                    </Calendar.Cell>
-                  )}
-                </Calendar.GridBody>
-              </Calendar.Grid>
-              <Calendar.YearPickerGrid>
-                <Calendar.YearPickerGridBody>
-                  {({ year }) => <Calendar.YearPickerCell year={year} />}
-                </Calendar.YearPickerGridBody>
-              </Calendar.YearPickerGrid>
-            </Calendar>
-          </Card.Content>
-        </Card>
+              <Calendar
+                aria-label={t`Jump to date`}
+                focusedValue={focusedDate ?? calendarValue}
+                key={locale}
+                maxValue={parseDate(today)}
+                minValue={parseDate(calendarMin)}
+                value={calendarValue}
+                onChange={(next) => {
+                  if (!next) {
+                    return;
+                  }
+                  jumpToDate(next.toString());
+                }}
+                onFocusChange={setFocusedDate}
+              >
+                <Calendar.Header>
+                  <Calendar.YearPickerTrigger>
+                    <Calendar.YearPickerTriggerHeading />
+                    <Calendar.YearPickerTriggerIndicator />
+                  </Calendar.YearPickerTrigger>
+                  <Calendar.NavButton slot="previous" />
+                  <Calendar.NavButton slot="next" />
+                </Calendar.Header>
+                <Calendar.Grid>
+                  <Calendar.GridHeader>
+                    {(day) => <Calendar.HeaderCell>{day}</Calendar.HeaderCell>}
+                  </Calendar.GridHeader>
+                  <Calendar.GridBody>
+                    {(date) => (
+                      <Calendar.Cell date={date}>
+                        {({ formattedDate, isOutsideMonth }) => (
+                          <>
+                            {formattedDate}
+                            {!isOutsideMonth && (daysByDate[date.toString()]?.mealCount ?? 0) > 0 ? (
+                              <Calendar.CellIndicator />
+                            ) : null}
+                          </>
+                        )}
+                      </Calendar.Cell>
+                    )}
+                  </Calendar.GridBody>
+                </Calendar.Grid>
+                <Calendar.YearPickerGrid>
+                  <Calendar.YearPickerGridBody>
+                    {({ year }) => <Calendar.YearPickerCell year={year} />}
+                  </Calendar.YearPickerGridBody>
+                </Calendar.YearPickerGrid>
+              </Calendar>
+            </Card.Content>
+          </Card>
         </div>
       ) : null}
     </div>
@@ -375,10 +375,10 @@ function DayRingCell({
 
   const label = date && today
     ? formatDayRingLabel(date, today, {
-        locale: i18n.locale,
-        todayLabel: t`Today`,
-        yesterdayLabel: t`Yesterday`,
-      })
+      locale: i18n.locale,
+      todayLabel: t`Today`,
+      yesterdayLabel: t`Yesterday`,
+    })
     : null;
 
   return (
@@ -386,7 +386,7 @@ function DayRingCell({
       aria-current={selected ? "date" : undefined}
       aria-label={label ? `${label.weekday}, ${label.date}` : t`Loading day`}
       className={cn(
-        "flex cursor-[var(--cursor-interactive)] flex-col items-center gap-1.5 rounded-2xl px-1 py-1",
+        "w-full flex cursor-[var(--cursor-interactive)] flex-col items-center gap-1.5 rounded-2xl px-1 py-1",
         selected && "bg-surface-secondary",
       )}
       disabled={!date}
@@ -409,10 +409,10 @@ function DayRingCell({
         >
           {recorded ? (
             <CircleCheckFill className={cn("size-6", selected ? "text-accent" : "text-accent/80")} />
-          ) : null}
+          ) : <div className="size-6 bg-muted/10 rounded-full" />}
         </span>
       )}
-      <span className="flex min-h-8 flex-col items-center leading-tight">
+      <span className="flex flex-col items-center leading-tight">
         <span className={cn("text-[11px] font-medium", selected ? "text-foreground" : "text-muted")}>
           {label?.weekday ?? " "}
         </span>
@@ -438,7 +438,7 @@ function CalendarDayCell({
       aria-expanded={open}
       aria-label={t`Choose a date`}
       className={cn(
-        "flex cursor-[var(--cursor-interactive)] flex-col items-center gap-1.5 rounded-2xl px-1 py-1",
+        "w-full flex cursor-[var(--cursor-interactive)] flex-col items-center gap-1.5 rounded-2xl px-1 py-1",
         open && "bg-surface-secondary",
       )}
       type="button"
@@ -450,7 +450,7 @@ function CalendarDayCell({
       >
         <CalendarIcon className="size-6" />
       </span>
-      <span className="flex min-h-8 flex-col items-center leading-tight">
+      <span className="flex flex-col items-center leading-tight">
         <span className={cn("text-[11px] font-medium", open ? "text-foreground" : "text-muted")}>
           Calendar
         </span>

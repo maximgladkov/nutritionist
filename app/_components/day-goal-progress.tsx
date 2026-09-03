@@ -3,8 +3,9 @@
 import { GOAL_LABELS } from "@/app/_components/i18n-labels";
 import { formatGrams, formatKcal } from "@/app/_components/nutrition-format";
 import type { GoalField, GoalRing, GoalRingId } from "@/lib/goal-values";
+import { cn } from "@/lib/utils";
 import { Droplet, Flame, HeartFill, ThunderboltFill } from "@gravity-ui/icons";
-import { Card, ProgressBar, Typography } from "@heroui/react";
+import { Card, ProgressBar, ScrollShadow, Typography } from "@heroui/react";
 import { useLingui } from "@lingui/react/macro";
 import type { ComponentType, SVGProps } from "react";
 
@@ -45,19 +46,14 @@ const GOAL_ICONS: Record<GoalRingId, ComponentType<SVGProps<SVGSVGElement>>> = {
 
 export function DayGoalProgress({ rings }: { readonly rings: readonly GoalRing[] }) {
   const bars = BAR_ORDER.flatMap((id) => rings.filter((ring) => ring.id === id));
-  const calories = bars.find((ring) => ring.id === "calories");
-  const macros = bars.filter((ring) => ring.id !== "calories");
   return (
-    <div className="flex flex-col gap-3">
-      {calories ? <NutrientCard featured ring={calories} /> : null}
-      {macros.length > 0 ? (
-        <div className="grid grid-cols-2 items-stretch gap-3">
-          {macros.map((ring) => (
-            <NutrientCard key={ring.id} ring={ring} />
-          ))}
-        </div>
-      ) : null}
-    </div>
+    <ScrollShadow hideScrollBar className="w-full" orientation="horizontal">
+      <div className="flex items-start gap-3">
+        {bars.map((ring) => (
+          <NutrientCard featured={ring.id === "calories"} key={ring.id} ring={ring} />
+        ))}
+      </div>
+    </ScrollShadow>
   );
 }
 
@@ -74,29 +70,31 @@ function NutrientCard({
   const valueText = goal ? `${consumed} / ${goal} ${ring.unit}` : `${consumed} ${ring.unit}`;
   const Icon = GOAL_ICONS[ring.id];
   return (
-    <Card className="h-full">
+    <Card
+      className={cn("h-36 shrink-0", featured ? "aspect-[3/2]" : "aspect-square")}
+    >
       <Card.Header className="flex-row items-center gap-2">
         <Icon aria-hidden="true" className="size-5 shrink-0" style={{ color: ring.fill }} />
         <Card.Title>{t(GOAL_LABELS[GOAL_FIELD[ring.id]])}</Card.Title>
       </Card.Header>
-      <Card.Content>
+      <Card.Content className="flex-1 flex flex-col justify-end">
         <div className="flex items-start justify-between gap-3">
           <MetricStat featured={featured} label={t`Today`} unit={ring.unit} value={consumed} />
           <MetricStat
             align="end"
             featured={featured}
             label={t`Goal`}
-            unit={goal ? ring.unit : undefined}
+            unit={""}
             value={goal ?? "—"}
           />
         </div>
       </Card.Content>
-      <Card.Footer className="w-full">
+      <Card.Footer className="mt-auto w-full">
         <ProgressBar
           aria-label={valueText}
           className="w-full [grid-template-areas:'track']"
           maxValue={100}
-          size={featured ? "lg" : "md"}
+          size="md"
           value={ring.value}
         >
           <ProgressBar.Track
@@ -135,11 +133,11 @@ function MetricStat({
   readonly value: string;
 }) {
   return (
-    <div className={align === "end" ? "flex flex-col items-end" : "flex flex-col items-start"}>
+    <div className={align === "end" ? "flex flex-col items-end justify-end" : "flex flex-col items-start justify-start"}>
       <Typography color="muted" type="body-xs">
         {label}
       </Typography>
-      <div className="flex items-baseline gap-1.5">
+      <div className="flex items-baseline gap-1">
         <Typography
           className="tabular-nums leading-none"
           type={featured ? "h3" : "h5"}
@@ -148,7 +146,7 @@ function MetricStat({
           {value}
         </Typography>
         {unit ? (
-          <Typography color="muted" type="body-sm">
+          <Typography color="muted" type="body-sm" className="leading-none">
             {unit}
           </Typography>
         ) : null}
