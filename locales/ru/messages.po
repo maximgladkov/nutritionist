@@ -261,8 +261,8 @@ msgid "Food"
 msgstr "Еда"
 
 #: app/_components/i18n-labels.ts:16
-msgid "g"
-msgstr "г"
+msgid "grams per day"
+msgstr "граммы в день"
 
 #: app/_components/settings-forms.tsx:658
 msgid "Generate"
@@ -282,8 +282,8 @@ msgid "Jump to date"
 msgstr "Перейти к дате"
 
 #: app/_components/i18n-labels.ts:17
-msgid "kcal"
-msgstr "ккал"
+msgid "kilocalories per day"
+msgstr "килокалории в день"
 
 #: app/_components/settings-forms.tsx:215
 #: app/_components/settings-forms.tsx:240

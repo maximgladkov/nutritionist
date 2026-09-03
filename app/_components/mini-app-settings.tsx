@@ -1,19 +1,19 @@
 "use client";
 
+import { useAppLocale } from "@/app/_components/lingui-client-provider";
 import {
   DailyGoalsSettings,
   LinkAccountsSettings,
   LocationSettings,
   ReminderSettings,
 } from "@/app/_components/settings-forms";
-import { useAppLocale } from "@/app/_components/lingui-client-provider";
 import { bootTelegramWebApp } from "@/app/_components/telegram-webapp-client";
 import { getMiniAppSettingsAction } from "@/app/actions/settings";
 import type { GoalsView } from "@/lib/goal-values";
 import type { Locale } from "@/lib/i18n/locales";
 import type { ReminderClock, ReminderLabel } from "@/lib/reminder-clock";
-import { Trans, useLingui } from "@lingui/react/macro";
 import { Spinner } from "@heroui/react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { useEffect, useState } from "react";
 import useSWR from "swr";
 
@@ -85,7 +85,7 @@ export function MiniAppSettings() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-lg flex-col gap-6 p-2">
+    <div className="mx-auto flex w-full max-w-lg flex-col gap-6 px-2">
       <LocationSettings
         defaultCountry={data.country}
         defaultTimezone={data.timezone}

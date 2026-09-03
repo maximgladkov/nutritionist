@@ -13,8 +13,8 @@ export const GOAL_LABELS: Record<GoalField, MessageDescriptor> = {
 };
 
 export const GOAL_UNIT_LABELS: Record<"g" | "kcal", MessageDescriptor> = {
-  g: msg`g`,
-  kcal: msg`kcal`,
+  g: msg`grams per day`,
+  kcal: msg`kilocalories per day`,
 };
 
 export const MEAL_LABELS: Record<MealView["label"], MessageDescriptor> = {

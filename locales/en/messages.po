@@ -261,8 +261,8 @@ msgid "Food"
 msgstr "Food"
 
 #: app/_components/i18n-labels.ts:16
-msgid "g"
-msgstr "g"
+msgid "grams per day"
+msgstr "grams per day"
 
 #: app/_components/settings-forms.tsx:658
 msgid "Generate"
@@ -282,8 +282,8 @@ msgid "Jump to date"
 msgstr "Jump to date"
 
 #: app/_components/i18n-labels.ts:17
-msgid "kcal"
-msgstr "kcal"
+msgid "kilocalories per day"
+msgstr "kilocalories per day"
 
 #: app/_components/settings-forms.tsx:215
 #: app/_components/settings-forms.tsx:240

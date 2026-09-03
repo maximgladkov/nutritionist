@@ -1,6 +1,7 @@
 "use client";
 
 import { GOAL_LABELS, GOAL_UNIT_LABELS, REMINDER_TITLES } from "@/app/_components/i18n-labels";
+import { useAppLocale } from "@/app/_components/lingui-client-provider";
 import {
   consumeLinkCodeAction,
   generateLinkCodeAction,
@@ -11,7 +12,6 @@ import {
   saveTimezoneAction,
   type SettingsNotice,
 } from "@/app/actions/settings";
-import { useAppLocale } from "@/app/_components/lingui-client-provider";
 import { listCountries } from "@/lib/countries";
 import {
   GOAL_FIELDS,
@@ -20,13 +20,12 @@ import {
   type GoalsPatch,
   type GoalsView,
 } from "@/lib/goal-values";
-import { isLocale, locales, localeDisplayName } from "@/lib/i18n/locales";
+import { isLocale, localeDisplayName, locales } from "@/lib/i18n/locales";
 import {
   REMINDER_LABELS,
   type ReminderClock,
   type ReminderLabel,
 } from "@/lib/reminder-clock";
-import { Trans, useLingui } from "@lingui/react/macro";
 import {
   Arrows3RotateLeftLetterA,
   ChartColumn,
@@ -38,14 +37,12 @@ import {
   HeartFill,
   Link,
   Moon,
-  SparklesFill,
   Sun,
   ThunderboltFill,
 } from "@gravity-ui/icons";
 import { ItemCard, ItemCardGroup } from "@heroui-pro/react";
 import {
   Button,
-  Chip,
   ComboBox,
   Input,
   Label,
@@ -59,8 +56,17 @@ import {
   toast,
 } from "@heroui/react";
 import { Time } from "@internationalized/date";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { useRouter } from "next/navigation";
-import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import {
+  Fragment,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+  type SVGProps,
+} from "react";
 
 const NONE_KEY = "__none__";
 
@@ -71,12 +77,30 @@ const REMINDER_ICONS: Record<ReminderLabel, typeof Cup> = {
   summary: ChartColumn,
 };
 
+function Grains(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={16}
+      height={16}
+      fill="none"
+      viewBox="0 0 256 256"
+      {...props}
+    >
+      <path
+        fill="currentColor"
+        d="M208 56a87.5 87.5 0 0 0-31.84 6c-14.32-29.7-43.25-44.46-44.57-45.13a8 8 0 0 0-7.16 0c-1.33.64-30.26 15.4-44.58 45.13A87.5 87.5 0 0 0 48 56a8 8 0 0 0-8 8v80a88.12 88.12 0 0 0 75.48 87.1a4 4 0 0 0 4.52-4v-50.83a8.18 8.18 0 0 1 7.47-8.25a8 8 0 0 1 8.53 8v51.14a4 4 0 0 0 4.52 4A88.12 88.12 0 0 0 216 144V64a8 8 0 0 0-8-8m-88 93.46a88 88 0 0 0-64-37.09V72.44A72.1 72.1 0 0 1 120 144Zm8-42.1a88.6 88.6 0 0 0-33.84-38.25c9.21-19.21 26.4-31.33 33.84-35.9c7.45 4.58 24.63 16.7 33.84 35.9A88.6 88.6 0 0 0 128 107.36m72 5a88 88 0 0 0-64 37.09V144a72.1 72.1 0 0 1 64-71.56Z"
+      />
+    </svg>
+  );
+}
+
 const GOAL_ICONS: Record<GoalField, { color: string; icon: typeof Flame }> = {
   caloriesPerDay: { color: "var(--goal-calories)", icon: Flame },
   proteinGPerDay: { color: "var(--goal-protein)", icon: HeartFill },
   carbsGPerDay: { color: "var(--goal-carbs)", icon: ThunderboltFill },
   fatGPerDay: { color: "var(--goal-fat)", icon: Droplet },
-  fiberGPerDay: { color: "var(--goal-fiber)", icon: SparklesFill },
+  fiberGPerDay: { color: "var(--goal-fiber)", icon: Grains },
 };
 
 type ReminderRowState = {
@@ -423,12 +447,10 @@ export function DailyGoalsSettings({
                   <Icon />
                 </ItemCard.Icon>
                 <ItemCard.Content>
-                  <ItemCard.Title>
-                    {label}
-                    <Chip className="ml-2 align-middle" size="sm" variant="soft">
-                      {t(GOAL_UNIT_LABELS[spec.unit])}
-                    </Chip>
-                  </ItemCard.Title>
+                  <ItemCard.Title>{label}</ItemCard.Title>
+                  <ItemCard.Description className="whitespace-normal">
+                    {t(GOAL_UNIT_LABELS[spec.unit])}
+                  </ItemCard.Description>
                 </ItemCard.Content>
                 <ItemCard.Action>
                   <div className="flex items-center gap-2">
