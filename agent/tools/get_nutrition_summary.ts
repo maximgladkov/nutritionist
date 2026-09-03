@@ -1,45 +1,35 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { parseIsoDate, summarizeNutrition } from "../../lib/meals";
-import { prisma } from "../../lib/prisma";
-import { normalizeTimezone } from "../../lib/timezone";
+import { callerTimezone, mealQueryRange, summarizeNutrition } from "../../lib/meals";
 import { requireUser } from "../lib/require-user";
 
 export default defineTool({
   description:
-    "Sum nutrition for the caller's meals in a date range. from is inclusive, to is exclusive. Both are ISO-8601. Pass groupBy day for a per-day breakdown. Day buckets run from 04:00 to 04:00 the next morning in the saved timezone unless timezone is passed.",
-  inputSchema: z.object({
-    from: z.string().min(1),
-    to: z.string().min(1),
-    groupBy: z.enum(["day"]).optional(),
-    timezone: z.string().min(1).optional(),
-  }),
+    "Sum nutrition for the caller's meals in a date range. Omit from and to to use today's nutrition day (04:00 to 04:00 the next morning in the saved timezone). from is inclusive, to is exclusive, and both are ISO-8601 when passed. Pass groupBy day for a per-day breakdown. Day buckets use the saved timezone unless timezone is passed.",
+  inputSchema: z
+    .object({
+      from: z.string().min(1).optional(),
+      to: z.string().min(1).optional(),
+      groupBy: z.enum(["day"]).optional(),
+      timezone: z.string().min(1).optional(),
+    })
+    .refine((value) => (value.from === undefined) === (value.to === undefined), {
+      message: "from and to must both be provided",
+    }),
   async execute({ from, to, groupBy, timezone }, ctx) {
     const { userId } = await requireUser(ctx);
+    const resolvedTimezone = await callerTimezone(userId, timezone);
+    const range = mealQueryRange({
+      from,
+      to,
+      timeZone: resolvedTimezone ?? "UTC",
+    });
     return summarizeNutrition({
       userId,
-      from: parseIsoDate(from, "from"),
-      to: parseIsoDate(to, "to"),
+      from: range.from,
+      to: range.to,
       groupBy,
-      timezone: await resolveSummaryTimezone(timezone, userId),
+      timezone: resolvedTimezone,
     });
   },
 });
-
-async function resolveSummaryTimezone(
-  override: string | undefined,
-  userId: string,
-): Promise<string | undefined> {
-  if (override !== undefined && override !== "") {
-    const normalized = normalizeTimezone(override);
-    if (!normalized) {
-      throw new Error("timezone must be a valid IANA time zone");
-    }
-    return normalized;
-  }
-  const profile = await prisma.userProfile.findUnique({
-    where: { userId },
-    select: { timezone: true },
-  });
-  return profile?.timezone ?? undefined;
-}

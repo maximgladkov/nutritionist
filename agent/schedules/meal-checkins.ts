@@ -4,7 +4,7 @@ import telegram from "../channels/telegram";
 import whatsapp from "../channels/whatsapp";
 import { appPrincipal } from "../../lib/principal";
 import {
-  checkInPrompt,
+  buildCheckInPrompt,
   claimDueReminders,
   completeReminder,
   isMealCheckInLabel,
@@ -69,7 +69,7 @@ async function sendCheckIn(
   label: ClaimedReminder["label"],
   target: ReachTarget,
 ): Promise<void> {
-  const prompt = checkInPrompt(label);
+  const prompt = await buildCheckInPrompt({ label, userId });
   if (target.channel === "telegram") {
     await to(telegram, { chatId: target.chatId }).send(prompt, {
       auth: appPrincipal(userId, "telegram"),

@@ -9,10 +9,13 @@ import {
   isValidClock,
   parseClock,
   REMINDER_LABELS,
+  summaryCheckInPrompt,
   type MealCheckInLabel,
   type ReminderLabel,
+  type SummaryCheckInSnapshot,
 } from "./reminder-clock.ts";
-import { localDayRange, nextLocalOccurrence } from "./timezone.ts";
+import { loadTodayNutritionDay } from "./summary.ts";
+import { getZonedParts, localDayRange, nextLocalOccurrence } from "./timezone.ts";
 
 export {
   checkInPrompt,
@@ -22,9 +25,10 @@ export {
   isReminderLabel,
   isValidClock,
   parseClock,
+  summaryCheckInPrompt,
   REMINDER_LABELS,
 };
-export type { MealCheckInLabel, ReminderLabel };
+export type { MealCheckInLabel, ReminderLabel, SummaryCheckInSnapshot };
 
 const CLAIM_LIMIT = 25;
 const LEASE_MS = 50 * 60_000;
@@ -295,6 +299,54 @@ export function missingTimezoneRetryAt(now: Date = new Date()): Date {
 
 export function sendFailureRetryAt(now: Date = new Date()): Date {
   return new Date(now.getTime() + SEND_FAILURE_RETRY_MS);
+}
+
+export async function buildCheckInPrompt(input: {
+  label: ReminderLabel;
+  now?: Date;
+  userId: string;
+}): Promise<string> {
+  if (input.label === "summary") {
+    return summaryCheckInPrompt(await loadSummaryCheckInSnapshot(input.userId, input.now));
+  }
+  return checkInPrompt(input.label);
+}
+
+export async function loadSummaryCheckInSnapshot(
+  userId: string,
+  now?: Date,
+): Promise<SummaryCheckInSnapshot> {
+  const day = await loadTodayNutritionDay({ now, userId });
+  return {
+    date: day.date,
+    goals: day.goals,
+    meals: day.meals.map((meal) => {
+      const local = getZonedParts(new Date(meal.eatenAt), day.timezone);
+      return {
+        items: meal.items
+          .map((item) => `${item.name} ${formatLoggedAmount(item.amount)}${item.unit}`)
+          .join(", "),
+        kcal: meal.totals.energyKcal,
+        label: meal.label,
+        time: formatClock(local.hour, local.minute),
+      };
+    }),
+    timezone: day.timezone,
+    totals: {
+      carbohydrates: day.totals.carbohydrates,
+      energyKcal: day.totals.energyKcal,
+      fat: day.totals.fat,
+      fiber: day.totals.fiber,
+      proteins: day.totals.proteins,
+    },
+  };
+}
+
+function formatLoggedAmount(amount: number): string {
+  if (Number.isInteger(amount)) {
+    return String(amount);
+  }
+  return String(Math.round(amount * 10) / 10);
 }
 
 export async function reminderTimezone(userId: string): Promise<string | null> {

@@ -8,6 +8,7 @@ import {
   isReminderLabel,
   isValidClock,
   parseClock,
+  summaryCheckInPrompt,
 } from "./reminder-clock.ts";
 import { localDayRange, nextLocalOccurrence } from "./timezone.ts";
 
@@ -43,10 +44,62 @@ describe("check-in prompts", () => {
   });
 
   it("asks for a day recap on the summary check-in", () => {
-    const prompt = checkInPrompt("summary");
+    const prompt = summaryCheckInPrompt({
+      date: "2026-09-03",
+      goals: {
+        caloriesPerDay: 2000,
+        carbsGPerDay: null,
+        fatGPerDay: null,
+        fiberGPerDay: null,
+        proteinGPerDay: 140,
+      },
+      meals: [
+        {
+          items: "oatmeal 80g, banana 120g",
+          kcal: 420,
+          label: "breakfast",
+          time: "08:15",
+        },
+      ],
+      timezone: "Europe/Berlin",
+      totals: {
+        carbohydrates: 70,
+        energyKcal: 420,
+        fat: 8,
+        fiber: 10,
+        proteins: 18,
+      },
+    });
     assert.match(prompt, /daily summary/);
-    assert.match(prompt, /get_nutrition_summary/);
+    assert.match(prompt, /oatmeal 80g/);
+    assert.match(prompt, /420 kcal/);
+    assert.match(prompt, /protein 140 g/);
+    assert.doesNotMatch(prompt, /get_nutrition_summary/);
     assert.doesNotMatch(prompt, /how summary went/);
+  });
+
+  it("says when the summary snapshot has no meals", () => {
+    const prompt = summaryCheckInPrompt({
+      date: "2026-09-03",
+      goals: {
+        caloriesPerDay: null,
+        carbsGPerDay: null,
+        fatGPerDay: null,
+        fiberGPerDay: null,
+        proteinGPerDay: null,
+      },
+      meals: [],
+      timezone: "Europe/Berlin",
+      totals: {
+        carbohydrates: null,
+        energyKcal: null,
+        fat: null,
+        fiber: null,
+        proteins: null,
+      },
+    });
+    assert.match(prompt, /Logged meals:\nnone/);
+    assert.match(prompt, /Goals: none set/);
   });
 });
 

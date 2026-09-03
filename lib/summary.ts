@@ -92,6 +92,14 @@ export async function loadNutritionDiary(input: {
   return { day, days };
 }
 
+export async function loadTodayNutritionDay(input: {
+  now?: Date;
+  userId: string;
+}): Promise<NutritionDayPayload> {
+  const ctx = await readSummaryContext(input.userId, input.now);
+  return loadDayForContext(ctx, ctx.today);
+}
+
 async function readSummaryContext(userId: string, now = new Date()): Promise<SummaryContext> {
   const profile = await prisma.userProfile.findUnique({
     where: { userId },

@@ -12,7 +12,7 @@ import {
   sumNutrients,
 } from "./nutrition.ts";
 import { prisma } from "./prisma.ts";
-import { formatDateInTimeZone, normalizeTimezone } from "./timezone.ts";
+import { formatDateInTimeZone, localDayRange, normalizeTimezone } from "./timezone.ts";
 import type { MealItemUnit, MealLabel, Prisma } from "../generated/prisma/client";
 
 export class MealError extends Error {
@@ -214,6 +214,41 @@ export function parseIsoDate(value: string, field: string): Date {
     throw new MealError(`${field} must be a valid ISO datetime`);
   }
   return date;
+}
+
+export async function callerTimezone(userId: string, override?: string): Promise<string | undefined> {
+  if (override !== undefined && override !== "") {
+    const normalized = normalizeTimezone(override);
+    if (!normalized) {
+      throw new MealError("timezone must be a valid IANA time zone");
+    }
+    return normalized;
+  }
+  const profile = await prisma.userProfile.findUnique({
+    where: { userId },
+    select: { timezone: true },
+  });
+  return profile?.timezone ?? undefined;
+}
+
+export function mealQueryRange(input: {
+  from?: string;
+  to?: string;
+  now?: Date;
+  timeZone: string;
+}): { from: Date; to: Date } {
+  const fromValue = input.from?.trim() ?? "";
+  const toValue = input.to?.trim() ?? "";
+  if ((fromValue === "") !== (toValue === "")) {
+    throw new MealError("from and to must both be provided");
+  }
+  if (fromValue === "" || toValue === "") {
+    return localDayRange(input.now ?? new Date(), input.timeZone);
+  }
+  const from = parseIsoDate(fromValue, "from");
+  const to = parseIsoDate(toValue, "to");
+  assertRange(from, to);
+  return { from, to };
 }
 
 async function resolveItems(
