@@ -7,12 +7,14 @@
     "#evals/*": "./evals/*"
   },
   "scripts": {
-    "build": "next build",
+    "build": "lingui compile && next build",
     "deploy": "eve deploy",
-    "dev": "next dev",
+    "dev": "lingui compile && next dev",
+    "lingui:compile": "lingui compile",
+    "lingui:extract": "lingui extract --clean",
     "eval": "eve eval",
     "start": "next start",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "lingui compile && tsc --noEmit -p tsconfig.json",
     "test": "node --experimental-strip-types --test lib/*.test.ts",
     "db:generate": "prisma generate",
     "db:validate": "prisma validate",
@@ -31,6 +33,8 @@
     "@heroui/react": ">=3.2.2",
     "@heroui/styles": ">=3.2.2",
     "@internationalized/date": "^3.12.3",
+    "@lingui/core": "^6",
+    "@lingui/react": "^6",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "@react-aria/i18n": "^3.13.1",
@@ -75,6 +79,8 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@lingui/cli": "^6",
+    "@lingui/swc-plugin": "6.1.0",
     "@types/node": "26",
     "@types/pg": "^8.23.1",
     "@types/react": "19.2.15",

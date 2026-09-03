@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { CircleDashed } from "@gravity-ui/icons";
 import { EmptyState } from "@heroui-pro/react";
 import { Link, Spinner } from "@heroui/react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 
@@ -83,6 +84,7 @@ export function NutritionSummaryApp({
   readonly embed: boolean;
   readonly initial?: NutritionDiaryPayload;
 }) {
+  const { t } = useLingui();
   const [initData, setInitData] = useState<string | null>(embed ? null : "");
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState<{ from: string; to: string } | null>(null);
@@ -200,14 +202,14 @@ export function NutritionSummaryApp({
 
   const goals = day?.goals ?? diary?.day.goals ?? initial?.day.goals ?? null;
   const groups = useMemo(() => groupMealsByLabel(day?.meals ?? []), [day?.meals]);
-  const bootError = embed && initData === "" ? "Open this from the Telegram bot." : null;
+  const bootError = embed && initData === "" ? t`Open this from the Telegram bot.` : null;
   const loadError = firstError(diaryError, dayError, daysError);
   const errorMessage =
     bootError ??
     (loadError instanceof Error
       ? loadError.message
       : loadError
-        ? "Could not load that summary."
+        ? t`Could not load that summary.`
         : null);
   const isPending = Boolean(day && selectedDate && day.date !== selectedDate && dayValidating);
   const timezoneIsFallback =
@@ -223,8 +225,12 @@ export function NutritionSummaryApp({
     >
       {embed ? null : (
         <div className="flex flex-col gap-1">
-          <h1 className="text-foreground text-xl font-semibold">Summary</h1>
-          <p className="text-muted text-sm">Calories and macros for the meals you have logged.</p>
+          <h1 className="text-foreground text-xl font-semibold">
+            <Trans>Summary</Trans>
+          </h1>
+          <p className="text-muted text-sm">
+            <Trans>Calories and macros for the meals you have logged.</Trans>
+          </p>
         </div>
       )}
       <DayRingStrip
@@ -240,7 +246,9 @@ export function NutritionSummaryApp({
         onVisibleRange={onVisibleRange}
       />
       {calendarOpen ? null : timezoneIsFallback ? (
-        <p className="text-muted text-sm">Times use UTC until you save a time zone in Settings.</p>
+        <p className="text-muted text-sm">
+          <Trans>Times use UTC until you save a time zone in Settings.</Trans>
+        </p>
       ) : null}
       {calendarOpen ? null : errorMessage ? <p className="text-danger text-sm">{errorMessage}</p> : null}
       {calendarOpen ? null : day ? (
@@ -279,8 +287,12 @@ function SelectedDayView({
             <EmptyState.Media variant="icon">
               <CircleDashed className="size-5" />
             </EmptyState.Media>
-            <EmptyState.Title>No meals logged</EmptyState.Title>
-            <EmptyState.Description>Log a meal in chat to see totals here.</EmptyState.Description>
+            <EmptyState.Title>
+              <Trans>No meals logged</Trans>
+            </EmptyState.Title>
+            <EmptyState.Description>
+              <Trans>Log a meal in chat to see totals here.</Trans>
+            </EmptyState.Description>
           </EmptyState.Header>
         </EmptyState>
       ) : (
@@ -292,12 +304,17 @@ function SelectedDayView({
 
 function SetCalorieGoalHint({ compact }: { readonly compact: boolean }) {
   if (compact) {
-    return <p className="text-muted px-1 text-sm">Set daily goals in chat to track them here.</p>;
+    return (
+      <p className="text-muted px-1 text-sm">
+        <Trans>Set daily goals in chat to track them here.</Trans>
+      </p>
+    );
   }
   return (
     <p className="text-muted px-1 text-sm">
-      <Link href="/settings">Set daily goals</Link>
-      {" to fill rings as you eat."}
+      <Trans>
+        <Link href="/settings">Set daily goals</Link> to fill rings as you eat.
+      </Trans>
     </p>
   );
 }

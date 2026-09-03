@@ -5,6 +5,7 @@ import {
   hasAuthSessionCookie,
   readAuthJwt,
 } from "./lib/auth-cookies";
+import { isLocale, localeCookieOptions, LOCALE_COOKIE_NAME, negotiateLocale } from "./lib/i18n/locales";
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -15,15 +16,15 @@ export async function proxy(request: NextRequest) {
 
   if (pathname === "/login") {
     if (!staleCookie) {
-      return NextResponse.next();
+      return withLocaleCookie(request, NextResponse.next());
     }
-    return clearAuthSessionCookies(NextResponse.next());
+    return withLocaleCookie(request, clearAuthSessionCookies(NextResponse.next()));
   }
 
   if (telegramEmbed) {
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set("x-tg-embed", "1");
-    return NextResponse.next({ request: { headers: requestHeaders } });
+    return withLocaleCookie(request, NextResponse.next({ request: { headers: requestHeaders } }));
   }
 
   if (
@@ -33,21 +34,34 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/summary")
   ) {
     if (token) {
-      return NextResponse.next();
+      return withLocaleCookie(request, NextResponse.next());
     }
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("callbackUrl", pathname);
     const response = NextResponse.redirect(url);
     if (staleCookie) {
-      return clearAuthSessionCookies(response);
+      return withLocaleCookie(request, clearAuthSessionCookies(response));
     }
-    return response;
+    return withLocaleCookie(request, response);
   }
 
-  return NextResponse.next();
+  return withLocaleCookie(request, NextResponse.next());
 }
 
 export const config = {
   matcher: ["/", "/s/:path*", "/settings", "/summary", "/login"],
 };
+
+function withLocaleCookie(request: NextRequest, response: NextResponse): NextResponse {
+  const existing = request.cookies.get(LOCALE_COOKIE_NAME)?.value;
+  if (existing && isLocale(existing)) {
+    return response;
+  }
+  response.cookies.set(
+    LOCALE_COOKIE_NAME,
+    negotiateLocale(request.headers.get("accept-language")),
+    localeCookieOptions(),
+  );
+  return response;
+}

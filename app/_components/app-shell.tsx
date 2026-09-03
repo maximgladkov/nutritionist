@@ -3,8 +3,10 @@
 import { ArrowRightFromSquare, ChartColumn, Comment, Gear, Plus } from "@gravity-ui/icons";
 import { Button } from "@heroui/react";
 import { AppLayout, Navbar, Sidebar } from "@heroui-pro/react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
+import { useAppLocale } from "@/app/_components/lingui-client-provider";
 import { MiniAppShell } from "@/app/_components/mini-app-shell";
 import { signOutAction } from "@/app/actions/auth";
 
@@ -17,12 +19,14 @@ export function AppShell({
   readonly email?: string;
   readonly embed?: boolean;
 }) {
+  const { t } = useLingui();
+  const { locale } = useAppLocale();
   const pathname = usePathname();
   const router = useRouter();
   const isChat = pathname === "/" || pathname === "/s" || pathname.startsWith("/s/");
   const isSettings = pathname.startsWith("/settings");
   const isSummary = pathname.startsWith("/summary");
-  const title = isSettings ? "Settings" : isSummary ? "Summary" : "Chat";
+  const title = isSettings ? t`Settings` : isSummary ? t`Summary` : t`Chat`;
 
   if (pathname === "/login") {
     return children;
@@ -35,6 +39,7 @@ export function AppShell({
   return (
     <AppLayout
       className="h-dvh"
+      key={locale}
       navigate={router.push}
       navbar={
         <Navbar maxWidth="full">
@@ -45,13 +50,15 @@ export function AppShell({
             <Navbar.Spacer />
             {isChat ? (
               <Button
-                aria-label="Start a new chat"
+                aria-label={t`Start a new chat`}
                 size="sm"
                 variant="ghost"
                 onPress={() => router.push("/s")}
               >
                 <Plus className="size-4" />
-                <span className="hidden sm:inline">New chat</span>
+                <span className="hidden sm:inline">
+                  <Trans>New chat</Trans>
+                </span>
               </Button>
             ) : null}
           </Navbar.Header>
@@ -88,7 +95,7 @@ function SidebarBrand() {
           <span className="text-accent-foreground text-sm font-bold">N</span>
         </div>
         <span className="text-foreground text-sm font-semibold" data-sidebar="label">
-          Nutritionist
+          <Trans>Nutritionist</Trans>
         </span>
       </div>
     </Sidebar.Header>
@@ -104,32 +111,36 @@ function SidebarNav({
   readonly isSettings: boolean;
   readonly isSummary: boolean;
 }) {
+  const { t } = useLingui();
+  const chat = t`Chat`;
+  const summary = t`Summary`;
+  const settings = t`Settings`;
   return (
     <Sidebar.Content>
       <Sidebar.Group>
-        <Sidebar.Menu aria-label="Navigation">
-          <Sidebar.MenuItem href="/s" id="chat" isCurrent={isChat} textValue="Chat">
+        <Sidebar.Menu aria-label={t`Navigation`}>
+          <Sidebar.MenuItem href="/s" id="chat" isCurrent={isChat} textValue={chat}>
             <Sidebar.MenuIcon>
               <Comment className="size-4" />
             </Sidebar.MenuIcon>
-            <Sidebar.MenuLabel>Chat</Sidebar.MenuLabel>
+            <Sidebar.MenuLabel>{chat}</Sidebar.MenuLabel>
           </Sidebar.MenuItem>
-          <Sidebar.MenuItem href="/summary" id="summary" isCurrent={isSummary} textValue="Summary">
+          <Sidebar.MenuItem href="/summary" id="summary" isCurrent={isSummary} textValue={summary}>
             <Sidebar.MenuIcon>
               <ChartColumn className="size-4" />
             </Sidebar.MenuIcon>
-            <Sidebar.MenuLabel>Summary</Sidebar.MenuLabel>
+            <Sidebar.MenuLabel>{summary}</Sidebar.MenuLabel>
           </Sidebar.MenuItem>
           <Sidebar.MenuItem
             href="/settings"
             id="settings"
             isCurrent={isSettings}
-            textValue="Settings"
+            textValue={settings}
           >
             <Sidebar.MenuIcon>
               <Gear className="size-4" />
             </Sidebar.MenuIcon>
-            <Sidebar.MenuLabel>Settings</Sidebar.MenuLabel>
+            <Sidebar.MenuLabel>{settings}</Sidebar.MenuLabel>
           </Sidebar.MenuItem>
         </Sidebar.Menu>
       </Sidebar.Group>
@@ -148,7 +159,9 @@ function SidebarAccount({ email }: { readonly email?: string }) {
       <form action={signOutAction}>
         <Button className="w-full justify-start" type="submit" variant="ghost">
           <ArrowRightFromSquare className="size-4" />
-          <span data-sidebar="label">Sign out</span>
+          <span data-sidebar="label">
+            <Trans>Sign out</Trans>
+          </span>
         </Button>
       </form>
     </Sidebar.Footer>

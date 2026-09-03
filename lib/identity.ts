@@ -240,16 +240,25 @@ export async function mergeUsers(survivorId: string, absorbedId: string): Promis
             userId: survivorId,
             notes: absorbedProfile.notes,
             country: absorbedProfile.country,
+            locale: absorbedProfile.locale,
             timezone: absorbedProfile.timezone,
           },
         });
       } else {
-        const data: { notes?: string; country?: string | null; timezone?: string | null } = {};
+        const data: {
+          notes?: string;
+          country?: string | null;
+          locale?: string | null;
+          timezone?: string | null;
+        } = {};
         if (!survivorProfile.notes && absorbedProfile.notes) {
           data.notes = absorbedProfile.notes;
         }
         if (!survivorProfile.country && absorbedProfile.country) {
           data.country = absorbedProfile.country;
+        }
+        if (!survivorProfile.locale && absorbedProfile.locale) {
+          data.locale = absorbedProfile.locale;
         }
         if (!survivorProfile.timezone && absorbedProfile.timezone) {
           data.timezone = absorbedProfile.timezone;

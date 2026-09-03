@@ -2,6 +2,7 @@
 
 import { PersonFill } from "@gravity-ui/icons";
 import { EmptyState } from "@heroui-pro/react";
+import { Trans } from "@lingui/react/macro";
 
 export function MiniAppGroups() {
   return (
@@ -11,9 +12,11 @@ export function MiniAppGroups() {
           <EmptyState.Media variant="icon">
             <PersonFill className="size-5" />
           </EmptyState.Media>
-          <EmptyState.Title>Groups</EmptyState.Title>
+          <EmptyState.Title>
+            <Trans>Groups</Trans>
+          </EmptyState.Title>
           <EmptyState.Description>
-            Saved food groups will show up here so you can log them in one tap.
+            <Trans>Saved food groups will show up here so you can log them in one tap.</Trans>
           </EmptyState.Description>
         </EmptyState.Header>
       </EmptyState>

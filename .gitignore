@@ -9,3 +9,6 @@ dist
 generated
 .DS_Store
 *.tsbuildinfo
+locales/**/messages.ts
+locales/**/messages.js
+locales/**/messages.d.ts

@@ -1,15 +1,18 @@
 "use client";
 
+import { GOAL_LABELS, GOAL_UNIT_LABELS, REMINDER_TITLES } from "@/app/_components/i18n-labels";
 import {
   consumeLinkCodeAction,
   generateLinkCodeAction,
   saveCountryAction,
   saveGoalsAction,
+  saveLocaleAction,
   saveRemindersAction,
   saveTimezoneAction,
   type SettingsNotice,
 } from "@/app/actions/settings";
-import type { CountryOption } from "@/lib/countries";
+import { useAppLocale } from "@/app/_components/lingui-client-provider";
+import { listCountries } from "@/lib/countries";
 import {
   GOAL_FIELDS,
   GOAL_SPECS,
@@ -17,12 +20,15 @@ import {
   type GoalsPatch,
   type GoalsView,
 } from "@/lib/goal-values";
+import { isLocale, locales, localeDisplayName } from "@/lib/i18n/locales";
 import {
   REMINDER_LABELS,
   type ReminderClock,
   type ReminderLabel,
 } from "@/lib/reminder-clock";
+import { Trans, useLingui } from "@lingui/react/macro";
 import {
+  Arrows3RotateLeftLetterA,
   ChartColumn,
   ClockFill,
   Cup,
@@ -39,11 +45,13 @@ import {
 import { ItemCard, ItemCardGroup } from "@heroui-pro/react";
 import {
   Button,
+  Chip,
   ComboBox,
   Input,
   Label,
   ListBox,
   NumberField,
+  Select,
   Separator,
   Switch,
   TextField,
@@ -52,16 +60,9 @@ import {
 } from "@heroui/react";
 import { Time } from "@internationalized/date";
 import { useRouter } from "next/navigation";
-import { Fragment, useEffect, useRef, useState, useTransition } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 const NONE_KEY = "__none__";
-
-const REMINDER_TITLES: Record<ReminderLabel, string> = {
-  breakfast: "Breakfast",
-  lunch: "Lunch",
-  dinner: "Dinner",
-  summary: "Daily summary",
-};
 
 const REMINDER_ICONS: Record<ReminderLabel, typeof Cup> = {
   breakfast: Cup,
@@ -154,46 +155,126 @@ function patchFromGoalRow(field: GoalField, row: GoalRowState): GoalsPatch | nul
   return { [field]: row.value };
 }
 
+export function SettingsHeading({ email }: { readonly email?: string }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <h1 className="text-foreground text-xl font-semibold">
+        <Trans>Settings</Trans>
+      </h1>
+      {email ? (
+        <p className="text-muted text-sm">
+          <Trans>Signed in as {email}</Trans>
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function LocationSettings({
-  countries,
   defaultCountry,
   defaultTimezone,
   initData,
+  onLocaleSaved,
   onTimezoneSaved,
   timeZones,
 }: {
-  readonly countries: readonly CountryOption[];
   readonly defaultCountry: string | null;
   readonly defaultTimezone: string | null;
   readonly initData?: string;
+  readonly onLocaleSaved?: () => void;
   readonly onTimezoneSaved?: () => void;
   readonly timeZones: readonly string[];
 }) {
+  const { t } = useLingui();
+  const { locale, setLocale } = useAppLocale();
+  const countries = useMemo(() => listCountries(locale), [locale]);
   const [country, setCountry] = useState<string>(defaultCountry ?? NONE_KEY);
   const [timezone, setTimezone] = useState<string>(defaultTimezone ?? NONE_KEY);
   const [, startTransition] = useTransition();
   const router = useRouter();
+  const worldwide = t`Not set (worldwide)`;
+  const notSet = t`Not set`;
 
   return (
     <ItemCardGroup variant="transparent" className="overflow-hidden">
       <ItemCardGroup.Header>
-        <ItemCardGroup.Title>Location</ItemCardGroup.Title>
+        <ItemCardGroup.Title>
+          <Trans>Language & location</Trans>
+        </ItemCardGroup.Title>
         <ItemCardGroup.Description>
-          Product lookups, meal times, and reminders use these.
+          <Trans>App language, product lookups, meal times, and reminders.</Trans>
         </ItemCardGroup.Description>
       </ItemCardGroup.Header>
 
       <ItemCardGroup className="overflow-hidden">
         <ItemCard>
           <ItemCard.Icon>
+            <Arrows3RotateLeftLetterA />
+          </ItemCard.Icon>
+          <ItemCard.Content>
+            <ItemCard.Title>
+              <Trans>Language</Trans>
+            </ItemCard.Title>
+          </ItemCard.Content>
+          <ItemCard.Action>
+            <Select
+              className="w-40"
+              selectedKey={locale}
+              variant="secondary"
+              onSelectionChange={(key) => {
+                const next = String(key);
+                if (!isLocale(next) || next === locale) {
+                  return;
+                }
+                setLocale(next);
+                startTransition(() => {
+                  runSettingsAction(() => saveLocaleAction(next, initData), {
+                    onSaved: () => {
+                      onLocaleSaved?.();
+                      router.refresh();
+                    },
+                  });
+                });
+              }}
+            >
+              <Label className="sr-only">
+                <Trans>Language</Trans>
+              </Label>
+              <Select.Trigger>
+                <Select.Value />
+                <Select.Indicator />
+              </Select.Trigger>
+              <Select.Popover>
+                <ListBox>
+                  {locales.map((option) => (
+                    <ListBox.Item
+                      id={option}
+                      key={option}
+                      textValue={localeDisplayName(option)}
+                    >
+                      {localeDisplayName(option)}
+                      <ListBox.ItemIndicator />
+                    </ListBox.Item>
+                  ))}
+                </ListBox>
+              </Select.Popover>
+            </Select>
+          </ItemCard.Action>
+        </ItemCard>
+        <Separator />
+        <ItemCard>
+          <ItemCard.Icon>
             <Globe />
           </ItemCard.Icon>
           <ItemCard.Content>
-            <ItemCard.Title>Country</ItemCard.Title>
+            <ItemCard.Title>
+              <Trans>Country</Trans>
+            </ItemCard.Title>
           </ItemCard.Content>
           <ItemCard.Action>
             <ComboBox
               className="w-40"
+              key={`country-${locale}`}
               menuTrigger="focus"
               selectedKey={country}
               onSelectionChange={(key) => {
@@ -207,15 +288,17 @@ export function LocationSettings({
                 });
               }}
             >
-              <Label className="sr-only">Country</Label>
+              <Label className="sr-only">
+                <Trans>Country</Trans>
+              </Label>
               <ComboBox.InputGroup>
-                <Input placeholder="Search…" variant="secondary" />
+                <Input placeholder={t`Search…`} variant="secondary" />
                 <ComboBox.Trigger />
               </ComboBox.InputGroup>
               <ComboBox.Popover>
                 <ListBox>
-                  <ListBox.Item id={NONE_KEY} textValue="Not set (worldwide)">
-                    Not set (worldwide)
+                  <ListBox.Item id={NONE_KEY} textValue={worldwide}>
+                    {worldwide}
                     <ListBox.ItemIndicator />
                   </ListBox.Item>
                   {countries.map((option) => (
@@ -235,11 +318,14 @@ export function LocationSettings({
             <ClockFill />
           </ItemCard.Icon>
           <ItemCard.Content>
-            <ItemCard.Title>Time zone</ItemCard.Title>
+            <ItemCard.Title>
+              <Trans>Time zone</Trans>
+            </ItemCard.Title>
           </ItemCard.Content>
           <ItemCard.Action>
             <ComboBox
               className="w-40"
+              key={`timezone-${locale}`}
               menuTrigger="focus"
               selectedKey={timezone}
               onSelectionChange={(key) => {
@@ -258,15 +344,17 @@ export function LocationSettings({
                 });
               }}
             >
-              <Label className="sr-only">Time zone</Label>
+              <Label className="sr-only">
+                <Trans>Time zone</Trans>
+              </Label>
               <ComboBox.InputGroup>
-                <Input placeholder="Search…" variant="secondary" />
+                <Input placeholder={t`Search…`} variant="secondary" />
                 <ComboBox.Trigger />
               </ComboBox.InputGroup>
               <ComboBox.Popover>
                 <ListBox>
-                  <ListBox.Item id={NONE_KEY} textValue="Not set">
-                    Not set
+                  <ListBox.Item id={NONE_KEY} textValue={notSet}>
+                    {notSet}
                     <ListBox.ItemIndicator />
                   </ListBox.Item>
                   {timeZones.map((zone) => (
@@ -292,6 +380,8 @@ export function DailyGoalsSettings({
   readonly defaultGoals: GoalsView;
   readonly initData?: string;
 }) {
+  const { t } = useLingui();
+  const { locale } = useAppLocale();
   const [rows, setRows] = useState<Record<GoalField, GoalRowState>>(() => rowsFromGoals(defaultGoals));
   const [, startTransition] = useTransition();
   const schedule = useKeyedDebounce(400);
@@ -312,9 +402,11 @@ export function DailyGoalsSettings({
   return (
     <ItemCardGroup variant="transparent" className="overflow-hidden">
       <ItemCardGroup.Header>
-        <ItemCardGroup.Title>Daily Goals</ItemCardGroup.Title>
+        <ItemCardGroup.Title>
+          <Trans>Daily Goals</Trans>
+        </ItemCardGroup.Title>
         <ItemCardGroup.Description>
-          Turn on a nutrient to track it on the summary rings.
+          <Trans>Turn on a nutrient to track it on the summary rings.</Trans>
         </ItemCardGroup.Description>
       </ItemCardGroup.Header>
       <ItemCardGroup className="overflow-hidden">
@@ -322,6 +414,7 @@ export function DailyGoalsSettings({
           const spec = GOAL_SPECS[field];
           const row = rows[field];
           const { color, icon: Icon } = GOAL_ICONS[field];
+          const label = t(GOAL_LABELS[field]);
           return (
             <Fragment key={field}>
               {index > 0 ? <Separator /> : null}
@@ -330,7 +423,12 @@ export function DailyGoalsSettings({
                   <Icon />
                 </ItemCard.Icon>
                 <ItemCard.Content>
-                  <ItemCard.Title>{spec.label}</ItemCard.Title>
+                  <ItemCard.Title>
+                    {label}
+                    <Chip className="ml-2 align-middle" size="sm" variant="soft">
+                      {t(GOAL_UNIT_LABELS[spec.unit])}
+                    </Chip>
+                  </ItemCard.Title>
                 </ItemCard.Content>
                 <ItemCard.Action>
                   <div className="flex items-center gap-2">
@@ -338,6 +436,7 @@ export function DailyGoalsSettings({
                       className="w-40"
                       formatOptions={{ maximumFractionDigits: 0, useGrouping: false }}
                       isDisabled={!row.enabled}
+                      key={`${field}-${locale}`}
                       maxValue={spec.max}
                       minValue={spec.min}
                       step={spec.step}
@@ -349,15 +448,15 @@ export function DailyGoalsSettings({
                         commit(field, { ...row, value: nextValue }, false);
                       }}
                     >
-                      <Label className="sr-only">{spec.label} goal</Label>
+                      <Label className="sr-only">{t`${label} goal`}</Label>
                       <NumberField.Group>
                         <NumberField.DecrementButton />
-                        <NumberField.Input className="text-center" placeholder={spec.unit} />
+                        <NumberField.Input className="text-center" />
                         <NumberField.IncrementButton />
                       </NumberField.Group>
                     </NumberField>
                     <Switch
-                      aria-label={`Enable ${spec.label} goal`}
+                      aria-label={t`Enable ${label} goal`}
                       isSelected={row.enabled}
                       onChange={(enabled) => {
                         commit(field, { ...row, enabled }, true);
@@ -389,6 +488,8 @@ export function ReminderSettings({
   readonly reminders: Readonly<Record<ReminderLabel, ReminderClock>>;
   readonly timezone: string | null;
 }) {
+  const { t } = useLingui();
+  const { locale } = useAppLocale();
   const [rows, setRows] = useState<Record<ReminderLabel, ReminderRowState>>(() =>
     Object.fromEntries(
       REMINDER_LABELS.map((label) => [
@@ -429,11 +530,15 @@ export function ReminderSettings({
   return (
     <ItemCardGroup variant="transparent" className="overflow-hidden">
       <ItemCardGroup.Header>
-        <ItemCardGroup.Title>Check-ins</ItemCardGroup.Title>
+        <ItemCardGroup.Title>
+          <Trans>Check-ins</Trans>
+        </ItemCardGroup.Title>
         <ItemCardGroup.Description>
-          {timezone
-            ? "Daily check-ins use your time zone."
-            : "Set a time zone first to turn reminders on."}
+          {timezone ? (
+            <Trans>Daily check-ins use your time zone.</Trans>
+          ) : (
+            <Trans>Set a time zone first to turn reminders on.</Trans>
+          )}
         </ItemCardGroup.Description>
       </ItemCardGroup.Header>
       <ItemCardGroup className="overflow-hidden">
@@ -441,6 +546,7 @@ export function ReminderSettings({
           ? REMINDER_LABELS.map((label, index) => {
             const row = rows[label];
             const Icon = REMINDER_ICONS[label];
+            const title = t(REMINDER_TITLES[label]);
             return (
               <Fragment key={label}>
                 {index > 0 ? <Separator /> : null}
@@ -449,7 +555,7 @@ export function ReminderSettings({
                     <Icon />
                   </ItemCard.Icon>
                   <ItemCard.Content>
-                    <ItemCard.Title>{REMINDER_TITLES[label]}</ItemCard.Title>
+                    <ItemCard.Title>{title}</ItemCard.Title>
                   </ItemCard.Content>
                   <ItemCard.Action>
                     <div className="flex items-center gap-2">
@@ -457,6 +563,7 @@ export function ReminderSettings({
                         className="w-28"
                         granularity="minute"
                         hourCycle={24}
+                        key={`${label}-${locale}`}
                         value={row.time}
                         onChange={(time) => {
                           if (!time) {
@@ -471,7 +578,7 @@ export function ReminderSettings({
                           );
                         }}
                       >
-                        <Label className="sr-only">{REMINDER_TITLES[label]} time</Label>
+                        <Label className="sr-only">{t`${title} time`}</Label>
                         <TimeField.Group variant="secondary">
                           <TimeField.Input className="justify-center">
                             {(segment) => <TimeField.Segment segment={segment} />}
@@ -479,7 +586,7 @@ export function ReminderSettings({
                         </TimeField.Group>
                       </TimeField>
                       <Switch
-                        aria-label={`Enable ${REMINDER_TITLES[label]} reminder`}
+                        aria-label={t`Enable ${title} reminder`}
                         isSelected={row.enabled}
                         onChange={(enabled) => {
                           commit(
@@ -522,9 +629,11 @@ export function LinkAccountsSettings({
   return (
     <ItemCardGroup variant="transparent" className="overflow-hidden">
       <ItemCardGroup.Header>
-        <ItemCardGroup.Title>Linked Accounts</ItemCardGroup.Title>
+        <ItemCardGroup.Title>
+          <Trans>Linked Accounts</Trans>
+        </ItemCardGroup.Title>
         <ItemCardGroup.Description>
-          Connect Telegram or WhatsApp with a one-time code.
+          <Trans>Connect Telegram or WhatsApp with a one-time code.</Trans>
         </ItemCardGroup.Description>
       </ItemCardGroup.Header>
       <ItemCardGroup className="overflow-hidden">
@@ -533,8 +642,12 @@ export function LinkAccountsSettings({
             <Link />
           </ItemCard.Icon>
           <ItemCard.Content>
-            <ItemCard.Title>Generate a code</ItemCard.Title>
-            <ItemCard.Description>Send /link CODE in a private chat with the bot.</ItemCard.Description>
+            <ItemCard.Title>
+              <Trans>Generate a code</Trans>
+            </ItemCard.Title>
+            <ItemCard.Description>
+              <Trans>Send /link CODE in a private chat with the bot.</Trans>
+            </ItemCard.Description>
           </ItemCard.Content>
           <ItemCard.Action>
             <Button
@@ -547,7 +660,7 @@ export function LinkAccountsSettings({
                 });
               }}
             >
-              Generate
+              <Trans>Generate</Trans>
             </Button>
           </ItemCard.Action>
         </ItemCard>
@@ -556,12 +669,16 @@ export function LinkAccountsSettings({
             <Separator />
             <ItemCard>
               <ItemCard.Content>
-                <ItemCard.Title>Enter a code from chat</ItemCard.Title>
+                <ItemCard.Title>
+                  <Trans>Enter a code from chat</Trans>
+                </ItemCard.Title>
               </ItemCard.Content>
               <ItemCard.Action>
                 <div className="flex items-center gap-2">
                   <TextField className="w-28" name="code" value={code} onChange={setCode}>
-                    <Label className="sr-only">Link code</Label>
+                    <Label className="sr-only">
+                      <Trans>Link code</Trans>
+                    </Label>
                     <Input autoComplete="off" placeholder="ABCD2345" variant="secondary" />
                   </TextField>
                   <Button
@@ -577,7 +694,7 @@ export function LinkAccountsSettings({
                       });
                     }}
                   >
-                    Link
+                    <Trans>Link</Trans>
                   </Button>
                 </div>
               </ItemCard.Action>

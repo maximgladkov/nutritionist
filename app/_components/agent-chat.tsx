@@ -18,12 +18,16 @@ import { useEveAgent } from "eve/react";
 import { useEffect, useState } from "react";
 import { AgentMessage } from "./agent-message";
 import { prepareImageFiles } from "@/lib/heic";
+import { Trans, useLingui } from "@lingui/react/macro";
+import { msg } from "@lingui/core/macro";
 
-const AGENT_NAME = "Nutritionist";
 const IMAGE_ACCEPT =
   "image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif,.heic,.heif";
 const MAX_ATTACHMENT_FILES = 5;
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const PHOTO_READ_ERROR = msg`Could not read the photo.`;
+const MODEL_UNAVAILABLE = msg`The model is temporarily unavailable. Please try again.`;
+const CANCEL_FAILED = msg`Unable to cancel the response.`;
 
 type PendingAttachment = {
   readonly id: string;
@@ -39,6 +43,7 @@ export function AgentChat({
   readonly sessionId?: string;
   readonly sessionless?: boolean;
 }) {
+  const { t } = useLingui();
   const [cancellationError, setCancellationError] = useState<string>();
   const [value, setValue] = useState("");
   const [attachments, setAttachments] = useState<readonly PendingAttachment[]>([]);
@@ -75,7 +80,8 @@ export function AgentChat({
   const showPendingThinking =
     isBusy &&
     (agent.status === "submitted" || lastMessage?.role !== "assistant" || isPendingAssistantShell);
-  const turnFailure = isBusy || isResuming ? undefined : getLatestTurnFailure(agent.events);
+  const turnFailure =
+    isBusy || isResuming ? undefined : getLatestTurnFailure(agent.events, t(MODEL_UNAVAILABLE));
   const errorMessage = cancellationError ?? agent.error?.message ?? turnFailure;
   const hasConversationContent = sessionless || !isEmpty || errorMessage !== undefined;
   const showConversationLayout = isResuming || hasConversationContent;
@@ -98,7 +104,7 @@ export function AgentChat({
   const requestCancellation = () => {
     setCancellationError(undefined);
     void agent.cancel().catch((error: unknown) => {
-      setCancellationError(toErrorMessage(error));
+      setCancellationError(toErrorMessage(error, t(CANCEL_FAILED)));
     });
   };
 
@@ -106,21 +112,23 @@ export function AgentChat({
     setCancellationError(undefined);
     const remaining = MAX_ATTACHMENT_FILES - attachments.length;
     if (remaining <= 0) {
-      setCancellationError(`You can attach up to ${MAX_ATTACHMENT_FILES} photos.`);
+      setCancellationError(t`You can attach up to ${MAX_ATTACHMENT_FILES} photos.`);
       return;
     }
     const selected = files.slice(0, remaining);
     if (selected.some((file) => file.size > MAX_ATTACHMENT_BYTES)) {
-      setCancellationError("Each photo must be 10 MB or smaller.");
+      setCancellationError(t`Each photo must be 10 MB or smaller.`);
       return;
     }
     setIsPreparing(true);
     try {
       const prepared = await prepareImageFiles(selected);
-      const next = await Promise.all(prepared.map(fileToPendingAttachment));
+      const next = await Promise.all(
+        prepared.map((file) => fileToPendingAttachment(file, t(PHOTO_READ_ERROR))),
+      );
       setAttachments((current) => [...current, ...next]);
     } catch (error: unknown) {
-      setCancellationError(toErrorMessage(error));
+      setCancellationError(toErrorMessage(error, t(CANCEL_FAILED)));
     } finally {
       setIsPreparing(false);
     }
@@ -200,7 +208,7 @@ export function AgentChat({
                         >
                           <ChatAttachment.Preview />
                           <ChatAttachment.Remove
-                            aria-label={`Remove ${file.filename}`}
+                            aria-label={t`Remove ${file.filename}`}
                             onPress={() =>
                               setAttachments((current) =>
                                 current.filter((item) => item.id !== file.id),
@@ -214,7 +222,7 @@ export function AgentChat({
                 ) : null}
                 <PromptInput.TextArea
                   disabled={isResuming}
-                  placeholder="Ask about a meal or attach a photo…"
+                  placeholder={t`Ask about a meal or attach a photo…`}
                 />
               </PromptInput.Content>
               <PromptInput.Toolbar>
@@ -223,9 +231,9 @@ export function AgentChat({
                     render={(triggerProps) => (
                       <PromptInput.Action
                         {...triggerProps}
-                        aria-label="Add photo"
+                        aria-label={t`Add photo`}
                         isDisabled={isResuming || isPreparing}
-                        tooltip="Add photo"
+                        tooltip={t`Add photo`}
                       >
                         <Paperclip className="size-4" />
                       </PromptInput.Action>
@@ -233,7 +241,7 @@ export function AgentChat({
                   />
                 </PromptInput.ToolbarStart>
                 <PromptInput.ToolbarEnd>
-                  <PromptInput.Send aria-label={isBusy && !canSubmit ? "Stop" : "Send"}>
+                  <PromptInput.Send aria-label={isBusy && !canSubmit ? t`Stop` : t`Send`}>
                     {isBusy && !canSubmit ? (
                       <Square className="size-3 fill-current" />
                     ) : (
@@ -282,8 +290,8 @@ export function AgentChat({
               {errorMessage ? <ErrorMessage message={errorMessage} /> : null}
             </ChatConversation.Content>
             <ChatConversation.ScrollButton
-              aria-label="Scroll to bottom"
-              tooltip="Scroll to bottom"
+              aria-label={t`Scroll to bottom`}
+              tooltip={t`Scroll to bottom`}
             />
           </ChatConversation>
           <div className="mx-auto w-full max-w-3xl shrink-0 px-4 pt-3 pb-4 sm:px-6">{composer}</div>
@@ -292,9 +300,11 @@ export function AgentChat({
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-8 px-4 pb-[10vh]">
           <EmptyState className="max-w-xl">
             <EmptyState.Header>
-              <EmptyState.Title>{AGENT_NAME}</EmptyState.Title>
+              <EmptyState.Title>
+                <Trans>Nutritionist</Trans>
+              </EmptyState.Title>
               <EmptyState.Description>
-                Ask about a meal or attach a photo to log what you ate.
+                <Trans>Ask about a meal or attach a photo to log what you ate.</Trans>
               </EmptyState.Description>
             </EmptyState.Header>
           </EmptyState>
@@ -314,7 +324,9 @@ function ErrorMessage({ message }: { readonly message: string }) {
             <CircleExclamation />
           </Alert.Indicator>
           <Alert.Content>
-            <Alert.Title>Request failed</Alert.Title>
+            <Alert.Title>
+              <Trans>Request failed</Trans>
+            </Alert.Title>
             <Alert.Description>{message}</Alert.Description>
           </Alert.Content>
         </Alert>
@@ -324,26 +336,28 @@ function ErrorMessage({ message }: { readonly message: string }) {
 }
 
 function PendingThinking() {
+  const { t } = useLingui();
+  const thinking = t`Thinking`;
   return (
     <ChatMessage.Assistant>
       <ChatMessage.Body>
-        <TextShimmer>Thinking</TextShimmer>
-        <ChatLoader.Dots label="Thinking" />
+        <TextShimmer>{thinking}</TextShimmer>
+        <ChatLoader.Dots label={thinking} />
       </ChatMessage.Body>
     </ChatMessage.Assistant>
   );
 }
 
-async function fileToPendingAttachment(file: File): Promise<PendingAttachment> {
+async function fileToPendingAttachment(file: File, readError: string): Promise<PendingAttachment> {
   return {
     filename: file.name,
     id: `${file.name}-${file.lastModified}-${crypto.randomUUID()}`,
     mediaType: file.type || "image/jpeg",
-    url: await fileToDataUrl(file),
+    url: await fileToDataUrl(file, readError),
   };
 }
 
-function fileToDataUrl(file: File): Promise<string> {
+function fileToDataUrl(file: File, readError: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -351,29 +365,28 @@ function fileToDataUrl(file: File): Promise<string> {
         resolve(reader.result);
         return;
       }
-      reject(new Error("Could not read the photo."));
+      reject(new Error(readError));
     };
     reader.onerror = () => {
-      reject(new Error("Could not read the photo."));
+      reject(new Error(readError));
     };
     reader.readAsDataURL(file);
   });
 }
 
-function toErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Unable to cancel the response.";
+function toErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
 }
 
 function getLatestTurnFailure(
   events: ReturnType<typeof useEveAgent>["events"],
+  modelUnavailable: string,
 ): string | undefined {
   for (let index = events.length - 1; index >= 0; index -= 1) {
     const event = events[index];
 
     if (event.type === "turn.failed") {
-      return event.data.code === "MODEL_CALL_FAILED"
-        ? "The model is temporarily unavailable. Please try again."
-        : event.data.message;
+      return event.data.code === "MODEL_CALL_FAILED" ? modelUnavailable : event.data.message;
     }
 
     if (event.type === "turn.completed" || event.type === "turn.cancelled") {

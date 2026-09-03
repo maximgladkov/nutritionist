@@ -21,8 +21,8 @@ export function toOpenFoodFactsCountry(code: string): string | null {
   return normalized === "gb" ? "uk" : normalized;
 }
 
-export function listCountries(): CountryOption[] {
-  const names = new Intl.DisplayNames(["en"], { type: "region" });
+export function listCountries(locale = "en"): CountryOption[] {
+  const names = new Intl.DisplayNames([locale], { type: "region" });
   const countries: CountryOption[] = [];
   for (let first = 65; first <= 90; first += 1) {
     for (let second = 65; second <= 90; second += 1) {
@@ -33,5 +33,5 @@ export function listCountries(): CountryOption[] {
       }
     }
   }
-  return countries.sort((a, b) => a.name.localeCompare(b.name, "en"));
+  return countries.sort((a, b) => a.name.localeCompare(b.name, locale));
 }

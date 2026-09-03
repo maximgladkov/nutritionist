@@ -1,19 +1,14 @@
 "use client";
 
+import { MEAL_LABELS } from "@/app/_components/i18n-labels";
+import { useAppLocale } from "@/app/_components/lingui-client-provider";
 import { NutrientMetricsRow } from "@/app/_components/nutrient-metrics-row";
 import { formatAmount } from "@/app/_components/nutrition-format";
 import type { MealGroupView } from "@/lib/meal-groups";
 import type { MealView } from "@/lib/meals";
 import { CircleDashed, Cup, Moon, Sun } from "@gravity-ui/icons";
 import { Accordion } from "@heroui/react";
-
-const MEAL_LABELS: Record<MealView["label"], string> = {
-  breakfast: "Breakfast",
-  dinner: "Dinner",
-  lunch: "Lunch",
-  other: "Other",
-  snack: "Snack",
-};
+import { useLingui } from "@lingui/react/macro";
 
 const MEAL_ICONS: Record<MealView["label"], typeof CircleDashed> = {
   breakfast: Cup,
@@ -24,11 +19,13 @@ const MEAL_ICONS: Record<MealView["label"], typeof CircleDashed> = {
 };
 
 export function MealGroupsAccordion({ groups }: { readonly groups: readonly MealGroupView[] }) {
+  const { t } = useLingui();
+  const { locale } = useAppLocale();
   if (groups.length === 0) {
     return null;
   }
   return (
-    <Accordion allowsMultipleExpanded className="w-full" variant="surface">
+    <Accordion allowsMultipleExpanded className="w-full" key={locale} variant="surface">
       {groups.map((group) => {
         const Icon = MEAL_ICONS[group.label];
         return (
@@ -40,7 +37,7 @@ export function MealGroupsAccordion({ groups }: { readonly groups: readonly Meal
                     <Icon />
                   </span>
                   <span className="text-foreground min-w-0 flex-1 truncate text-left text-sm font-medium">
-                    {MEAL_LABELS[group.label]}
+                    {t(MEAL_LABELS[group.label])}
                   </span>
                   <Accordion.Indicator />
                 </span>

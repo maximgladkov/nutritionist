@@ -1,6 +1,7 @@
 "use client";
 
 import { CompactGoalRing, DAY_RING_SIZE } from "@/app/_components/compact-goal-ring";
+import { useAppLocale } from "@/app/_components/lingui-client-provider";
 import { formatDayRingLabel } from "@/app/_components/nutrition-format";
 import { goalRingsForToday, hasAnyGoal, type GoalsView } from "@/lib/goal-values";
 import { NUTRITION_DAY_TODAY_INDEX } from "@/lib/summary-days";
@@ -10,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { Calendar as CalendarIcon } from "@gravity-ui/icons";
 import { endOfMonth, parseDate, startOfMonth, type CalendarDate } from "@internationalized/date";
 import { Calendar, Card, ScrollShadow, Skeleton } from "@heroui/react";
+import { useLingui } from "@lingui/react/macro";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
@@ -43,6 +45,8 @@ export function DayRingStrip({
   readonly selectedDate: string | null;
   readonly today: string | null;
 }) {
+  const { t } = useLingui();
+  const { locale } = useAppLocale();
   const parentRef = useRef<HTMLDivElement>(null);
   const growing = useRef(false);
   const pendingJump = useRef<string | null>(null);
@@ -287,8 +291,9 @@ export function DayRingStrip({
           <Card className="w-fit">
             <Card.Content>
             <Calendar
-              aria-label="Jump to date"
+              aria-label={t`Jump to date`}
               focusedValue={focusedDate ?? calendarValue}
+              key={locale}
               maxValue={parseDate(today)}
               minValue={parseDate(calendarMin)}
               value={calendarValue}
@@ -370,6 +375,7 @@ function DayRingCell({
   readonly selected: boolean;
   readonly today: string | null;
 }) {
+  const { i18n, t } = useLingui();
   const loading = !date || !bucket;
   const empty = bucket != null && bucket.mealCount === 0;
   const rings =
@@ -377,12 +383,18 @@ function DayRingCell({
       ? goalRingsForToday(goals, bucket.totals)
       : [];
 
-  const label = date && today ? formatDayRingLabel(date, today) : null;
+  const label = date && today
+    ? formatDayRingLabel(date, today, {
+        locale: i18n.locale,
+        todayLabel: t`Today`,
+        yesterdayLabel: t`Yesterday`,
+      })
+    : null;
 
   return (
     <button
       aria-current={selected ? "date" : undefined}
-      aria-label={label ? `${label.weekday}, ${label.date}` : "Loading day"}
+      aria-label={label ? `${label.weekday}, ${label.date}` : t`Loading day`}
       className={cn(
         "flex cursor-[var(--cursor-interactive)] flex-col items-center gap-1.5 rounded-2xl px-1 py-1",
         selected && "bg-surface-secondary",
@@ -422,11 +434,12 @@ function CalendarDayCell({
   readonly onToggle: () => void;
   readonly open: boolean;
 }) {
+  const { t } = useLingui();
   return (
     <button
       aria-current={open ? "true" : undefined}
       aria-expanded={open}
-      aria-label="Choose a date"
+      aria-label={t`Choose a date`}
       className={cn(
         "flex cursor-[var(--cursor-interactive)] flex-col items-center gap-1.5 rounded-2xl px-1 py-1",
         open && "bg-surface-secondary",

@@ -3,11 +3,13 @@ import {
   LinkAccountsSettings,
   LocationSettings,
   ReminderSettings,
+  SettingsHeading,
 } from "@/app/_components/settings-forms";
 import { FlashToast } from "@/app/_components/flash-toast";
 import { auth } from "@/auth";
-import { listCountries } from "@/lib/countries";
 import { getGoals } from "@/lib/goals";
+import { initLingui } from "@/lib/i18n/init-lingui";
+import { resolveRequestLocale } from "@/lib/i18n/request-locale";
 import { prisma } from "@/lib/prisma";
 import { reminderRowsFromState } from "@/lib/reminder-clock";
 import { listReminders } from "@/lib/reminders";
@@ -23,12 +25,13 @@ export default async function SettingsPage({
   if (!session?.user?.id) {
     redirect("/login?callbackUrl=/settings");
   }
+  const locale = await resolveRequestLocale(session.user.id);
+  initLingui(locale);
   const params = await searchParams;
   const profile = await prisma.userProfile.findUnique({
     where: { userId: session.user.id },
-    select: { country: true, timezone: true },
+    select: { country: true, locale: true, timezone: true },
   });
-  const countries = listCountries();
   const timeZones = listTimeZones();
   const goals = await getGoals(session.user.id);
   const reminderState = await listReminders(session.user.id);
@@ -41,10 +44,7 @@ export default async function SettingsPage({
 
   return (
     <div className="mx-auto flex w-full max-w-lg flex-col gap-6 overflow-y-auto px-6 py-8">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-foreground text-xl font-semibold">Settings</h1>
-        <p className="text-muted text-sm">Signed in as {session.user.email}</p>
-      </div>
+      <SettingsHeading email={session.user.email ?? undefined} />
       {params.notice ? (
         <FlashToast
           message={params.notice}
@@ -52,7 +52,6 @@ export default async function SettingsPage({
         />
       ) : null}
       <LocationSettings
-        countries={countries}
         defaultCountry={profile?.country ?? null}
         defaultTimezone={profile?.timezone ?? null}
         timeZones={timeZones}

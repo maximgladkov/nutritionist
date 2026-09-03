@@ -26,6 +26,7 @@ import type {
   EveMessagePart,
 } from "eve/react";
 import { useState } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 
 export type AgentInputResponse = {
   readonly optionId?: string;
@@ -123,8 +124,9 @@ function MessageAttachments({
 }: {
   readonly attachments: readonly (FileUIPart & { id: string })[];
 }) {
+  const { t } = useLingui();
   const [preview, setPreview] = useState<(FileUIPart & { id: string }) | undefined>();
-  const previewLabel = preview === undefined ? "Attachment" : (preview.filename ?? "Attachment");
+  const previewLabel = preview === undefined ? t`Attachment` : (preview.filename ?? t`Attachment`);
 
   return (
     <>
@@ -143,7 +145,7 @@ function MessageAttachments({
             <ChatAttachment
               mediaType="image"
               mimeType={file.mediaType}
-              name={file.filename ?? "Photo"}
+              name={file.filename ?? t`Photo`}
               src={file.url}
             >
               <ChatAttachment.Preview />
@@ -190,6 +192,7 @@ function AgentMessagePart({
   readonly onInputResponses: (responses: readonly AgentInputResponse[]) => void | Promise<void>;
   readonly part: EveMessagePart;
 }) {
+  const { t } = useLingui();
   switch (part.type) {
     case "step-start":
       return null;
@@ -198,10 +201,12 @@ function AgentMessagePart({
     case "reasoning":
       return (
         <ChainOfThought defaultExpanded isStreaming={part.state === "streaming"}>
-          <ChainOfThought.Trigger>Thinking</ChainOfThought.Trigger>
+          <ChainOfThought.Trigger>
+            <Trans>Thinking</Trans>
+          </ChainOfThought.Trigger>
           <ChainOfThought.Content>
             <ChainOfThought.Steps>
-              <ChainOfThought.Step label="Reasoning">{part.text}</ChainOfThought.Step>
+              <ChainOfThought.Step label={t`Reasoning`}>{part.text}</ChainOfThought.Step>
             </ChainOfThought.Steps>
           </ChainOfThought.Content>
         </ChainOfThought>
@@ -234,7 +239,7 @@ function AgentMessagePart({
             output={part.output}
             state={toChatToolState(part.state)}
             toolName={part.toolName}
-            triggerPrefix="Used tool: "
+            triggerPrefix={t`Used tool: `}
           />
           <InputRequestActions
             canRespond={canRespond}
@@ -258,6 +263,7 @@ function QuestionRequest({
   readonly inputResponse?: AgentInputResponse;
   readonly onInputResponses: (responses: readonly AgentInputResponse[]) => void | Promise<void>;
 }) {
+  const { t } = useLingui();
   const hasOptions = (inputRequest.options?.length ?? 0) > 0;
   const acceptsFreeform = inputRequest.allowFreeform === true || !hasOptions;
   const [text, setText] = useState(inputResponse?.text ?? "");
@@ -319,13 +325,15 @@ function QuestionRequest({
             value={text}
             onChange={setText}
           >
-            <Label className="sr-only">Answer</Label>
-            <Input placeholder="Type your answer…" />
+            <Label className="sr-only">
+              <Trans>Answer</Trans>
+            </Label>
+            <Input placeholder={t`Type your answer…`} />
           </TextField>
           {inputResponse === undefined && text.trim().length > 0 ? (
             <Button
               isIconOnly
-              aria-label="Answer"
+              aria-label={t`Answer`}
               isDisabled={disabled}
               onPress={() => {
                 void submitText();
@@ -443,7 +451,9 @@ function InputRequestActions({
         <Alert.Description>{inputRequest.prompt}</Alert.Description>
         {inputResponse ? (
           <p className="text-foreground mt-2 text-sm font-medium">
-            Responded: {selectedOption?.label ?? inputResponse.text ?? inputResponse.optionId}
+            <Trans>
+              Responded: {selectedOption?.label ?? inputResponse.text ?? inputResponse.optionId}
+            </Trans>
           </p>
         ) : (
           <div className="mt-2 flex flex-wrap gap-2">

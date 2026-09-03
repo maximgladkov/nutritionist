@@ -1,6 +1,9 @@
-import { signIn } from "@/auth";
+import { Trans } from "@lingui/react/macro";
 import { Alert, Button, Card, Form, Input, Label, TextField } from "@heroui/react";
+import { signIn } from "@/auth";
 import { readAuthJwt } from "@/lib/auth-cookies";
+import { initLingui } from "@/lib/i18n/init-lingui";
+import { resolveRequestLocale } from "@/lib/i18n/request-locale";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -13,6 +16,8 @@ export default async function LoginPage({
   if (token?.sub) {
     redirect("/s");
   }
+  const locale = await resolveRequestLocale();
+  initLingui(locale);
   const params = await searchParams;
   const callbackUrl = params.callbackUrl ?? "/s";
 
@@ -20,9 +25,13 @@ export default async function LoginPage({
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-6">
       <Card>
         <Card.Header>
-          <Card.Title>Nutritionist</Card.Title>
+          <Card.Title>
+            <Trans>Nutritionist</Trans>
+          </Card.Title>
           <Card.Description>
-            Sign in with a magic link to chat on the web and link Telegram or WhatsApp.
+            <Trans>
+              Sign in with a magic link to chat on the web and link Telegram or WhatsApp.
+            </Trans>
           </Card.Description>
         </Card.Header>
         <Card.Content className="flex flex-col gap-4">
@@ -30,8 +39,12 @@ export default async function LoginPage({
             <Alert status="danger">
               <Alert.Indicator />
               <Alert.Content>
-                <Alert.Title>Could not send a sign-in email</Alert.Title>
-                <Alert.Description>Check the address and try again.</Alert.Description>
+                <Alert.Title>
+                  <Trans>Could not send a sign-in email</Trans>
+                </Alert.Title>
+                <Alert.Description>
+                  <Trans>Check the address and try again.</Trans>
+                </Alert.Description>
               </Alert.Content>
             </Alert>
           ) : null}
@@ -47,11 +60,13 @@ export default async function LoginPage({
             }}
           >
             <TextField isRequired autoComplete="email" name="email" type="email">
-              <Label>Email</Label>
+              <Label>
+                <Trans>Email</Trans>
+              </Label>
               <Input placeholder="you@example.com" />
             </TextField>
             <Button className="w-full" type="submit">
-              Email me a sign-in link
+              <Trans>Email me a sign-in link</Trans>
             </Button>
           </Form>
         </Card.Content>

@@ -21,16 +21,22 @@ export function formatAmount(amount: number, unit: AmountUnit): string {
   return `${rounded} ${unit}`;
 }
 
-export function formatDayRingLabel(date: string, today: string): { date: string; weekday: string } | null {
+export function formatDayRingLabel(
+  date: string,
+  today: string,
+  options: { locale: string; todayLabel: string; yesterdayLabel: string },
+): { date: string; weekday: string } | null {
   const parts = parseYmd(date);
   if (!parts) {
     return null;
   }
   const utc = new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
   const todayParts = parseYmd(today);
-  let weekday = new Intl.DateTimeFormat("en-GB", { weekday: "short", timeZone: "UTC" }).format(utc);
+  let weekday = new Intl.DateTimeFormat(options.locale, { weekday: "short", timeZone: "UTC" }).format(
+    utc,
+  );
   if (date === today) {
-    weekday = "Today";
+    weekday = options.todayLabel;
   } else if (todayParts) {
     const yesterday = new Date(Date.UTC(todayParts.year, todayParts.month - 1, todayParts.day - 1));
     if (
@@ -38,10 +44,10 @@ export function formatDayRingLabel(date: string, today: string): { date: string;
       yesterday.getUTCMonth() + 1 === parts.month &&
       yesterday.getUTCDate() === parts.day
     ) {
-      weekday = "Yesterday";
+      weekday = options.yesterdayLabel;
     }
   }
-  const dateLine = new Intl.DateTimeFormat("en-GB", {
+  const dateLine = new Intl.DateTimeFormat(options.locale, {
     day: "numeric",
     month: "short",
     timeZone: "UTC",
