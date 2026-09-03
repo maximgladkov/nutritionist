@@ -1,11 +1,8 @@
-import { Card } from "@heroui/react";
 import {
   DailyGoalsSettings,
-  ConsumeLinkCodeSettings,
-  CountrySettings,
-  LinkCodeSettings,
+  LinkAccountsSettings,
+  LocationSettings,
   ReminderSettings,
-  TimezoneSettings,
 } from "@/app/_components/settings-forms";
 import { FlashToast } from "@/app/_components/flash-toast";
 import { auth } from "@/auth";
@@ -54,21 +51,19 @@ export default async function SettingsPage({
           variant={params.noticeKind === "danger" ? "danger" : "success"}
         />
       ) : null}
-      <CountrySettings countries={countries} defaultCountry={profile?.country ?? null} />
+      <LocationSettings
+        countries={countries}
+        defaultCountry={profile?.country ?? null}
+        defaultTimezone={profile?.timezone ?? null}
+        timeZones={timeZones}
+      />
       <DailyGoalsSettings defaultGoals={goals} />
-      <TimezoneSettings defaultTimezone={profile?.timezone ?? null} timeZones={timeZones} />
-      {profile?.timezone ? (
-        <ReminderSettings reminders={reminderRowsFromState(remindersByLabel)} />
-      ) : (
-        <Card>
-          <Card.Header>
-            <Card.Title>Meal Reminders</Card.Title>
-            <Card.Description>Save a time zone first to turn reminders on.</Card.Description>
-          </Card.Header>
-        </Card>
-      )}
-      <LinkCodeSettings />
-      <ConsumeLinkCodeSettings />
+      <ReminderSettings
+        key={profile?.timezone ?? "none"}
+        reminders={reminderRowsFromState(remindersByLabel)}
+        timezone={profile?.timezone ?? null}
+      />
+      <LinkAccountsSettings showConsume />
     </div>
   );
 }

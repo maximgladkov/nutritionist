@@ -176,6 +176,13 @@ enum MealLabel {
   other
 }
 
+enum ReminderLabel {
+  breakfast
+  lunch
+  dinner
+  summary
+}
+
 enum MealItemUnit {
   g
   ml
@@ -186,7 +193,7 @@ model MealReminder {
   id          String    @id @default(cuid())
   userId      String
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  label       MealLabel
+  label       ReminderLabel
   enabled     Boolean   @default(true)
   hour        Int
   minute      Int       @default(0)

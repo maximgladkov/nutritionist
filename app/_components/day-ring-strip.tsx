@@ -21,6 +21,7 @@ const DOUBLE_TAP_MS = 400;
 const CALENDAR_YEARS = 10;
 
 export function DayRingStrip({
+  active = true,
   calendarOpen,
   daysByDate,
   goals,
@@ -31,6 +32,7 @@ export function DayRingStrip({
   selectedDate,
   today,
 }: {
+  readonly active?: boolean;
   readonly calendarOpen: boolean;
   readonly daysByDate: Readonly<Record<string, NutritionDayBucket>>;
   readonly goals: GoalsView | null;
@@ -45,6 +47,7 @@ export function DayRingStrip({
   const growing = useRef(false);
   const pendingJump = useRef<string | null>(null);
   const lastTap = useRef<{ at: number; date: string } | null>(null);
+  const wasActive = useRef(active);
   const [count, setCount] = useState(INITIAL_COUNT);
   const [aligned, setAligned] = useState(false);
   const [edgePad, setEdgePad] = useState(0);
@@ -103,6 +106,24 @@ export function DayRingStrip({
     },
     [count, onCalendarOpenChange, onSelectDate, scrollToDate, today],
   );
+
+  useLayoutEffect(() => {
+    if (!active || wasActive.current || !today) {
+      wasActive.current = active;
+      return;
+    }
+    wasActive.current = active;
+    const element = parentRef.current;
+    const pad = element ? Math.max(0, element.clientWidth / 2 - CELL_WIDTH / 2) : edgePad;
+    if (element && pad !== edgePad) {
+      pendingJump.current = today;
+      setEdgePad(pad);
+      onCalendarOpenChange(false);
+      onSelectDate(today);
+      return;
+    }
+    jumpToDate(today, "auto");
+  }, [active, edgePad, jumpToDate, onCalendarOpenChange, onSelectDate, today]);
 
   const selectDate = useCallback(
     (date: string) => {

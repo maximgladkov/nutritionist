@@ -5,7 +5,7 @@ import { requireUser } from "../lib/require-user";
 
 export default defineTool({
   description:
-    "Get the caller's meal check-in reminders: whether each is enabled, the local clock time, timezone, and next run.",
+    "Get the caller's check-in reminders: whether each is enabled, the local clock time, timezone, and next run.",
   inputSchema: z.object({}),
   async execute(_input, ctx) {
     const { userId } = await requireUser(ctx);

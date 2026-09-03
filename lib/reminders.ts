@@ -1,26 +1,30 @@
 import type { ChannelName } from "./principal.ts";
 import { prisma } from "./prisma.ts";
 import {
+  checkInPrompt,
   DEFAULT_REMINDER_TIMES,
   formatClock,
+  isMealCheckInLabel,
   isReminderLabel,
   isValidClock,
   parseClock,
   REMINDER_LABELS,
+  type MealCheckInLabel,
   type ReminderLabel,
 } from "./reminder-clock.ts";
 import { localDayRange, nextLocalOccurrence } from "./timezone.ts";
-import type { MealLabel } from "../generated/prisma/client";
 
 export {
+  checkInPrompt,
   DEFAULT_REMINDER_TIMES,
   formatClock,
+  isMealCheckInLabel,
   isReminderLabel,
   isValidClock,
   parseClock,
   REMINDER_LABELS,
 };
-export type { ReminderLabel };
+export type { MealCheckInLabel, ReminderLabel };
 
 const CLAIM_LIMIT = 25;
 const LEASE_MS = 50 * 60_000;
@@ -65,7 +69,7 @@ export class ReminderError extends Error {
 }
 
 export function toReminderView(row: {
-  label: MealLabel;
+  label: string;
   enabled: boolean;
   hour: number;
   minute: number;
@@ -189,7 +193,12 @@ export async function rescheduleReminders(
 
 export async function seedRemindersForUsersWithTimezone(now: Date = new Date()): Promise<void> {
   const profiles = await prisma.userProfile.findMany({
-    where: { timezone: { not: null }, user: { reminders: { none: {} } } },
+    where: {
+      timezone: { not: null },
+      OR: REMINDER_LABELS.map((label) => ({
+        user: { reminders: { none: { label } } },
+      })),
+    },
     select: { userId: true, timezone: true },
     take: 50,
   });
@@ -314,7 +323,7 @@ export async function reminderFiredToday(input: {
 
 export async function mealAlreadyLoggedToday(input: {
   userId: string;
-  label: ReminderLabel;
+  label: MealCheckInLabel;
   timeZone: string;
   now?: Date;
 }): Promise<boolean> {
@@ -359,14 +368,6 @@ export async function resolveReachTarget(userId: string): Promise<ReachTarget | 
     return { channel: "web", sessionId: latestSession.eveSessionId };
   }
   return null;
-}
-
-export function checkInPrompt(label: ReminderLabel): string {
-  return [
-    `This is a scheduled ${label} check-in.`,
-    `Ask briefly how ${label} went and offer to log it.`,
-    "Be warm and short. Do not mention schedules, cron, or that this message was automated.",
-  ].join(" ");
 }
 
 async function applyReminderPatch(

@@ -1,59 +1,123 @@
 "use server";
 
-import { auth } from "@/auth";
 import { consumeLinkCode, createLinkCode } from "@/lib/identity";
-import { normalizeCountryCode } from "@/lib/countries";
-import { GoalError, type GoalsView } from "@/lib/goal-values";
-import { saveGoals } from "@/lib/goals";
+import { resolveAppUser } from "@/lib/app-user";
+import { listCountries, normalizeCountryCode, type CountryOption } from "@/lib/countries";
+import { GoalError, type GoalsPatch, type GoalsView } from "@/lib/goal-values";
+import { getGoals, saveGoals } from "@/lib/goals";
 import { prisma } from "@/lib/prisma";
+import {
+  reminderRowsFromState,
+  type ReminderClock,
+  type ReminderLabel,
+} from "@/lib/reminder-clock";
 import {
   REMINDER_LABELS,
   ensureDefaultReminders,
+  listReminders,
   rescheduleReminders,
   saveReminders,
-  type ReminderLabel,
 } from "@/lib/reminders";
-import { normalizeTimezone } from "@/lib/timezone";
+import { listTimeZones, normalizeTimezone } from "@/lib/timezone";
 import { redirect } from "next/navigation";
 
 const REMINDER_TITLES: Record<ReminderLabel, string> = {
   breakfast: "Breakfast",
   lunch: "Lunch",
   dinner: "Dinner",
+  summary: "Daily summary",
 };
 
-async function requireUserId(): Promise<string> {
-  const current = await auth();
-  if (!current?.user?.id) {
-    redirect("/login?callbackUrl=/settings");
+export type SettingsNotice = {
+  readonly message: string;
+  readonly ok: boolean;
+};
+
+export type MiniAppSettingsPayload = {
+  readonly countries: readonly CountryOption[];
+  readonly country: string | null;
+  readonly goals: GoalsView;
+  readonly reminders: Readonly<Record<ReminderLabel, ReminderClock>>;
+  readonly timeZones: readonly string[];
+  readonly timezone: string | null;
+};
+
+export type MiniAppSettingsResult =
+  | { ok: true; data: MiniAppSettingsPayload }
+  | { ok: false; error: string };
+
+async function requireUserId(initData?: string): Promise<string | SettingsNotice> {
+  const user = await resolveAppUser(initData);
+  if (user.ok) {
+    return user.userId;
   }
-  return current.user.id;
+  if (initData !== undefined) {
+    return { message: user.error, ok: false };
+  }
+  redirect("/login?callbackUrl=/settings");
 }
 
-function noticeRedirect(message: string, variant: "danger" | "success" = "success"): never {
-  const params = new URLSearchParams({ notice: message, noticeKind: variant });
-  redirect(`/settings?${params.toString()}`);
+function notice(message: string, variant: "danger" | "success" = "success"): SettingsNotice {
+  return { message, ok: variant !== "danger" };
 }
 
-export async function saveCountryAction(raw: string) {
-  const userId = await requireUserId();
+export async function getMiniAppSettingsAction(input: {
+  initData?: string;
+}): Promise<MiniAppSettingsResult> {
+  const user = await resolveAppUser(input.initData);
+  if (!user.ok) {
+    return { error: user.error, ok: false };
+  }
+  const profile = await prisma.userProfile.findUnique({
+    where: { userId: user.userId },
+    select: { country: true, timezone: true },
+  });
+  const goals = await getGoals(user.userId);
+  const reminderState = await listReminders(user.userId);
+  const remindersByLabel = new Map(
+    reminderState.reminders.map((row) => [
+      row.label,
+      { enabled: row.enabled, hour: row.hour, minute: row.minute },
+    ]),
+  );
+  return {
+    data: {
+      countries: listCountries(),
+      country: profile?.country ?? null,
+      goals,
+      reminders: reminderRowsFromState(remindersByLabel),
+      timeZones: listTimeZones(),
+      timezone: profile?.timezone ?? null,
+    },
+    ok: true,
+  };
+}
+
+export async function saveCountryAction(raw: string, initData?: string): Promise<SettingsNotice> {
+  const userId = await requireUserId(initData);
+  if (typeof userId !== "string") {
+    return userId;
+  }
   const trimmed = raw.trim();
   const country = trimmed === "" ? null : normalizeCountryCode(trimmed);
   if (trimmed !== "" && !country) {
-    noticeRedirect("Choose a valid country.", "danger");
+    return notice("Choose a valid country.", "danger");
   }
   await prisma.userProfile.upsert({
     where: { userId },
     create: { userId, country },
     update: { country },
   });
-  noticeRedirect(
+  return notice(
     country ? "Country saved." : "Country cleared. Lookups use the worldwide catalog.",
   );
 }
 
-export async function saveGoalsAction(patch: GoalsView) {
-  const userId = await requireUserId();
+export async function saveGoalsAction(patch: GoalsPatch, initData?: string): Promise<SettingsNotice> {
+  const userId = await requireUserId(initData);
+  if (typeof userId !== "string") {
+    return userId;
+  }
   try {
     await saveGoals(userId, patch);
   } catch (error) {
@@ -61,17 +125,20 @@ export async function saveGoalsAction(patch: GoalsView) {
       error instanceof GoalError || (error instanceof Error && error.name === "GoalError")
         ? error.message
         : "Could not save those goals.";
-    noticeRedirect(message, "danger");
+    return notice(message, "danger");
   }
-  noticeRedirect("Daily goals saved.");
+  return notice("Daily goals saved.");
 }
 
-export async function saveTimezoneAction(raw: string) {
-  const userId = await requireUserId();
+export async function saveTimezoneAction(raw: string, initData?: string): Promise<SettingsNotice> {
+  const userId = await requireUserId(initData);
+  if (typeof userId !== "string") {
+    return userId;
+  }
   const trimmed = raw.trim();
   const timezone = trimmed === "" ? null : normalizeTimezone(trimmed);
   if (trimmed !== "" && !timezone) {
-    noticeRedirect("Choose a valid time zone.", "danger");
+    return notice("Choose a valid time zone.", "danger");
   }
   await prisma.userProfile.upsert({
     where: { userId },
@@ -82,7 +149,7 @@ export async function saveTimezoneAction(raw: string) {
     await ensureDefaultReminders(userId, timezone);
     await rescheduleReminders(userId, timezone);
   }
-  noticeRedirect(timezone ? "Time zone saved." : "Time zone cleared.");
+  return notice(timezone ? "Time zone saved." : "Time zone cleared.");
 }
 
 export async function saveRemindersAction(
@@ -92,11 +159,15 @@ export async function saveRemindersAction(
     label: ReminderLabel;
     minute: number;
   }>,
-) {
-  const userId = await requireUserId();
+  initData?: string,
+): Promise<SettingsNotice> {
+  const userId = await requireUserId(initData);
+  if (typeof userId !== "string") {
+    return userId;
+  }
   try {
     if (patches.length !== REMINDER_LABELS.length) {
-      throw new Error("Choose a valid time for each meal.");
+      throw new Error("Choose a valid time for each check-in.");
     }
     await saveReminders({
       userId,
@@ -109,22 +180,28 @@ export async function saveRemindersAction(
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not save reminders.";
-    noticeRedirect(message, "danger");
+    return notice(message, "danger");
   }
-  noticeRedirect("Reminders saved.");
+  return notice("Reminders saved.");
 }
 
-export async function generateLinkCodeAction() {
-  const userId = await requireUserId();
+export async function generateLinkCodeAction(initData?: string): Promise<SettingsNotice> {
+  const userId = await requireUserId(initData);
+  if (typeof userId !== "string") {
+    return userId;
+  }
   const { code } = await createLinkCode(userId);
-  noticeRedirect(`Your code is ${code}. It expires in 10 minutes.`);
+  return notice(`Your code is ${code}. It expires in 10 minutes.`);
 }
 
-export async function consumeLinkCodeAction(code: string) {
-  const userId = await requireUserId();
+export async function consumeLinkCodeAction(code: string, initData?: string): Promise<SettingsNotice> {
+  const userId = await requireUserId(initData);
+  if (typeof userId !== "string") {
+    return userId;
+  }
   const result = await consumeLinkCode(code, userId);
   const ok = result.status === "merged" || result.status === "linked" || result.status === "already";
-  const notice =
+  const message =
     result.status === "merged" || result.status === "linked"
       ? "Accounts linked. Memory now follows you across channels."
       : result.status === "already"
@@ -134,5 +211,5 @@ export async function consumeLinkCodeAction(code: string) {
           : result.status === "both-have-email"
             ? "Those accounts both have email sign-in and cannot be merged."
             : "That code is not valid.";
-  noticeRedirect(notice, ok ? "success" : "danger");
+  return notice(message, ok ? "success" : "danger");
 }

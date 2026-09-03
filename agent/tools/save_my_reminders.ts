@@ -18,9 +18,9 @@ const reminderPatchSchema = z
 
 export default defineTool({
   description:
-    "Change the caller's meal check-in reminders. Pass one or more of breakfast, lunch, and dinner. hour and minute are local clock time in the saved timezone (0-23 and 0-59). A timezone must already be saved. Enabling a reminder or changing its time reschedules the next run. Never pass another person's id.",
+    "Change the caller's check-in reminders. Pass one or more of breakfast, lunch, dinner, and summary. hour and minute are local clock time in the saved timezone (0-23 and 0-59). A timezone must already be saved. Enabling a reminder or changing its time reschedules the next run. Never pass another person's id.",
   inputSchema: z.object({
-    reminders: z.array(reminderPatchSchema).min(1).max(3),
+    reminders: z.array(reminderPatchSchema).min(1).max(4),
   }),
   async execute({ reminders }, ctx) {
     const { userId } = await requireUser(ctx);

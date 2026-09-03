@@ -3,6 +3,8 @@
 import { DayRingStrip } from "@/app/_components/day-ring-strip";
 import { DayTotalsRow } from "@/app/_components/day-totals-row";
 import { MealGroupsAccordion } from "@/app/_components/meal-groups-accordion";
+import { useMiniAppFoodActive } from "@/app/_components/mini-app-shell";
+import { bootTelegramWebApp, telegramWebApp } from "@/app/_components/telegram-webapp-client";
 import {
   getNutritionDayAction,
   getNutritionDaysAction,
@@ -28,14 +30,6 @@ import useSWR from "swr";
 type DiarySWRKey = readonly ["nutrition-diary", string];
 type DaySWRKey = readonly ["nutrition-day", string, string];
 type DaysSWRKey = readonly ["nutrition-days", string, string];
-
-type TelegramWebApp = {
-  expand: () => void;
-  initData: string;
-  offEvent?: (event: string, callback: () => void) => void;
-  onEvent?: (event: string, callback: () => void) => void;
-  ready: () => void;
-};
 
 async function fetchDiary([, initData]: DiarySWRKey): Promise<NutritionDiaryPayload> {
   const result = await getNutritionDiaryAction({ initData: initData || undefined });
@@ -97,6 +91,7 @@ export function NutritionSummaryApp({
   const [daysByDate, setDaysByDate] = useState<Record<string, NutritionDayBucket>>(() =>
     bucketsFromDiary(initial),
   );
+  const foodActive = useMiniAppFoodActive();
 
   useEffect(() => {
     if (!embed) {
@@ -222,7 +217,7 @@ export function NutritionSummaryApp({
     <div
       className={
         embed
-          ? "mx-auto flex w-full max-w-lg flex-col gap-3 overflow-y-auto px-3 py-3"
+          ? "mx-auto flex w-full max-w-lg flex-col gap-3 px-3 py-3"
           : "mx-auto flex w-full max-w-lg flex-col gap-5 overflow-y-auto px-4 py-6 sm:px-6 sm:py-8"
       }
     >
@@ -233,6 +228,7 @@ export function NutritionSummaryApp({
         </div>
       )}
       <DayRingStrip
+        active={foodActive}
         calendarOpen={calendarOpen}
         daysByDate={daysByDate}
         goals={goals}
@@ -365,35 +361,4 @@ function windowIsCached(
 
 function firstError(...errors: unknown[]): unknown {
   return errors.find((error) => error != null);
-}
-
-function bootTelegramWebApp(onReady: (initData: string) => void): () => void {
-  const existing = telegramWebApp();
-  if (existing) {
-    existing.ready();
-    existing.expand();
-    onReady(existing.initData);
-    return () => {};
-  }
-  const script = document.createElement("script");
-  script.src = "https://telegram.org/js/telegram-web-app.js";
-  script.async = true;
-  script.onload = () => {
-    const bridge = telegramWebApp();
-    bridge?.ready();
-    bridge?.expand();
-    onReady(bridge?.initData ?? "");
-  };
-  script.onerror = () => {
-    onReady("");
-  };
-  document.head.appendChild(script);
-  return () => {
-    script.remove();
-  };
-}
-
-function telegramWebApp(): TelegramWebApp | undefined {
-  const telegram = (window as Window & { Telegram?: { WebApp?: TelegramWebApp } }).Telegram;
-  return telegram?.WebApp;
 }

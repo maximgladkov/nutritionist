@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { headers } from "next/headers";
 import type { ReactNode } from "react";
@@ -25,6 +25,11 @@ const mono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Nutritionist",
   description: "A nutritionist agent with web, Telegram, and WhatsApp chat.",
+};
+
+export const viewport: Viewport = {
+  viewportFit: "cover",
+  width: "device-width",
 };
 
 export default async function RootLayout({ children }: { readonly children: ReactNode }) {

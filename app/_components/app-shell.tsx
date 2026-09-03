@@ -5,6 +5,7 @@ import { Button } from "@heroui/react";
 import { AppLayout, Navbar, Sidebar } from "@heroui-pro/react";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
+import { MiniAppShell } from "@/app/_components/mini-app-shell";
 import { signOutAction } from "@/app/actions/auth";
 
 export function AppShell({
@@ -23,8 +24,12 @@ export function AppShell({
   const isSummary = pathname.startsWith("/summary");
   const title = isSettings ? "Settings" : isSummary ? "Summary" : "Chat";
 
-  if (pathname === "/login" || embed) {
+  if (pathname === "/login") {
     return children;
+  }
+
+  if (embed) {
+    return <MiniAppShell>{children}</MiniAppShell>;
   }
 
   return (

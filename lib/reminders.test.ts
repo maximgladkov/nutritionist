@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  checkInPrompt,
   DEFAULT_REMINDER_TIMES,
   formatClock,
+  isMealCheckInLabel,
   isReminderLabel,
   isValidClock,
   parseClock,
@@ -26,17 +28,34 @@ describe("reminder clocks", () => {
     assert.equal(isValidClock(8.5, 0), false);
   });
 
-  it("recognizes meal check-in labels", () => {
+  it("recognizes meal and summary check-in labels", () => {
     assert.equal(isReminderLabel("breakfast"), true);
+    assert.equal(isReminderLabel("summary"), true);
     assert.equal(isReminderLabel("snack"), false);
+    assert.equal(isMealCheckInLabel("breakfast"), true);
+    assert.equal(isMealCheckInLabel("summary"), false);
+  });
+});
+
+describe("check-in prompts", () => {
+  it("asks how a meal went", () => {
+    assert.match(checkInPrompt("lunch"), /how lunch went/);
+  });
+
+  it("asks for a day recap on the summary check-in", () => {
+    const prompt = checkInPrompt("summary");
+    assert.match(prompt, /daily summary/);
+    assert.match(prompt, /get_nutrition_summary/);
+    assert.doesNotMatch(prompt, /how summary went/);
   });
 });
 
 describe("default reminder times", () => {
-  it("uses breakfast 10:00, lunch 14:00, and dinner 21:00", () => {
+  it("uses breakfast 10:00, lunch 14:00, dinner 21:00, and summary 22:00", () => {
     assert.deepEqual(DEFAULT_REMINDER_TIMES.breakfast, { hour: 10, minute: 0 });
     assert.deepEqual(DEFAULT_REMINDER_TIMES.lunch, { hour: 14, minute: 0 });
     assert.deepEqual(DEFAULT_REMINDER_TIMES.dinner, { hour: 21, minute: 0 });
+    assert.deepEqual(DEFAULT_REMINDER_TIMES.summary, { hour: 22, minute: 0 });
   });
 });
 

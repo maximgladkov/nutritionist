@@ -7,6 +7,7 @@ import {
   checkInPrompt,
   claimDueReminders,
   completeReminder,
+  isMealCheckInLabel,
   mealAlreadyLoggedToday,
   missingTimezoneRetryAt,
   reminderFiredToday,
@@ -43,7 +44,10 @@ async function dispatchOne(to: ScheduleToFn, job: ClaimedReminder): Promise<void
       await completeReminder(job);
       return;
     }
-    if (await mealAlreadyLoggedToday({ label: job.label, timeZone, userId: job.userId })) {
+    if (
+      isMealCheckInLabel(job.label) &&
+      (await mealAlreadyLoggedToday({ label: job.label, timeZone, userId: job.userId }))
+    ) {
       await completeReminder(job);
       return;
     }
