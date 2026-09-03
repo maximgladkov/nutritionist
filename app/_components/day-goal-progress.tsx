@@ -47,7 +47,7 @@ const GOAL_ICONS: Record<GoalRingId, ComponentType<SVGProps<SVGSVGElement>>> = {
 export function DayGoalProgress({ rings }: { readonly rings: readonly GoalRing[] }) {
   const bars = BAR_ORDER.flatMap((id) => rings.filter((ring) => ring.id === id));
   return (
-    <ScrollShadow hideScrollBar className="w-full" orientation="horizontal">
+    <ScrollShadow hideScrollBar className="w-full p-1 -m-1" orientation="horizontal">
       <div className="flex items-start gap-3">
         {bars.map((ring) => (
           <NutrientCard featured={ring.id === "calories"} key={ring.id} ring={ring} />
