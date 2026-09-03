@@ -14,11 +14,10 @@ import { Widget } from "@heroui-pro/react";
 import { Button, Tooltip } from "@heroui/react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { usePathname } from "next/navigation";
-import { useLayoutEffect, useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useState, type ReactNode } from "react";
 
 const DESKTOP_MQ = "(min-width: 1024px)";
-const WIDGET_FRAME =
-  "shadow-overlay ring-foreground/8 h-[min(44rem,70dvh)] w-[min(25rem,100vw)] shrink-0 ring-1";
+const SCREEN_SIZE = "h-[min(44rem,72dvh)] w-[36vw] min-w-[22rem]";
 
 export function useDesktopLayout() {
   const [matches, setMatches] = useState<boolean | null>(null);
@@ -41,7 +40,7 @@ export function useDesktopLayout() {
 export function DesktopWorkspace({ email }: { readonly email?: string }) {
   const { t } = useLingui();
   const pathname = usePathname();
-  const [front, setFront] = useState<DesktopWidgetId>("chat");
+  const [front, setFront] = useState<DesktopWidgetId>("summary");
   const chat = chatSessionFromPath(pathname);
   const api = useMemo(
     () => ({
@@ -52,8 +51,8 @@ export function DesktopWorkspace({ email }: { readonly email?: string }) {
 
   return (
     <DesktopWorkspaceContext.Provider value={api}>
-      <div className="bg-background relative h-dvh overflow-x-auto">
-        <div className="absolute top-4 right-6 z-20 flex max-w-[min(24rem,calc(100%-2rem))] items-center gap-3">
+      <div className="bg-background relative h-dvh overflow-hidden">
+        <div className="absolute top-4 right-6 z-40 flex max-w-[min(24rem,calc(100%-2rem))] items-center gap-3">
           {email ? <p className="text-muted min-w-0 truncate text-sm">{email}</p> : null}
           <form action={signOutAction}>
             <Tooltip delay={0}>
@@ -66,58 +65,83 @@ export function DesktopWorkspace({ email }: { readonly email?: string }) {
             </Tooltip>
           </form>
         </div>
-        <div className="flex h-full items-center justify-around gap-2 px-8">
-          <Widget
-            aria-label={t`Chat`}
-            className={cn(WIDGET_FRAME, "-rotate-1 -translate-y-6", front === "chat" && "z-10")}
-            onPointerDown={() => setFront("chat")}
-          >
-            <Widget.Header>
-              <Widget.Title>
-                <Trans>Chat</Trans>
-              </Widget.Title>
-            </Widget.Header>
-            <Widget.Content className="flex min-h-0 flex-col p-0">
-              <AgentChat
-                compact
-                key={chat.sessionId ?? (chat.sessionless ? "new" : "home")}
-                sessionId={chat.sessionId}
-                sessionless={chat.sessionless}
-              />
-            </Widget.Content>
-          </Widget>
-          <Widget
-            aria-label={t`Summary`}
-            className={cn(WIDGET_FRAME, "translate-y-8", front === "summary" && "z-10")}
-            onPointerDown={() => setFront("summary")}
-          >
-            <Widget.Header>
-              <Widget.Title>
-                <Trans>Summary</Trans>
-              </Widget.Title>
-            </Widget.Header>
-            <Widget.Content className="min-h-0 p-0">
-              <NutritionSummaryApp compact embed={false} />
-            </Widget.Content>
-          </Widget>
-          <Widget
-            aria-label={t`Settings`}
-            className={cn(WIDGET_FRAME, "rotate-1 -translate-y-2", front === "settings" && "z-10")}
-            onPointerDown={() => setFront("settings")}
-          >
-            <Widget.Header>
-              <Widget.Title>
-                <Trans>Settings</Trans>
-              </Widget.Title>
-            </Widget.Header>
-            <Widget.Content className="min-h-0 p-0">
-              <DesktopSettings />
-            </Widget.Content>
-          </Widget>
-        </div>
+        <DesktopScreen
+          className="top-[12%] left-[5vw] -translate-y-4 -rotate-2"
+          front={front}
+          id="chat"
+          label={t`Chat`}
+          onFront={setFront}
+        >
+          <AgentChat
+            compact
+            key={chat.sessionId ?? (chat.sessionless ? "new" : "home")}
+            sessionId={chat.sessionId}
+            sessionless={chat.sessionless}
+          />
+        </DesktopScreen>
+        <DesktopScreen
+          className="top-[16%] left-1/2 -translate-x-1/2 translate-y-4"
+          front={front}
+          id="summary"
+          label={t`Summary`}
+          onFront={setFront}
+        >
+          <NutritionSummaryApp compact embed={false} />
+        </DesktopScreen>
+        <DesktopScreen
+          className="top-[13%] right-[5vw] -translate-y-1 rotate-2"
+          front={front}
+          id="settings"
+          label={t`Settings`}
+          onFront={setFront}
+        >
+          <DesktopSettings />
+        </DesktopScreen>
       </div>
     </DesktopWorkspaceContext.Provider>
   );
+}
+
+function DesktopScreen({
+  children,
+  className,
+  front,
+  id,
+  label,
+  onFront,
+}: {
+  readonly children: ReactNode;
+  readonly className: string;
+  readonly front: DesktopWidgetId;
+  readonly id: DesktopWidgetId;
+  readonly label: string;
+  readonly onFront: (id: DesktopWidgetId) => void;
+}) {
+  return (
+    <div
+      className={cn("absolute", SCREEN_SIZE, className, stackClass(id, front))}
+      onPointerDown={() => onFront(id)}
+      onPointerEnter={() => onFront(id)}
+    >
+      <Widget aria-label={label} className="shadow-overlay ring-foreground/8 h-full w-full ring-1">
+        <Widget.Content
+          className={id === "chat" ? "flex min-h-0 flex-col p-0" : "min-h-0 p-0"}
+        >
+          {children}
+        </Widget.Content>
+      </Widget>
+    </div>
+  );
+}
+
+function stackClass(id: DesktopWidgetId, front: DesktopWidgetId): string {
+  if (id === front) {
+    return "z-30";
+  }
+  if (id === "summary") {
+    return "z-20";
+  }
+  return "z-10";
 }
 
 function chatSessionFromPath(pathname: string): {

@@ -9,9 +9,9 @@ import { cn } from "@/lib/utils";
 import { Calendar as CalendarIcon, CircleCheckFill } from "@gravity-ui/icons";
 import { Calendar, Card, ScrollShadow, Skeleton } from "@heroui/react";
 import { endOfMonth, parseDate, startOfMonth, type CalendarDate } from "@internationalized/date";
-import { useLingui } from "@lingui/react/macro";
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type SVGProps } from "react";
 
 const CELL_WIDTH = 60;
 const CELL_HEIGHT = 72;
@@ -30,6 +30,7 @@ export function DayRingStrip({
   onSelectDate,
   onVisibleRange,
   selectedDate,
+  streakDays,
   today,
 }: {
   readonly active?: boolean;
@@ -40,6 +41,7 @@ export function DayRingStrip({
   readonly onSelectDate: (date: string) => void;
   readonly onVisibleRange: (startIndex: number, endIndex: number) => void;
   readonly selectedDate: string | null;
+  readonly streakDays: number | null;
   readonly today: string | null;
 }) {
   const { t } = useLingui();
@@ -282,6 +284,7 @@ export function DayRingStrip({
           })}
         </div>
       </ScrollShadow>
+      {streakDays != null ? <MealStreakLine days={streakDays} /> : null}
       {calendarOpen && today && calendarMin && calendarValue ? (
         <div className="flex w-full justify-center">
           <Card className="w-fit">
@@ -339,6 +342,42 @@ export function DayRingStrip({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function FlameFill(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={16}
+      height={16}
+      fill="none"
+      viewBox="0 0 256 256"
+      {...props}
+    >
+      <path
+        fill="currentColor"
+        fillRule="evenodd"
+        d="M173.79,51.48a221.25,221.25,0,0,0-41.67-34.34,8,8,0,0,0-8.24,0A221.25,221.25,0,0,0,82.21,51.48C54.59,80.48,40,112.47,40,144a88,88,0,0,0,176,0C216,112.47,201.41,80.48,173.79,51.48ZM96,184c0-27.67,22.53-47.28,32-54.3,9.48,7,32,26.63,32,54.3a32,32,0,0,1-64,0Z"
+      />
+    </svg>
+  );
+}
+
+function MealStreakLine({ days }: { readonly days: number }) {
+  return (
+    <p className="flex w-full items-center justify-center gap-1 text-center text-xs font-medium text-orange-500 dark:text-orange-400">
+      <FlameFill aria-hidden="true" className="size-3 shrink-0" />
+      {days === 0 ? (
+        <Trans>Log a meal today to start your streak</Trans>
+      ) : (
+        <Plural
+          one="You've logged meals for # day in a row"
+          other="You've logged meals for # days in a row"
+          value={days}
+        />
+      )}
+    </p>
   );
 }
 

@@ -2,6 +2,7 @@
 
 import { GOAL_LABELS, GOAL_UNIT_LABELS, REMINDER_TITLES } from "@/app/_components/i18n-labels";
 import { useAppLocale } from "@/app/_components/lingui-client-provider";
+import { signOutAction } from "@/app/actions/auth";
 import {
   consumeLinkCodeAction,
   generateLinkCodeAction,
@@ -27,6 +28,7 @@ import {
   type ReminderLabel,
 } from "@/lib/reminder-clock";
 import {
+  ArrowRightFromSquare,
   Arrows3RotateLeftLetterA,
   ChartColumn,
   ClockFill,
@@ -215,6 +217,35 @@ export function SettingsHeading({ email }: { readonly email?: string }) {
   );
 }
 
+export function AccountSettings({ email }: { readonly email?: string }) {
+  return (
+    <SettingsSection
+      description={
+        email ? <Trans>Signed in as {email}</Trans> : <Trans>Sign out of this browser.</Trans>
+      }
+      title={<Trans>Account</Trans>}
+    >
+      <ItemCard>
+        <ItemCard.Icon>
+          <ArrowRightFromSquare />
+        </ItemCard.Icon>
+        <ItemCard.Content>
+          <ItemCard.Title>
+            <Trans>Sign out</Trans>
+          </ItemCard.Title>
+        </ItemCard.Content>
+        <ItemCard.Action>
+          <form action={signOutAction}>
+            <Button size="sm" type="submit" variant="danger-soft">
+              <Trans>Sign out</Trans>
+            </Button>
+          </form>
+        </ItemCard.Action>
+      </ItemCard>
+    </SettingsSection>
+  );
+}
+
 export function LocationSettings({
   defaultCountry,
   defaultTimezone,
@@ -245,167 +276,167 @@ export function LocationSettings({
       description={<Trans>App language, product lookups, meal times, and reminders.</Trans>}
       title={<Trans>Language & location</Trans>}
     >
-        <ItemCard>
-          <ItemCard.Icon>
-            <Arrows3RotateLeftLetterA />
-          </ItemCard.Icon>
-          <ItemCard.Content>
-            <ItemCard.Title>
+      <ItemCard>
+        <ItemCard.Icon>
+          <Arrows3RotateLeftLetterA />
+        </ItemCard.Icon>
+        <ItemCard.Content>
+          <ItemCard.Title>
+            <Trans>Language</Trans>
+          </ItemCard.Title>
+        </ItemCard.Content>
+        <ItemCard.Action className="min-w-0">
+          <Select
+            className="w-40 max-w-full min-w-0"
+            selectedKey={locale}
+            variant="secondary"
+            onSelectionChange={(key) => {
+              const next = String(key);
+              if (!isLocale(next) || next === locale) {
+                return;
+              }
+              setLocale(next);
+              startTransition(() => {
+                runSettingsAction(() => saveLocaleAction(next, initData), {
+                  onSaved: () => {
+                    onLocaleSaved?.();
+                    router.refresh();
+                  },
+                });
+              });
+            }}
+          >
+            <Label className="sr-only">
               <Trans>Language</Trans>
-            </ItemCard.Title>
-          </ItemCard.Content>
-          <ItemCard.Action className="min-w-0">
-            <Select
-              className="w-40 max-w-full min-w-0"
-              selectedKey={locale}
-              variant="secondary"
-              onSelectionChange={(key) => {
-                const next = String(key);
-                if (!isLocale(next) || next === locale) {
-                  return;
-                }
-                setLocale(next);
-                startTransition(() => {
-                  runSettingsAction(() => saveLocaleAction(next, initData), {
-                    onSaved: () => {
-                      onLocaleSaved?.();
-                      router.refresh();
-                    },
-                  });
-                });
-              }}
-            >
-              <Label className="sr-only">
-                <Trans>Language</Trans>
-              </Label>
-              <Select.Trigger className="w-full overflow-hidden">
-                <Select.Value />
-                <Select.Indicator />
-              </Select.Trigger>
-              <Select.Popover>
-                <ListBox>
-                  {locales.map((option) => (
-                    <ListBox.Item
-                      id={option}
-                      key={option}
-                      textValue={localeDisplayName(option)}
-                    >
-                      {localeDisplayName(option)}
-                      <ListBox.ItemIndicator />
-                    </ListBox.Item>
-                  ))}
-                </ListBox>
-              </Select.Popover>
-            </Select>
-          </ItemCard.Action>
-        </ItemCard>
-        <Separator />
-        <ItemCard>
-          <ItemCard.Icon>
-            <Globe />
-          </ItemCard.Icon>
-          <ItemCard.Content>
-            <ItemCard.Title>
+            </Label>
+            <Select.Trigger className="w-full overflow-hidden">
+              <Select.Value />
+              <Select.Indicator />
+            </Select.Trigger>
+            <Select.Popover>
+              <ListBox>
+                {locales.map((option) => (
+                  <ListBox.Item
+                    id={option}
+                    key={option}
+                    textValue={localeDisplayName(option)}
+                  >
+                    {localeDisplayName(option)}
+                    <ListBox.ItemIndicator />
+                  </ListBox.Item>
+                ))}
+              </ListBox>
+            </Select.Popover>
+          </Select>
+        </ItemCard.Action>
+      </ItemCard>
+      <Separator />
+      <ItemCard>
+        <ItemCard.Icon>
+          <Globe />
+        </ItemCard.Icon>
+        <ItemCard.Content>
+          <ItemCard.Title>
+            <Trans>Country</Trans>
+          </ItemCard.Title>
+        </ItemCard.Content>
+        <ItemCard.Action className="min-w-0">
+          <ComboBox
+            className="w-52 max-w-full min-w-0"
+            key={`country-${locale}`}
+            menuTrigger="focus"
+            selectedKey={country}
+            onSelectionChange={(key) => {
+              const next = key === null ? NONE_KEY : String(key);
+              if (next === country) {
+                return;
+              }
+              setCountry(next);
+              startTransition(() => {
+                runSettingsAction(() => saveCountryAction(next === NONE_KEY ? "" : next, initData));
+              });
+            }}
+          >
+            <Label className="sr-only">
               <Trans>Country</Trans>
-            </ItemCard.Title>
-          </ItemCard.Content>
-          <ItemCard.Action className="min-w-0">
-            <ComboBox
-              className="w-52 max-w-full min-w-0"
-              key={`country-${locale}`}
-              menuTrigger="focus"
-              selectedKey={country}
-              onSelectionChange={(key) => {
-                const next = key === null ? NONE_KEY : String(key);
-                if (next === country) {
-                  return;
-                }
-                setCountry(next);
-                startTransition(() => {
-                  runSettingsAction(() => saveCountryAction(next === NONE_KEY ? "" : next, initData));
-                });
-              }}
-            >
-              <Label className="sr-only">
-                <Trans>Country</Trans>
-              </Label>
-              <ComboBox.InputGroup className="min-w-0">
-                <Input className="min-w-0 truncate" placeholder={t`Search…`} variant="secondary" />
-                <ComboBox.Trigger />
-              </ComboBox.InputGroup>
-              <ComboBox.Popover>
-                <ListBox>
-                  <ListBox.Item id={NONE_KEY} textValue={worldwide}>
-                    {worldwide}
+            </Label>
+            <ComboBox.InputGroup className="min-w-0">
+              <Input className="min-w-0 truncate" placeholder={t`Search…`} variant="secondary" />
+              <ComboBox.Trigger />
+            </ComboBox.InputGroup>
+            <ComboBox.Popover>
+              <ListBox>
+                <ListBox.Item id={NONE_KEY} textValue={worldwide}>
+                  {worldwide}
+                  <ListBox.ItemIndicator />
+                </ListBox.Item>
+                {countries.map((option) => (
+                  <ListBox.Item key={option.code} id={option.code} textValue={option.name}>
+                    {option.name}
                     <ListBox.ItemIndicator />
                   </ListBox.Item>
-                  {countries.map((option) => (
-                    <ListBox.Item key={option.code} id={option.code} textValue={option.name}>
-                      {option.name}
-                      <ListBox.ItemIndicator />
-                    </ListBox.Item>
-                  ))}
-                </ListBox>
-              </ComboBox.Popover>
-            </ComboBox>
-          </ItemCard.Action>
-        </ItemCard>
-        <Separator />
-        <ItemCard>
-          <ItemCard.Icon>
-            <ClockFill />
-          </ItemCard.Icon>
-          <ItemCard.Content>
-            <ItemCard.Title>
+                ))}
+              </ListBox>
+            </ComboBox.Popover>
+          </ComboBox>
+        </ItemCard.Action>
+      </ItemCard>
+      <Separator />
+      <ItemCard>
+        <ItemCard.Icon>
+          <ClockFill />
+        </ItemCard.Icon>
+        <ItemCard.Content>
+          <ItemCard.Title>
+            <Trans>Time zone</Trans>
+          </ItemCard.Title>
+        </ItemCard.Content>
+        <ItemCard.Action className="min-w-0">
+          <ComboBox
+            className="w-52 max-w-full min-w-0"
+            key={`timezone-${locale}`}
+            menuTrigger="focus"
+            selectedKey={timezone}
+            onSelectionChange={(key) => {
+              const next = key === null ? NONE_KEY : String(key);
+              if (next === timezone) {
+                return;
+              }
+              setTimezone(next);
+              startTransition(() => {
+                runSettingsAction(() => saveTimezoneAction(next === NONE_KEY ? "" : next, initData), {
+                  onSaved: () => {
+                    onTimezoneSaved?.();
+                    router.refresh();
+                  },
+                });
+              });
+            }}
+          >
+            <Label className="sr-only">
               <Trans>Time zone</Trans>
-            </ItemCard.Title>
-          </ItemCard.Content>
-          <ItemCard.Action className="min-w-0">
-            <ComboBox
-              className="w-52 max-w-full min-w-0"
-              key={`timezone-${locale}`}
-              menuTrigger="focus"
-              selectedKey={timezone}
-              onSelectionChange={(key) => {
-                const next = key === null ? NONE_KEY : String(key);
-                if (next === timezone) {
-                  return;
-                }
-                setTimezone(next);
-                startTransition(() => {
-                  runSettingsAction(() => saveTimezoneAction(next === NONE_KEY ? "" : next, initData), {
-                    onSaved: () => {
-                      onTimezoneSaved?.();
-                      router.refresh();
-                    },
-                  });
-                });
-              }}
-            >
-              <Label className="sr-only">
-                <Trans>Time zone</Trans>
-              </Label>
-              <ComboBox.InputGroup className="min-w-0">
-                <Input className="min-w-0 truncate" placeholder={t`Search…`} variant="secondary" />
-                <ComboBox.Trigger />
-              </ComboBox.InputGroup>
-              <ComboBox.Popover>
-                <ListBox>
-                  <ListBox.Item id={NONE_KEY} textValue={notSet}>
-                    {notSet}
+            </Label>
+            <ComboBox.InputGroup className="min-w-0">
+              <Input className="min-w-0 truncate" placeholder={t`Search…`} variant="secondary" />
+              <ComboBox.Trigger />
+            </ComboBox.InputGroup>
+            <ComboBox.Popover>
+              <ListBox>
+                <ListBox.Item id={NONE_KEY} textValue={notSet}>
+                  {notSet}
+                  <ListBox.ItemIndicator />
+                </ListBox.Item>
+                {timeZones.map((zone) => (
+                  <ListBox.Item key={zone} id={zone} textValue={zone}>
+                    {zone}
                     <ListBox.ItemIndicator />
                   </ListBox.Item>
-                  {timeZones.map((zone) => (
-                    <ListBox.Item key={zone} id={zone} textValue={zone}>
-                      {zone}
-                      <ListBox.ItemIndicator />
-                    </ListBox.Item>
-                  ))}
-                </ListBox>
-              </ComboBox.Popover>
-            </ComboBox>
-          </ItemCard.Action>
-        </ItemCard>
+                ))}
+              </ListBox>
+            </ComboBox.Popover>
+          </ComboBox>
+        </ItemCard.Action>
+      </ItemCard>
     </SettingsSection>
   );
 }
@@ -441,68 +472,68 @@ export function DailyGoalsSettings({
       description={<Trans>Turn on a nutrient to track it in the summary.</Trans>}
       title={<Trans>Daily Goals</Trans>}
     >
-        {GOAL_FIELDS.map((field, index) => {
-          const spec = GOAL_SPECS[field];
-          const row = rows[field];
-          const { color, icon: Icon } = GOAL_ICONS[field];
-          const label = t(GOAL_LABELS[field]);
-          return (
-            <Fragment key={field}>
-              {index > 0 ? <Separator /> : null}
-              <ItemCard>
-                <ItemCard.Icon style={{ color }}>
-                  <Icon />
-                </ItemCard.Icon>
-                <ItemCard.Content>
-                  <ItemCard.Title>{label}</ItemCard.Title>
-                  <ItemCard.Description className="whitespace-normal">
-                    {t(GOAL_UNIT_LABELS[spec.unit])}
-                  </ItemCard.Description>
-                </ItemCard.Content>
-                <ItemCard.Action className="min-w-0">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <NumberField
-                      className="w-32 max-w-full min-w-0"
-                      formatOptions={{ maximumFractionDigits: 0, useGrouping: false }}
-                      isDisabled={!row.enabled}
-                      key={`${field}-${locale}`}
-                      maxValue={spec.max}
-                      minValue={spec.min}
-                      step={spec.step}
-                      value={row.value ?? Number.NaN}
-                      variant="secondary"
-                      onChange={(value) => {
-                        const nextValue =
-                          value === undefined || Number.isNaN(value) ? undefined : value;
-                        commit(field, { ...row, value: nextValue }, false);
-                      }}
-                    >
-                      <Label className="sr-only">{t`${label} goal`}</Label>
-                      <NumberField.Group className="w-full min-w-0">
-                        <NumberField.DecrementButton />
-                        <NumberField.Input className="min-w-0 text-center" />
-                        <NumberField.IncrementButton />
-                      </NumberField.Group>
-                    </NumberField>
-                    <Switch
-                      aria-label={t`Enable ${label} goal`}
-                      isSelected={row.enabled}
-                      onChange={(enabled) => {
-                        commit(field, { ...row, enabled }, true);
-                      }}
-                    >
-                      <Switch.Content>
-                        <Switch.Control>
-                          <Switch.Thumb />
-                        </Switch.Control>
-                      </Switch.Content>
-                    </Switch>
-                  </div>
-                </ItemCard.Action>
-              </ItemCard>
-            </Fragment>
-          );
-        })}
+      {GOAL_FIELDS.map((field, index) => {
+        const spec = GOAL_SPECS[field];
+        const row = rows[field];
+        const { color, icon: Icon } = GOAL_ICONS[field];
+        const label = t(GOAL_LABELS[field]);
+        return (
+          <Fragment key={field}>
+            {index > 0 ? <Separator /> : null}
+            <ItemCard>
+              <ItemCard.Icon style={{ color }}>
+                <Icon />
+              </ItemCard.Icon>
+              <ItemCard.Content>
+                <ItemCard.Title>{label}</ItemCard.Title>
+                <ItemCard.Description className="whitespace-normal">
+                  {t(GOAL_UNIT_LABELS[spec.unit])}
+                </ItemCard.Description>
+              </ItemCard.Content>
+              <ItemCard.Action className="min-w-0">
+                <div className="flex min-w-0 items-center gap-2">
+                  <NumberField
+                    className="w-36 max-w-full min-w-0"
+                    formatOptions={{ maximumFractionDigits: 0, useGrouping: false }}
+                    isDisabled={!row.enabled}
+                    key={`${field}-${locale}`}
+                    maxValue={spec.max}
+                    minValue={spec.min}
+                    step={spec.step}
+                    value={row.value ?? Number.NaN}
+                    variant="secondary"
+                    onChange={(value) => {
+                      const nextValue =
+                        value === undefined || Number.isNaN(value) ? undefined : value;
+                      commit(field, { ...row, value: nextValue }, false);
+                    }}
+                  >
+                    <Label className="sr-only">{t`${label} goal`}</Label>
+                    <NumberField.Group className="w-full min-w-0">
+                      <NumberField.DecrementButton />
+                      <NumberField.Input className="min-w-0 text-center" />
+                      <NumberField.IncrementButton />
+                    </NumberField.Group>
+                  </NumberField>
+                  <Switch
+                    aria-label={t`Enable ${label} goal`}
+                    isSelected={row.enabled}
+                    onChange={(enabled) => {
+                      commit(field, { ...row, enabled }, true);
+                    }}
+                  >
+                    <Switch.Content>
+                      <Switch.Control>
+                        <Switch.Thumb />
+                      </Switch.Control>
+                    </Switch.Content>
+                  </Switch>
+                </div>
+              </ItemCard.Action>
+            </ItemCard>
+          </Fragment>
+        );
+      })}
     </SettingsSection>
   );
 }
@@ -566,75 +597,75 @@ export function ReminderSettings({
       }
       title={<Trans>Check-ins</Trans>}
     >
-        {timezone
-          ? REMINDER_LABELS.map((label, index) => {
-            const row = rows[label];
-            const Icon = REMINDER_ICONS[label];
-            const title = t(REMINDER_TITLES[label]);
-            return (
-              <Fragment key={label}>
-                {index > 0 ? <Separator /> : null}
-                <ItemCard>
-                  <ItemCard.Icon>
-                    <Icon />
-                  </ItemCard.Icon>
-                  <ItemCard.Content>
-                    <ItemCard.Title>{title}</ItemCard.Title>
-                  </ItemCard.Content>
-                  <ItemCard.Action className="min-w-0">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <TimeField
-                        className="w-[6.75rem] max-w-full min-w-0"
-                        granularity="minute"
-                        hourCycle={24}
-                        key={`${label}-${locale}`}
-                        value={row.time}
-                        onChange={(time) => {
-                          if (!time) {
-                            return;
-                          }
-                          commit(
-                            {
-                              ...rows,
-                              [label]: { ...row, time },
-                            },
-                            false,
-                          );
-                        }}
-                      >
-                        <Label className="sr-only">{t`${title} time`}</Label>
-                        <TimeField.Group className="w-full min-w-0" variant="secondary">
-                          <TimeField.Input className="min-w-0 justify-center">
-                            {(segment) => <TimeField.Segment segment={segment} />}
-                          </TimeField.Input>
-                        </TimeField.Group>
-                      </TimeField>
-                      <Switch
-                        aria-label={t`Enable ${title} reminder`}
-                        isSelected={row.enabled}
-                        onChange={(enabled) => {
-                          commit(
-                            {
-                              ...rows,
-                              [label]: { ...row, enabled },
-                            },
-                            true,
-                          );
-                        }}
-                      >
-                        <Switch.Content>
-                          <Switch.Control>
-                            <Switch.Thumb />
-                          </Switch.Control>
-                        </Switch.Content>
-                      </Switch>
-                    </div>
-                  </ItemCard.Action>
-                </ItemCard>
-              </Fragment>
-            );
-          })
-          : null}
+      {timezone
+        ? REMINDER_LABELS.map((label, index) => {
+          const row = rows[label];
+          const Icon = REMINDER_ICONS[label];
+          const title = t(REMINDER_TITLES[label]);
+          return (
+            <Fragment key={label}>
+              {index > 0 ? <Separator /> : null}
+              <ItemCard>
+                <ItemCard.Icon>
+                  <Icon />
+                </ItemCard.Icon>
+                <ItemCard.Content>
+                  <ItemCard.Title>{title}</ItemCard.Title>
+                </ItemCard.Content>
+                <ItemCard.Action className="min-w-0">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <TimeField
+                      className="w-[6.75rem] max-w-full min-w-0"
+                      granularity="minute"
+                      hourCycle={24}
+                      key={`${label}-${locale}`}
+                      value={row.time}
+                      onChange={(time) => {
+                        if (!time) {
+                          return;
+                        }
+                        commit(
+                          {
+                            ...rows,
+                            [label]: { ...row, time },
+                          },
+                          false,
+                        );
+                      }}
+                    >
+                      <Label className="sr-only">{t`${title} time`}</Label>
+                      <TimeField.Group className="w-full min-w-0" variant="secondary">
+                        <TimeField.Input className="min-w-0 justify-center">
+                          {(segment) => <TimeField.Segment segment={segment} />}
+                        </TimeField.Input>
+                      </TimeField.Group>
+                    </TimeField>
+                    <Switch
+                      aria-label={t`Enable ${title} reminder`}
+                      isSelected={row.enabled}
+                      onChange={(enabled) => {
+                        commit(
+                          {
+                            ...rows,
+                            [label]: { ...row, enabled },
+                          },
+                          true,
+                        );
+                      }}
+                    >
+                      <Switch.Content>
+                        <Switch.Control>
+                          <Switch.Thumb />
+                        </Switch.Control>
+                      </Switch.Content>
+                    </Switch>
+                  </div>
+                </ItemCard.Action>
+              </ItemCard>
+            </Fragment>
+          );
+        })
+        : null}
     </SettingsSection>
   );
 }
@@ -654,70 +685,70 @@ export function LinkAccountsSettings({
       description={<Trans>Connect Telegram or WhatsApp with a one-time code.</Trans>}
       title={<Trans>Linked Accounts</Trans>}
     >
-        <ItemCard>
-          <ItemCard.Icon>
-            <Link />
-          </ItemCard.Icon>
-          <ItemCard.Content>
-            <ItemCard.Title>
-              <Trans>Generate a code</Trans>
-            </ItemCard.Title>
-            <ItemCard.Description>
-              <Trans>Send /link CODE in a private chat with the bot.</Trans>
-            </ItemCard.Description>
-          </ItemCard.Content>
-          <ItemCard.Action>
-            <Button
-              isPending={isPending}
-              size="sm"
-              variant="outline"
-              onPress={() => {
-                startTransition(() => {
-                  runSettingsAction(() => generateLinkCodeAction(initData), { successToast: true });
-                });
-              }}
-            >
-              <Trans>Generate</Trans>
-            </Button>
-          </ItemCard.Action>
-        </ItemCard>
-        {showConsume ? (
-          <>
-            <Separator />
-            <ItemCard>
-              <ItemCard.Content>
-                <ItemCard.Title>
-                  <Trans>Enter a code from chat</Trans>
-                </ItemCard.Title>
-              </ItemCard.Content>
-              <ItemCard.Action className="min-w-0">
-                <div className="flex min-w-0 items-center gap-2">
-                  <TextField className="w-28 min-w-0" name="code" value={code} onChange={setCode}>
-                    <Label className="sr-only">
-                      <Trans>Link code</Trans>
-                    </Label>
-                    <Input autoComplete="off" className="min-w-0" placeholder="ABCD2345" variant="secondary" />
-                  </TextField>
-                  <Button
-                    isDisabled={code.trim().length === 0}
-                    isPending={isPending}
-                    size="sm"
-                    variant="outline"
-                    onPress={() => {
-                      startTransition(() => {
-                        runSettingsAction(() => consumeLinkCodeAction(code, initData), {
-                          successToast: true,
-                        });
+      <ItemCard>
+        <ItemCard.Icon>
+          <Link />
+        </ItemCard.Icon>
+        <ItemCard.Content>
+          <ItemCard.Title>
+            <Trans>Generate a code</Trans>
+          </ItemCard.Title>
+          <ItemCard.Description>
+            <Trans>Send /link CODE in a private chat with the bot.</Trans>
+          </ItemCard.Description>
+        </ItemCard.Content>
+        <ItemCard.Action>
+          <Button
+            isPending={isPending}
+            size="sm"
+            variant="outline"
+            onPress={() => {
+              startTransition(() => {
+                runSettingsAction(() => generateLinkCodeAction(initData), { successToast: true });
+              });
+            }}
+          >
+            <Trans>Generate</Trans>
+          </Button>
+        </ItemCard.Action>
+      </ItemCard>
+      {showConsume ? (
+        <>
+          <Separator />
+          <ItemCard>
+            <ItemCard.Content>
+              <ItemCard.Title>
+                <Trans>Enter a code from chat</Trans>
+              </ItemCard.Title>
+            </ItemCard.Content>
+            <ItemCard.Action className="min-w-0">
+              <div className="flex min-w-0 items-center gap-2">
+                <TextField className="w-28 min-w-0" name="code" value={code} onChange={setCode}>
+                  <Label className="sr-only">
+                    <Trans>Link code</Trans>
+                  </Label>
+                  <Input autoComplete="off" className="min-w-0" placeholder="ABCD2345" variant="secondary" />
+                </TextField>
+                <Button
+                  isDisabled={code.trim().length === 0}
+                  isPending={isPending}
+                  size="sm"
+                  variant="outline"
+                  onPress={() => {
+                    startTransition(() => {
+                      runSettingsAction(() => consumeLinkCodeAction(code, initData), {
+                        successToast: true,
                       });
-                    }}
-                  >
-                    <Trans>Link</Trans>
-                  </Button>
-                </div>
-              </ItemCard.Action>
-            </ItemCard>
-          </>
-        ) : null}
+                    });
+                  }}
+                >
+                  <Trans>Link</Trans>
+                </Button>
+              </div>
+            </ItemCard.Action>
+          </ItemCard>
+        </>
+      ) : null}
     </SettingsSection>
   );
 }

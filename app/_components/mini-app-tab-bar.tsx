@@ -2,7 +2,7 @@
 
 import { useAppLocale } from "@/app/_components/lingui-client-provider";
 import { cn } from "@/lib/utils";
-import { Gear, PersonFill } from "@gravity-ui/icons";
+import { ChartColumn, Comment, Gear, PersonFill } from "@gravity-ui/icons";
 import { Segment } from "@heroui-pro/react";
 import { useLingui } from "@lingui/react/macro";
 import type { ComponentType, SVGProps } from "react";
@@ -28,33 +28,28 @@ function Utensils(props: SVGProps<SVGSVGElement>) {
 export const MINI_APP_TABS = ["food", "groups", "settings"] as const;
 export type MiniAppTab = (typeof MINI_APP_TABS)[number];
 
-function isMiniAppTab(key: unknown): key is MiniAppTab {
-  return key === "food" || key === "groups" || key === "settings";
-}
+export type AppTab<T extends string> = {
+  readonly id: T;
+  readonly label: string;
+  readonly icon: ComponentType<SVGProps<SVGSVGElement>>;
+};
 
-export function MiniAppTabBar({
+export function AppTabBar<T extends string>({
+  ariaLabel,
   onSelect,
   selected,
+  tabs,
 }: {
-  readonly onSelect: (tab: MiniAppTab) => void;
-  readonly selected: MiniAppTab;
+  readonly ariaLabel: string;
+  readonly onSelect: (tab: T) => void;
+  readonly selected: T;
+  readonly tabs: readonly AppTab<T>[];
 }) {
-  const { t } = useLingui();
   const { locale } = useAppLocale();
-  const tabs: readonly {
-    id: MiniAppTab;
-    label: string;
-    icon: ComponentType<SVGProps<SVGSVGElement>>;
-  }[] = [
-    { id: "food", label: t`Food`, icon: Utensils },
-    { id: "groups", label: t`Groups`, icon: PersonFill },
-    { id: "settings", label: t`Settings`, icon: Gear },
-  ];
-
   return (
     <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
       <Segment
-        aria-label={t`Mini app`}
+        aria-label={ariaLabel}
         className={cn(
           "border-border/70 bg-surface/95 shadow-overlay pointer-events-auto rounded-full border p-1.5 backdrop-blur-xl",
           "**:data-[slot=segment-indicator]:bg-accent/12 **:data-[slot=segment-indicator]:shadow-none",
@@ -62,8 +57,9 @@ export function MiniAppTabBar({
         key={locale}
         selectedKey={selected}
         onSelectionChange={(key) => {
-          if (isMiniAppTab(key)) {
-            onSelect(key);
+          const tab = tabs.find((item) => item.id === key);
+          if (tab) {
+            onSelect(tab.id);
           }
         }}
       >
@@ -82,5 +78,46 @@ export function MiniAppTabBar({
         })}
       </Segment>
     </nav>
+  );
+}
+
+export function MiniAppTabBar({
+  onSelect,
+  selected,
+}: {
+  readonly onSelect: (tab: MiniAppTab) => void;
+  readonly selected: MiniAppTab;
+}) {
+  const { t } = useLingui();
+  const tabs: readonly AppTab<MiniAppTab>[] = [
+    { id: "food", label: t`Food`, icon: Utensils },
+    { id: "groups", label: t`Groups`, icon: PersonFill },
+    { id: "settings", label: t`Settings`, icon: Gear },
+  ];
+
+  return (
+    <AppTabBar ariaLabel={t`Mini app`} selected={selected} tabs={tabs} onSelect={onSelect} />
+  );
+}
+
+export const WEB_APP_TABS = ["chat", "summary", "settings"] as const;
+export type WebAppTab = (typeof WEB_APP_TABS)[number];
+
+export function WebAppTabBar({
+  onSelect,
+  selected,
+}: {
+  readonly onSelect: (tab: WebAppTab) => void;
+  readonly selected: WebAppTab;
+}) {
+  const { t } = useLingui();
+  const tabs: readonly AppTab<WebAppTab>[] = [
+    { id: "chat", label: t`Chat`, icon: Comment },
+    { id: "summary", label: t`Summary`, icon: ChartColumn },
+    { id: "settings", label: t`Settings`, icon: Gear },
+  ];
+
+  return (
+    <AppTabBar ariaLabel={t`Navigation`} selected={selected} tabs={tabs} onSelect={onSelect} />
   );
 }

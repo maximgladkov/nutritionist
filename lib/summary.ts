@@ -1,4 +1,5 @@
 import { getGoals, type GoalsView } from "./goals.ts";
+import { consecutiveRecordedDays } from "./meal-streak.ts";
 import { listMeals, summarizeNutrition, type MealView, type NutritionSummary } from "./meals.ts";
 import { emptyNutrients, type NutrientKey, type NutrientValues } from "./nutrition.ts";
 import { prisma } from "./prisma.ts";
@@ -49,6 +50,7 @@ export type NutritionDayPayload = {
 export type NutritionDiaryPayload = {
   day: NutritionDayPayload;
   days: NutritionDaysPayload;
+  mealStreak: number;
 };
 
 type SummaryContext = {
@@ -85,11 +87,25 @@ export async function loadNutritionDiary(input: {
 }): Promise<NutritionDiaryPayload> {
   const ctx = await readSummaryContext(input.userId, input.now);
   const from = shiftYmd(ctx.today, -(NUTRITION_DAYS_INITIAL - 1));
-  const [days, day] = await Promise.all([
+  const [days, day, mealStreak] = await Promise.all([
     loadDaysForContext(ctx, from, ctx.today),
     loadDayForContext(ctx, ctx.today),
+    loadMealStreak({ timezone: ctx.timezone, today: ctx.today, userId: ctx.userId }),
   ]);
-  return { day, days };
+  return { day, days, mealStreak };
+}
+
+async function loadMealStreak(input: {
+  timezone: string;
+  today: string;
+  userId: string;
+}): Promise<number> {
+  const meals = await prisma.meal.findMany({
+    select: { eatenAt: true },
+    where: { userId: input.userId },
+  });
+  const dates = new Set(meals.map((meal) => formatDateInTimeZone(meal.eatenAt, input.timezone)));
+  return consecutiveRecordedDays(dates, input.today);
 }
 
 export async function loadTodayNutritionDay(input: {

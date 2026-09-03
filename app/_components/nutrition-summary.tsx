@@ -14,6 +14,7 @@ import {
 } from "@/app/actions/summary";
 import { goalRingsForToday, hasAnyGoal, type GoalsView } from "@/lib/goal-values";
 import { groupMealsByLabel } from "@/lib/meal-groups";
+import { resolveMealStreak } from "@/lib/meal-streak";
 import { dayIndexWindows, ymdToDayIndex } from "@/lib/summary-days";
 import type {
   NutritionDayBucket,
@@ -220,6 +221,14 @@ export function NutritionSummaryApp({
   const isPending = Boolean(day && selectedDate && day.date !== selectedDate && dayValidating);
   const timezoneIsFallback =
     day?.timezoneIsFallback ?? diary?.day.timezoneIsFallback ?? initial?.day.timezoneIsFallback ?? false;
+  const streakDays = today
+    ? resolveMealStreak({
+        buckets: daysByDate,
+        serverStreak: diary?.mealStreak ?? initial?.mealStreak,
+        serverTodayMealCount: diary?.day.mealCount ?? initial?.day.mealCount,
+        today,
+      })
+    : null;
 
   return (
     <div
@@ -251,6 +260,7 @@ export function NutritionSummaryApp({
         onCalendarOpenChange={setCalendarOpen}
         onSelectDate={setUserSelectedDate}
         onVisibleRange={onVisibleRange}
+        streakDays={streakDays}
       />
       {calendarOpen ? null : timezoneIsFallback ? (
         <p className="text-muted text-sm">

@@ -1,4 +1,5 @@
 import {
+  AccountSettings,
   DailyGoalsSettings,
   LinkAccountsSettings,
   LocationSettings,
@@ -63,6 +64,7 @@ export default async function SettingsPage({
         timezone={profile?.timezone ?? null}
       />
       <LinkAccountsSettings showConsume />
+      <AccountSettings />
     </div>
   );
 }
