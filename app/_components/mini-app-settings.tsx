@@ -72,7 +72,7 @@ export function MiniAppSettings() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-lg flex-col gap-6 py-6">
+    <div className="mx-auto flex w-full max-w-lg flex-col gap-6 p-2">
       <LocationSettings
         countries={data.countries}
         defaultCountry={data.country}
