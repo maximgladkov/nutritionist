@@ -66,16 +66,19 @@ function metricChipStyle(fill: string, quiet: boolean) {
 
 export function NutrientMetricsRow({
   compact = false,
+  hideCalories = false,
   showLabels = false,
   size = "sm",
   totals,
 }: {
   readonly compact?: boolean;
+  readonly hideCalories?: boolean;
   readonly showLabels?: boolean;
   readonly size?: "sm" | "md";
   readonly totals: NutrientValues;
 }) {
   const { t } = useLingui();
+  const metrics = hideCalories ? METRICS.filter((metric) => metric.id !== "calories") : METRICS;
   return (
     <div
       className={
@@ -86,7 +89,7 @@ export function NutrientMetricsRow({
             : "flex flex-wrap items-center gap-1"
       }
     >
-      {METRICS.map((metric) => {
+      {metrics.map((metric) => {
         const value = metric.value(totals);
         return (
           <div className="flex min-w-0 flex-col items-center gap-0.5" key={metric.id}>

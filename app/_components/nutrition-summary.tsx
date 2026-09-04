@@ -24,8 +24,6 @@ import type {
 } from "@/lib/summary";
 import { shiftYmd } from "@/lib/timezone";
 import { cn } from "@/lib/utils";
-import { CircleDashed } from "@gravity-ui/icons";
-import { EmptyState } from "@heroui-pro/react";
 import { Link, Spinner } from "@heroui/react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -293,29 +291,12 @@ function SelectedDayView({
   readonly groups: ReturnType<typeof groupMealsByLabel>;
   readonly isPending: boolean;
 }) {
-  const empty = day.mealCount === 0;
   const rings = goals && hasAnyGoal(goals) ? goalRingsForToday(goals, day.totals) : [];
   return (
     <div className={cn("flex flex-col", compact ? "gap-3" : "gap-4", isPending && "opacity-60")}>
       {rings.length > 0 ? <DayGoalProgress rings={rings} /> : <DayTotalsRow totals={day.totals} />}
       {goals && !hasAnyGoal(goals) ? <SetCalorieGoalHint compact={compact} /> : null}
-      {empty ? (
-        <EmptyState className="bg-surface-secondary rounded-2xl" size="sm">
-          <EmptyState.Header>
-            <EmptyState.Media variant="icon">
-              <CircleDashed className="size-5" />
-            </EmptyState.Media>
-            <EmptyState.Title>
-              <Trans>No meals logged</Trans>
-            </EmptyState.Title>
-            <EmptyState.Description>
-              <Trans>Log a meal in chat to see totals here.</Trans>
-            </EmptyState.Description>
-          </EmptyState.Header>
-        </EmptyState>
-      ) : (
-        <MealGroupsAccordion groups={groups} />
-      )}
+      <MealGroupsAccordion groups={groups} />
     </div>
   );
 }

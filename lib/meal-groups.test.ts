@@ -76,7 +76,7 @@ describe("groupMealsByLabel", () => {
     ]);
     assert.deepEqual(
       grouped.map((group) => group.label),
-      ["breakfast", "lunch"],
+      ["breakfast", "lunch", "dinner", "snack"],
     );
     assert.deepEqual(
       grouped[0]?.items.map((row) => row.id),
@@ -88,10 +88,24 @@ describe("groupMealsByLabel", () => {
     assert.equal(grouped[1]?.totals.energyKcal, 400);
   });
 
-  it("skips labels with no items", () => {
+  it("always includes breakfast, lunch, dinner, and snack", () => {
     const grouped = groupMealsByLabel([
       meal({ eatenAt: "2026-09-02T08:00:00.000Z", id: "empty", items: [], label: "dinner" }),
     ]);
-    assert.deepEqual(grouped, []);
+    assert.deepEqual(
+      grouped.map((group) => group.label),
+      ["breakfast", "lunch", "dinner", "snack"],
+    );
+    assert.deepEqual(grouped.find((group) => group.label === "dinner")?.items, []);
+  });
+
+  it("omits other when it has no items", () => {
+    const grouped = groupMealsByLabel([
+      meal({ eatenAt: "2026-09-02T08:00:00.000Z", id: "empty", items: [], label: "other" }),
+    ]);
+    assert.equal(
+      grouped.some((group) => group.label === "other"),
+      false,
+    );
   });
 });

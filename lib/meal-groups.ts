@@ -4,6 +4,8 @@ import { incompleteNutrients, sumNutrients, type NutrientKey, type NutrientValue
 
 export const MEAL_GROUP_ORDER = ["breakfast", "lunch", "dinner", "snack", "other"] as const;
 
+const ALWAYS_VISIBLE_LABELS = new Set<MealLabel>(["breakfast", "lunch", "dinner", "snack"]);
+
 export type MealGroupView = {
   incomplete: NutrientKey[];
   items: MealItemView[];
@@ -19,12 +21,9 @@ export function groupMealsByLabel(meals: readonly MealView[]): MealGroupView[] {
     buckets.set(meal.label, group);
   }
   return MEAL_GROUP_ORDER.flatMap((label) => {
-    const group = buckets.get(label);
-    if (!group || group.length === 0) {
-      return [];
-    }
+    const group = buckets.get(label) ?? [];
     const items = group.flatMap((meal) => meal.items);
-    if (items.length === 0) {
+    if (items.length === 0 && !ALWAYS_VISIBLE_LABELS.has(label)) {
       return [];
     }
     const metrics = items.map((item) => item.metrics);
