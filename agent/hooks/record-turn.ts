@@ -2,7 +2,9 @@ import { defineHook } from "eve/hooks";
 import type { HookContext } from "eve/hooks";
 import { resolveAuthenticatedUserId } from "../../lib/identity";
 import { prisma } from "../../lib/prisma";
+import { consumePendingAgentTurnAck } from "../../lib/agent-turn-ack";
 import {
+  applyAckMessage,
   applyAssistantMessage,
   applyStepCompleted,
   applyStepStarted,
@@ -32,6 +34,13 @@ export default defineHook({
           turnSequence: scope.turnSequence,
           userId: scope.userId,
         });
+        const pending = await consumePendingAgentTurnAck({
+          channel: scope.channel,
+          userId: scope.userId,
+        });
+        if (pending) {
+          await patchAgentTurnTranscript(scope, (transcript) => applyAckMessage(transcript, pending));
+        }
       });
     },
     async "message.received"(event, ctx) {

@@ -11,9 +11,20 @@ export function formatUsd(value: number): string {
   return `$${value.toFixed(6)}`;
 }
 
+export function formatUsdPerDay(value: number): string {
+  return `${formatUsd(value)}/day`;
+}
+
 export function formatRequestCount(value: number): string {
   const count = Number.isFinite(value) ? value : 0;
   return `${count.toLocaleString("en-US")} req`;
+}
+
+export function formatRequestPerDay(value: number): string {
+  const count = Number.isFinite(value) ? value : 0;
+  return `${count.toLocaleString("en-US", {
+    maximumFractionDigits: count >= 10 ? 1 : 2,
+  })} req/day`;
 }
 
 export function formatTokenCount(value: number): string {
@@ -124,4 +135,43 @@ export function sortAdminUserRows<T extends { costUsd: number; id: string; lastT
     }
     return left.id.localeCompare(right.id);
   });
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export function adminRangeDayCount(
+  range: "7d" | "30d" | "all",
+  createdAtIso: string,
+  now = new Date(),
+): number {
+  const created = Date.parse(createdAtIso);
+  const elapsed = Number.isFinite(created) ? now.getTime() - created : DAY_MS;
+  const lifetimeDays = Math.max(1, Math.ceil(elapsed / DAY_MS) || 1);
+  if (range === "all") {
+    return lifetimeDays;
+  }
+  return Math.min(range === "30d" ? 30 : 7, lifetimeDays);
+}
+
+export function adminUserRateMetrics(input: {
+  readonly costUsd: number;
+  readonly createdAt: string;
+  readonly range: "7d" | "30d" | "all";
+  readonly requestCount: number;
+  readonly now?: Date;
+}): {
+  readonly costPerDay: number;
+  readonly costPerRequest: number;
+  readonly days: number;
+  readonly requestsPerDay: number;
+} {
+  const days = adminRangeDayCount(input.range, input.createdAt, input.now);
+  const costUsd = Number.isFinite(input.costUsd) ? input.costUsd : 0;
+  const requestCount = Number.isFinite(input.requestCount) ? input.requestCount : 0;
+  return {
+    costPerDay: costUsd / days,
+    costPerRequest: requestCount > 0 ? costUsd / requestCount : 0,
+    days,
+    requestsPerDay: requestCount / days,
+  };
 }

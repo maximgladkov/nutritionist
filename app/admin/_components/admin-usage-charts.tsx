@@ -101,6 +101,108 @@ export function AdminDailyUsageChart({
   );
 }
 
+export function AdminDailyCostChart({
+  data,
+}: {
+  readonly data: readonly AdminDailyPoint[];
+}) {
+  const gradientId = `admin-daily-cost-only-${useId().replace(/:/g, "")}`;
+  return (
+    <Card>
+      <Card.Header>
+        <Card.Title>Cost per day</Card.Title>
+        <Card.Description>USD spent by this user each day in the selected range.</Card.Description>
+      </Card.Header>
+      <Card.Content>
+        {data.length === 0 ? (
+          <EmptyChart>No requests in this range.</EmptyChart>
+        ) : (
+          <ComposedChart data={[...data]} height={240}>
+            <defs>
+              <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor="var(--chart-3)" stopOpacity={0.24} />
+                <stop offset="100%" stopColor="var(--chart-3)" stopOpacity={0.02} />
+              </linearGradient>
+            </defs>
+            <ComposedChart.Grid vertical={false} />
+            <ComposedChart.XAxis dataKey="day" tickMargin={8} />
+            <ComposedChart.YAxis tickFormatter={(value) => formatUsd(Number(value))} width={64} />
+            <ComposedChart.Area
+              dataKey="costUsd"
+              dot={false}
+              fill={`url(#${gradientId})`}
+              name="Cost (USD)"
+              stroke="var(--chart-3)"
+              strokeWidth={2}
+              type="monotone"
+            />
+            <ComposedChart.Tooltip
+              content={({ active, label, payload }) => {
+                if (!active || !payload?.length) {
+                  return null;
+                }
+                return (
+                  <ChartTooltip>
+                    <ChartTooltip.Header>{String(label)}</ChartTooltip.Header>
+                    <ChartTooltip.Item>
+                      <ChartTooltip.Indicator color="var(--chart-3)" />
+                      <ChartTooltip.Label>Cost (USD)</ChartTooltip.Label>
+                      <ChartTooltip.Value>{formatUsd(Number(payload[0]?.value ?? 0))}</ChartTooltip.Value>
+                    </ChartTooltip.Item>
+                  </ChartTooltip>
+                );
+              }}
+            />
+          </ComposedChart>
+        )}
+      </Card.Content>
+    </Card>
+  );
+}
+
+export function AdminDailyRequestsChart({
+  data,
+}: {
+  readonly data: readonly AdminDailyPoint[];
+}) {
+  return (
+    <Card>
+      <Card.Header>
+        <Card.Title>Requests per day</Card.Title>
+        <Card.Description>Request volume for this user each day in the selected range.</Card.Description>
+      </Card.Header>
+      <Card.Content>
+        {data.length === 0 ? (
+          <EmptyChart>No requests in this range.</EmptyChart>
+        ) : (
+          <BarChart data={[...data]} height={240}>
+            <BarChart.XAxis dataKey="day" tickMargin={8} />
+            <BarChart.YAxis tickFormatter={(value) => formatRequestCount(Number(value))} width={56} />
+            <BarChart.Bar dataKey="requests" fill="var(--chart-1)" name="Requests" radius={6} />
+            <BarChart.Tooltip
+              content={({ active, label, payload }) => {
+                if (!active || !payload?.length) {
+                  return null;
+                }
+                return (
+                  <ChartTooltip>
+                    <ChartTooltip.Header>{String(label)}</ChartTooltip.Header>
+                    <ChartTooltip.Item>
+                      <ChartTooltip.Indicator color="var(--chart-1)" />
+                      <ChartTooltip.Label>Requests</ChartTooltip.Label>
+                      <ChartTooltip.Value>{formatRequestCount(Number(payload[0]?.value ?? 0))}</ChartTooltip.Value>
+                    </ChartTooltip.Item>
+                  </ChartTooltip>
+                );
+              }}
+            />
+          </BarChart>
+        )}
+      </Card.Content>
+    </Card>
+  );
+}
+
 export function AdminChannelSpendChart({
   rows,
 }: {

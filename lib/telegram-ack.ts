@@ -106,8 +106,49 @@ export function telegramAckErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-export async function generateTelegramAckText(input: TelegramAckInput) {
-  const { text } = await Promise.race([
+export type TelegramAckUsage = {
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  costUsd: number;
+  inputTokens: number;
+  outputTokens: number;
+};
+
+export type TelegramAckGeneration = TelegramAckUsage & {
+  model: string;
+  text: string;
+};
+
+type TelegramAckGenerateResult = {
+  providerMetadata?: unknown;
+  text: string;
+  totalUsage?: TelegramAckUsageSource;
+  usage?: TelegramAckUsageSource;
+};
+
+type TelegramAckUsageSource = {
+  inputTokenDetails?: {
+    cacheReadTokens?: number;
+    cacheWriteTokens?: number;
+  };
+  inputTokens?: number;
+  outputTokens?: number;
+  raw?: unknown;
+};
+
+export function telegramAckUsageFromGenerateResult(result: TelegramAckGenerateResult): TelegramAckUsage {
+  const usage = result.usage ?? result.totalUsage;
+  return {
+    cacheReadTokens: finiteTokenCount(usage?.inputTokenDetails?.cacheReadTokens),
+    cacheWriteTokens: finiteTokenCount(usage?.inputTokenDetails?.cacheWriteTokens),
+    costUsd: costFromUnknown(result.providerMetadata) || costFromUnknown(usage?.raw),
+    inputTokens: finiteTokenCount(usage?.inputTokens),
+    outputTokens: finiteTokenCount(usage?.outputTokens),
+  };
+}
+
+export async function generateTelegramAckText(input: TelegramAckInput): Promise<TelegramAckGeneration> {
+  const result = await Promise.race([
     generateText({
       abortSignal: AbortSignal.timeout(TELEGRAM_ACK_TIMEOUT_MS),
       instructions: telegramAckSystem(input),
@@ -120,17 +161,24 @@ export async function generateTelegramAckText(input: TelegramAckInput) {
       setTimeout(() => reject(new Error("telegram ack timed out")), TELEGRAM_ACK_TIMEOUT_MS);
     }),
   ]);
-  const ack = text.trim();
+  const ack = result.text.trim();
   if (ack.length === 0) {
     throw new Error("telegram ack model returned empty text");
   }
-  return ack;
+  return {
+    model: TELEGRAM_ACK_MODEL,
+    text: ack,
+    ...telegramAckUsageFromGenerateResult(result),
+  };
 }
 
-export async function postTelegramAck(telegram: TelegramAckSender, input: TelegramAckInput) {
+export async function postTelegramAck(
+  telegram: TelegramAckSender,
+  input: TelegramAckInput,
+): Promise<TelegramAckGeneration | false> {
   try {
     const ack = await generateTelegramAckText(input);
-    await telegram.sendMessage(ack);
+    await telegram.sendMessage(ack.text);
     return ack;
   } catch (error) {
     const message = telegramAckErrorMessage(error);
@@ -142,6 +190,52 @@ export async function postTelegramAck(telegram: TelegramAckSender, input: Telegr
     }
     return false;
   }
+}
+
+function finiteTokenCount(value: number | undefined): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function asFiniteNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return null;
+}
+
+function costFromUnknown(value: unknown): number {
+  if (value === null || value === undefined) {
+    return 0;
+  }
+  const direct = asFiniteNumber(value);
+  if (direct !== null) {
+    return direct;
+  }
+  if (typeof value !== "object") {
+    return 0;
+  }
+  const record = value as Record<string, unknown>;
+  for (const key of ["cost", "costUsd", "totalCost", "total_cost"]) {
+    const found = asFiniteNumber(record[key]);
+    if (found !== null) {
+      return found;
+    }
+  }
+  for (const nested of Object.values(record)) {
+    if (nested !== null && typeof nested === "object") {
+      const found = costFromUnknown(nested);
+      if (found > 0) {
+        return found;
+      }
+    }
+  }
+  return 0;
 }
 
 function classifyTelegramAckFile(attachment: TelegramAckAttachment): TelegramAckFile {

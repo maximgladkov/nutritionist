@@ -2,10 +2,14 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   adminChannelChartRows,
+  adminRangeDayCount,
   adminUserPath,
+  adminUserRateMetrics,
   formatChannelLabel,
   formatRequestCount,
+  formatRequestPerDay,
   formatTokenCount,
+  formatUsdPerDay,
   sortAdminUserRows,
   topAdminSpenders,
 } from "./admin-format.ts";
@@ -91,5 +95,44 @@ describe("adminUserPath", () => {
   it("encodes the user id and optional range", () => {
     assert.equal(adminUserPath("abc/def"), "/admin/users/abc%2Fdef");
     assert.equal(adminUserPath("user-1", "7d"), "/admin/users/user-1?range=7d");
+  });
+});
+
+describe("adminRangeDayCount", () => {
+  it("uses the selected range unless the account is newer", () => {
+    const now = new Date("2026-09-04T12:00:00.000Z");
+    assert.equal(adminRangeDayCount("7d", "2026-01-01T00:00:00.000Z", now), 7);
+    assert.equal(adminRangeDayCount("30d", "2026-01-01T00:00:00.000Z", now), 30);
+    assert.equal(adminRangeDayCount("7d", "2026-09-03T00:00:00.000Z", now), 2);
+    assert.equal(adminRangeDayCount("all", "2026-09-01T12:00:00.000Z", now), 3);
+  });
+});
+
+describe("adminUserRateMetrics", () => {
+  it("averages cost and requests across the range", () => {
+    const rates = adminUserRateMetrics({
+      costUsd: 1.4,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      now: new Date("2026-09-04T12:00:00.000Z"),
+      range: "7d",
+      requestCount: 14,
+    });
+    assert.equal(rates.days, 7);
+    assert.equal(rates.requestsPerDay, 2);
+    assert.equal(Number(rates.costPerDay.toFixed(6)), 0.2);
+    assert.equal(Number(rates.costPerRequest.toFixed(6)), 0.1);
+  });
+});
+
+describe("formatRequestPerDay", () => {
+  it("appends the req/day unit", () => {
+    assert.equal(formatRequestPerDay(2), "2 req/day");
+    assert.equal(formatRequestPerDay(1.25), "1.25 req/day");
+  });
+});
+
+describe("formatUsdPerDay", () => {
+  it("appends the /day unit", () => {
+    assert.equal(formatUsdPerDay(1.5), "$1.50/day");
   });
 });

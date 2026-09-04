@@ -1,4 +1,5 @@
 import type { AgentTurnMessage } from "@/lib/agent-turn-model";
+import { formatTokenCount, formatUsd } from "@/lib/admin-format";
 
 export function AdminTranscript({ messages }: { readonly messages: readonly AgentTurnMessage[] }) {
   if (messages.length === 0) {
@@ -11,8 +12,19 @@ export function AdminTranscript({ messages }: { readonly messages: readonly Agen
           className="border-divider bg-surface rounded-xl border p-3"
           key={`${message.type}-${message.at}-${String(index)}`}
         >
-          <p className="text-muted mb-1 text-xs font-medium tracking-wide uppercase">{message.type}</p>
+          <p className="text-muted mb-1 text-xs font-medium tracking-wide uppercase">
+            {message.type === "ack" ? "Quick answer" : message.type}
+          </p>
           {message.type === "user" ? <p className="whitespace-pre-wrap text-sm">{message.text}</p> : null}
+          {message.type === "ack" ? (
+            <div className="flex flex-col gap-1">
+              <p className="whitespace-pre-wrap text-sm">{message.text}</p>
+              <p className="text-muted text-xs">
+                {message.model} · {formatUsd(message.costUsd)} · {formatTokenCount(message.inputTokens)} in ·{" "}
+                {formatTokenCount(message.outputTokens)} out
+              </p>
+            </div>
+          ) : null}
           {message.type === "assistant" ? (
             <p className="whitespace-pre-wrap text-sm">{message.text}</p>
           ) : null}

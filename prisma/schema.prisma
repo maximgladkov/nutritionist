@@ -25,6 +25,7 @@ model User {
   conversationMessages ConversationMessage[]
   catalogProducts CatalogProduct[]
   agentTurns    AgentTurn[]
+  pendingAcks   AgentTurnPendingAck[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -151,6 +152,23 @@ model AgentTurn {
   @@index([userId, startedAt])
   @@index([sessionId, turnSequence])
   @@index([channel, startedAt])
+}
+
+model AgentTurnPendingAck {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel          String
+  text             String   @db.Text
+  model            String
+  costUsd          Decimal  @default(0) @db.Decimal(12, 6)
+  inputTokens      Int      @default(0)
+  outputTokens     Int      @default(0)
+  cacheReadTokens  Int      @default(0)
+  cacheWriteTokens Int      @default(0)
+  createdAt        DateTime @default(now())
+
+  @@index([userId, channel, createdAt])
 }
 
 model ConversationMessage {

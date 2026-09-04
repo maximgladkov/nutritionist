@@ -8,6 +8,7 @@ import {
   telegramAckFiles,
   telegramAckMessages,
   telegramAckSystem,
+  telegramAckUsageFromGenerateResult,
   telegramAckUserContent,
 } from "./telegram-ack.ts";
 
@@ -135,5 +136,38 @@ describe("coalesceTelegramAckTurns", () => {
 describe("telegramAckErrorMessage", () => {
   it("reads Error.message", () => {
     assert.equal(telegramAckErrorMessage(new Error("telegram ack timed out")), "telegram ack timed out");
+  });
+});
+
+describe("telegramAckUsageFromGenerateResult", () => {
+  it("reads tokens and gateway cost", () => {
+    assert.deepEqual(
+      telegramAckUsageFromGenerateResult({
+        providerMetadata: { gateway: { cost: "0.00018" } },
+        text: "Checking calories…",
+        usage: {
+          inputTokenDetails: { cacheReadTokens: 4, cacheWriteTokens: 1 },
+          inputTokens: 80,
+          outputTokens: 6,
+        },
+      }),
+      {
+        cacheReadTokens: 4,
+        cacheWriteTokens: 1,
+        costUsd: 0.00018,
+        inputTokens: 80,
+        outputTokens: 6,
+      },
+    );
+  });
+
+  it("falls back to usage.raw when gateway cost is missing", () => {
+    assert.equal(
+      telegramAckUsageFromGenerateResult({
+        text: "Hang on…",
+        usage: { inputTokens: 10, outputTokens: 2, raw: { costUsd: 0.00004 } },
+      }).costUsd,
+      0.00004,
+    );
   });
 });

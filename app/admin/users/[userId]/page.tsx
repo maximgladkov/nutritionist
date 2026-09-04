@@ -1,7 +1,7 @@
 import { AdminChannelIcon } from "@/app/admin/_components/admin-channel-icon";
 import { AdminRangeLinks } from "@/app/admin/_components/admin-range-links";
 import { AdminRequestsTable } from "@/app/admin/_components/admin-requests-table";
-import { AdminChannelSpendChart, AdminDailyUsageChart } from "@/app/admin/_components/admin-usage-charts";
+import { AdminChannelSpendChart, AdminDailyCostChart, AdminDailyRequestsChart } from "@/app/admin/_components/admin-usage-charts";
 import { AdminUserKpis } from "@/app/admin/_components/admin-user-kpis";
 import { requireAdmin } from "@/lib/admin-guard";
 import { formatDateTime, formatUserLabel } from "@/lib/admin-format";
@@ -45,11 +45,10 @@ export default async function AdminUserPage({
         <AdminRangeLinks path={`/admin/users/${encodeURIComponent(user.id)}`} range={range} />
       </div>
       <AdminUserKpis data={user} />
-      <AdminDailyUsageChart
-        data={user.daily}
-        description="This user's cost and request volume in the selected range."
-        title="Daily usage"
-      />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <AdminDailyCostChart data={user.daily} />
+        <AdminDailyRequestsChart data={user.daily} />
+      </div>
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
           <Card.Header>

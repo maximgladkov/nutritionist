@@ -62,6 +62,7 @@ export type AdminSessionTurn = {
 export type AdminUserRow = {
   readonly channels: readonly string[];
   readonly costUsd: number;
+  readonly createdAt: string;
   readonly id: string;
   readonly lastTurnAt: string | null;
   readonly providers: readonly string[];
@@ -86,6 +87,7 @@ export type AdminUserDetail = {
   readonly id: string;
   readonly identities: readonly AdminUserIdentity[];
   readonly locale: string | null;
+  readonly p95DurationMs: number | null;
   readonly range: AdminRange;
   readonly requestCount: number;
   readonly requests: readonly AdminRequestRow[];
@@ -286,6 +288,7 @@ export async function listAdminUsers(input: {
       return {
         channels: uniqueSorted(channelsByUser.get(user.id) ?? []),
         costUsd: stats?.costUsd ?? 0,
+        createdAt: user.createdAt.toISOString(),
         id: user.id,
         lastTurnAt: stats?.lastTurnAt ?? null,
         providers: uniqueSorted(user.identities.map((identity) => identity.provider)),
@@ -320,6 +323,7 @@ export async function loadAdminUser(userId: string, range: AdminRange): Promise<
     prisma.$queryRaw<
       readonly {
         avgDurationMs: number | null;
+        p95DurationMs: number | null;
         requestCount: bigint;
         totalCostUsd: number | null;
       }[]
@@ -327,7 +331,8 @@ export async function loadAdminUser(userId: string, range: AdminRange): Promise<
       SELECT
         COUNT(*)::bigint AS "requestCount",
         COALESCE(SUM("costUsd"), 0)::float8 AS "totalCostUsd",
-        AVG("durationMs")::float8 AS "avgDurationMs"
+        AVG("durationMs")::float8 AS "avgDurationMs",
+        percentile_cont(0.95) WITHIN GROUP (ORDER BY "durationMs") FILTER (WHERE "durationMs" IS NOT NULL)::float8 AS "p95DurationMs"
       FROM "AgentTurn"
       WHERE "userId" = ${userId}
         AND ${startedAt === null ? Prisma.sql`TRUE` : Prisma.sql`"startedAt" >= ${startedAt}`}
@@ -361,6 +366,7 @@ export async function loadAdminUser(userId: string, range: AdminRange): Promise<
       threadId: identity.threadId,
     })),
     locale: user.profile?.locale ?? null,
+    p95DurationMs: row?.p95DurationMs ?? null,
     range,
     requestCount: Number(row?.requestCount ?? 0),
     requests,

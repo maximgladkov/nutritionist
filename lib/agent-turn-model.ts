@@ -19,6 +19,18 @@ export type AgentTurnUserMessage = {
   readonly type: "user";
 };
 
+export type AgentTurnAckMessage = {
+  readonly at: string;
+  readonly cacheReadTokens: number;
+  readonly cacheWriteTokens: number;
+  readonly costUsd: number;
+  readonly inputTokens: number;
+  readonly model: string;
+  readonly outputTokens: number;
+  readonly text: string;
+  readonly type: "ack";
+};
+
 export type AgentTurnAssistantMessage = {
   readonly at: string;
   readonly finishReason: string;
@@ -40,6 +52,7 @@ export type AgentTurnToolMessage = {
 };
 
 export type AgentTurnMessage =
+  | AgentTurnAckMessage
   | AgentTurnAssistantMessage
   | AgentTurnToolMessage
   | AgentTurnUserMessage;
@@ -123,15 +136,52 @@ export function applyUserMessage(
   transcript: AgentTurnTranscript,
   input: { at: string; parts?: readonly AgentTurnUserPart[]; text: string },
 ): AgentTurnTranscript {
+  const items = [...transcript.items];
+  const next: AgentTurnUserMessage = {
+    at: input.at,
+    parts: input.parts,
+    text: input.text,
+    type: "user",
+  };
+  const insertAt = items.findIndex((item) => item.type !== "user");
+  if (insertAt === -1) {
+    items.push(next);
+  } else {
+    items.splice(insertAt, 0, next);
+  }
+  return { ...transcript, items };
+}
+
+export function applyAckMessage(
+  transcript: AgentTurnTranscript,
+  input: {
+    at: string;
+    cacheReadTokens?: number;
+    cacheWriteTokens?: number;
+    costUsd?: number;
+    inputTokens?: number;
+    model: string;
+    outputTokens?: number;
+    text: string;
+  },
+): AgentTurnTranscript {
+  if (transcript.items.some((item) => item.type === "ack")) {
+    return transcript;
+  }
   return {
     ...transcript,
     items: [
       ...transcript.items,
       {
         at: input.at,
-        parts: input.parts,
+        cacheReadTokens: input.cacheReadTokens ?? 0,
+        cacheWriteTokens: input.cacheWriteTokens ?? 0,
+        costUsd: input.costUsd ?? 0,
+        inputTokens: input.inputTokens ?? 0,
+        model: input.model,
+        outputTokens: input.outputTokens ?? 0,
         text: input.text,
-        type: "user" as const,
+        type: "ack" as const,
       },
     ],
   };
@@ -228,12 +278,12 @@ export function applyStepStarted(
 ): AgentTurnTranscript {
   const retry =
     transcript.steps.some((step) => step.stepIndex === input.stepIndex) ||
-    transcript.items.some((item) => item.type !== "user" && item.stepIndex === input.stepIndex);
+    transcript.items.some((item) => isRetryableTurnItem(item) && item.stepIndex === input.stepIndex);
   if (!retry) {
     return transcript;
   }
   return {
-    items: transcript.items.filter((item) => item.type === "user" || item.stepIndex < input.stepIndex),
+    items: transcript.items.filter((item) => !isRetryableTurnItem(item) || item.stepIndex < input.stepIndex),
     steps: transcript.steps.filter((step) => step.stepIndex < input.stepIndex),
   };
 }
@@ -266,13 +316,24 @@ export function applyStepCompleted(
 export function summarizeTranscript(transcript: AgentTurnTranscript): AgentTurnUsageSummary {
   const lastStep = transcript.steps.at(-1);
   const user = transcript.items.find((item) => item.type === "user");
+  const acks = transcript.items.filter((item): item is AgentTurnAckMessage => item.type === "ack");
   return {
-    cacheReadTokens: transcript.steps.reduce((sum, step) => sum + step.cacheReadTokens, 0),
-    cacheWriteTokens: transcript.steps.reduce((sum, step) => sum + step.cacheWriteTokens, 0),
-    costUsd: transcript.steps.reduce((sum, step) => sum + step.costUsd, 0),
-    inputTokens: transcript.steps.reduce((sum, step) => sum + step.inputTokens, 0),
+    cacheReadTokens:
+      transcript.steps.reduce((sum, step) => sum + step.cacheReadTokens, 0) +
+      acks.reduce((sum, ack) => sum + ack.cacheReadTokens, 0),
+    cacheWriteTokens:
+      transcript.steps.reduce((sum, step) => sum + step.cacheWriteTokens, 0) +
+      acks.reduce((sum, ack) => sum + ack.cacheWriteTokens, 0),
+    costUsd:
+      transcript.steps.reduce((sum, step) => sum + step.costUsd, 0) +
+      acks.reduce((sum, ack) => sum + ack.costUsd, 0),
+    inputTokens:
+      transcript.steps.reduce((sum, step) => sum + step.inputTokens, 0) +
+      acks.reduce((sum, ack) => sum + ack.inputTokens, 0),
     model: lastStep?.model ?? null,
-    outputTokens: transcript.steps.reduce((sum, step) => sum + step.outputTokens, 0),
+    outputTokens:
+      transcript.steps.reduce((sum, step) => sum + step.outputTokens, 0) +
+      acks.reduce((sum, ack) => sum + ack.outputTokens, 0),
     userPreview: userPreviewFrom(user?.text),
   };
 }
@@ -359,12 +420,18 @@ export function userPreviewFrom(text: string | undefined): string | null {
     : `${trimmed.slice(0, USER_PREVIEW_MAX_CHARS - 1)}…`;
 }
 
+function isRetryableTurnItem(
+  item: AgentTurnMessage,
+): item is AgentTurnAssistantMessage | AgentTurnToolMessage {
+  return item.type === "assistant" || item.type === "tool";
+}
+
 function isTurnMessage(value: unknown): value is AgentTurnMessage {
   if (value === null || typeof value !== "object") {
     return false;
   }
   const type = (value as { type?: unknown }).type;
-  return type === "user" || type === "assistant" || type === "tool";
+  return type === "user" || type === "ack" || type === "assistant" || type === "tool";
 }
 
 function isStepUsage(value: unknown): value is AgentTurnStepUsage {

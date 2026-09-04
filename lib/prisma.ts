@@ -17,7 +17,10 @@ function createPrisma(): PrismaClient {
 }
 
 function hasAgentTurn(client: PrismaClient | undefined): client is PrismaClient {
-  return typeof client?.agentTurn?.findUnique === "function";
+  return (
+    typeof client?.agentTurn?.findUnique === "function" &&
+    typeof client?.agentTurnPendingAck?.findFirst === "function"
+  );
 }
 
 function getPrisma(): PrismaClient {

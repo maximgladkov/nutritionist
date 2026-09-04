@@ -3,6 +3,7 @@ import type { TelegramContext, TelegramMessage } from "eve/channels/telegram";
 import { handleChannelLink, resolveChannelUser, saveChannelThreadId } from "../lib/channel-identity";
 import { telegramSummaryMiniAppUrl } from "../../lib/app-url";
 import { TELEGRAM_ACK_TURN_CONTEXT, postTelegramAck, telegramAckFiles } from "../../lib/telegram-ack";
+import { enqueuePendingAgentTurnAck } from "../../lib/agent-turn-ack";
 import { applyTelegramHiddenMedia, telegramMessageHasInboundContent } from "../../lib/telegram-media";
 import { claimTelegramMessage } from "../../lib/telegram-message-claim";
 import { markdownToTelegramHtml, telegramHtmlMessage } from "../../lib/telegram-html";
@@ -102,7 +103,24 @@ export default wrapTelegramLastMessageChannel(
           });
           void ensureSummaryMenuButton(ctx);
         }
-        const ack = await ackPosted.catch(() => false);
+        const ack = await ackPosted.catch((): false => false);
+        if (ack !== false) {
+          try {
+            await enqueuePendingAgentTurnAck({
+              cacheReadTokens: ack.cacheReadTokens,
+              cacheWriteTokens: ack.cacheWriteTokens,
+              channel: "telegram",
+              costUsd: ack.costUsd,
+              inputTokens: ack.inputTokens,
+              model: ack.model,
+              outputTokens: ack.outputTokens,
+              text: ack.text,
+              userId: user.id,
+            });
+          } catch (error) {
+            console.error("telegram ack persist failed", error);
+          }
+        }
         return {
           auth: appPrincipal(user.id, "telegram"),
           ...(ack ? { context: [TELEGRAM_ACK_TURN_CONTEXT] } : {}),

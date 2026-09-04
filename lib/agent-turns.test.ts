@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  applyAckMessage,
   applyAssistantMessage,
   applyStepCompleted,
   applyStepStarted,
@@ -121,6 +122,59 @@ describe("transcript reducers", () => {
     assert.equal(summary.costUsd, 0.005);
     assert.equal(summary.inputTokens, 140);
     assert.equal(summary.outputTokens, 28);
+    assert.equal(summary.model, "zai/glm-5.3-flash");
+  });
+
+  it("keeps a quick answer ahead of retries and includes its cost", () => {
+    let transcript = applyAckMessage(emptyTranscript(), {
+      at: "2026-09-04T10:00:00.000Z",
+      costUsd: 0.00012,
+      inputTokens: 80,
+      model: "google/gemini-3.5-flash-lite",
+      outputTokens: 6,
+      text: "Checking calories…",
+    });
+    transcript = applyUserMessage(transcript, {
+      at: "2026-09-04T10:00:00.100Z",
+      text: "calories?",
+    });
+    transcript = applyAssistantMessage(transcript, {
+      at: "2026-09-04T10:00:01.000Z",
+      finishReason: "stop",
+      stepIndex: 0,
+      text: "stale",
+    });
+    transcript = applyStepCompleted(transcript, {
+      costUsd: 0.004,
+      inputTokens: 40,
+      model: "zai/glm-5.3-flash",
+      outputTokens: 10,
+      stepIndex: 0,
+    });
+    transcript = applyStepStarted(transcript, { model: "zai/glm-5.3-flash", stepIndex: 0 });
+    transcript = applyAssistantMessage(transcript, {
+      at: "2026-09-04T10:00:02.000Z",
+      finishReason: "stop",
+      stepIndex: 0,
+      text: "1,200 kcal",
+    });
+    transcript = applyStepCompleted(transcript, {
+      costUsd: 0.003,
+      inputTokens: 42,
+      model: "zai/glm-5.3-flash",
+      outputTokens: 8,
+      stepIndex: 0,
+    });
+    assert.deepEqual(
+      transcript.items.map((item) => item.type),
+      ["user", "ack", "assistant"],
+    );
+    const ack = transcript.items.find((item) => item.type === "ack");
+    assert.equal(ack?.type === "ack" ? ack.text : null, "Checking calories…");
+    const summary = summarizeTranscript(transcript);
+    assert.equal(Number(summary.costUsd.toFixed(6)), 0.00312);
+    assert.equal(summary.inputTokens, 122);
+    assert.equal(summary.outputTokens, 14);
     assert.equal(summary.model, "zai/glm-5.3-flash");
   });
 

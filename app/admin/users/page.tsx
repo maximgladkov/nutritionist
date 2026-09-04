@@ -2,7 +2,17 @@ import { AdminChannelIcons } from "@/app/admin/_components/admin-channel-icon";
 import { AdminRangeLinks } from "@/app/admin/_components/admin-range-links";
 import { AdminTopSpendersChart } from "@/app/admin/_components/admin-usage-charts";
 import { requireAdmin } from "@/lib/admin-guard";
-import { adminUserPath, formatDateTime, formatRequestCount, formatUsd, formatUserLabel, topAdminSpenders } from "@/lib/admin-format";
+import {
+  adminUserPath,
+  adminUserRateMetrics,
+  formatDateTime,
+  formatRequestCount,
+  formatRequestPerDay,
+  formatUsd,
+  formatUsdPerDay,
+  formatUserLabel,
+  topAdminSpenders,
+} from "@/lib/admin-format";
 import { listAdminUsers, parseAdminRange } from "@/lib/admin-queries";
 import { Button, Input, Label, Table, TextField } from "@heroui/react";
 import NextLink from "next/link";
@@ -23,7 +33,7 @@ export default async function AdminUsersPage({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">Users</h1>
-          <p className="text-muted text-sm">Channels, spend, and last activity for every account.</p>
+          <p className="text-muted text-sm">Channels, spend, daily rates, and last activity for every account.</p>
         </div>
         <AdminRangeLinks params={{ q }} path="/admin/users" range={range} />
       </div>
@@ -43,34 +53,46 @@ export default async function AdminUsersPage({
       ) : (
         <Table>
           <Table.ScrollContainer>
-            <Table.Content aria-label="Users" className="min-w-[960px]">
+            <Table.Content aria-label="Users" className="min-w-[1120px]">
               <Table.Header>
                 <Table.Column isRowHeader>User</Table.Column>
                 <Table.Column>Identities</Table.Column>
                 <Table.Column>Channels</Table.Column>
                 <Table.Column>Requests</Table.Column>
+                <Table.Column>Req / day</Table.Column>
                 <Table.Column>Spend (USD)</Table.Column>
+                <Table.Column>Spend / day</Table.Column>
                 <Table.Column>Last turn</Table.Column>
               </Table.Header>
               <Table.Body>
-                {rows.map((row) => (
-                  <Table.Row key={row.id}>
-                    <Table.Cell>
-                      <NextLink className="text-sm underline-offset-2 hover:underline" href={adminUserPath(row.id, range)}>
-                        {formatUserLabel({ userEmail: row.userEmail, userId: row.id, userName: row.userName })}
-                      </NextLink>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <AdminChannelIcons values={row.providers} />
-                    </Table.Cell>
-                    <Table.Cell>
-                      <AdminChannelIcons values={row.channels} />
-                    </Table.Cell>
-                    <Table.Cell>{formatRequestCount(row.requestCount)}</Table.Cell>
-                    <Table.Cell>{formatUsd(row.costUsd)}</Table.Cell>
-                    <Table.Cell>{row.lastTurnAt ? formatDateTime(row.lastTurnAt) : "—"}</Table.Cell>
-                  </Table.Row>
-                ))}
+                {rows.map((row) => {
+                  const rates = adminUserRateMetrics({
+                    costUsd: row.costUsd,
+                    createdAt: row.createdAt,
+                    range,
+                    requestCount: row.requestCount,
+                  });
+                  return (
+                    <Table.Row key={row.id}>
+                      <Table.Cell>
+                        <NextLink className="text-sm underline-offset-2 hover:underline" href={adminUserPath(row.id, range)}>
+                          {formatUserLabel({ userEmail: row.userEmail, userId: row.id, userName: row.userName })}
+                        </NextLink>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <AdminChannelIcons values={row.providers} />
+                      </Table.Cell>
+                      <Table.Cell>
+                        <AdminChannelIcons values={row.channels} />
+                      </Table.Cell>
+                      <Table.Cell>{formatRequestCount(row.requestCount)}</Table.Cell>
+                      <Table.Cell>{formatRequestPerDay(rates.requestsPerDay)}</Table.Cell>
+                      <Table.Cell>{formatUsd(row.costUsd)}</Table.Cell>
+                      <Table.Cell>{formatUsdPerDay(rates.costPerDay)}</Table.Cell>
+                      <Table.Cell>{row.lastTurnAt ? formatDateTime(row.lastTurnAt) : "—"}</Table.Cell>
+                    </Table.Row>
+                  );
+                })}
               </Table.Body>
             </Table.Content>
           </Table.ScrollContainer>
