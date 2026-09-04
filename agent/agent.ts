@@ -1,6 +1,6 @@
 import { defineAgent } from "eve";
 
 export default defineAgent({
-  model: "zai/glm-5.3-flash",
+  model: "deepseek/deepseek-v4-flash-0731",
   reasoning: "minimal",
 });
