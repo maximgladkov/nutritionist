@@ -6,7 +6,7 @@ import { NutrientMetricsRow } from "@/app/_components/nutrient-metrics-row";
 import { formatAmount, formatKcal } from "@/app/_components/nutrition-format";
 import type { MealGroupView } from "@/lib/meal-groups";
 import type { MealView } from "@/lib/meals";
-import { ChevronRight, CircleDashed, Cup, Moon, Sun } from "@gravity-ui/icons";
+import { CircleDashed, Cup, Moon, Sun } from "@gravity-ui/icons";
 import { Accordion, Card, Typography } from "@heroui/react";
 import { useLingui } from "@lingui/react/macro";
 
@@ -71,10 +71,7 @@ export function MealGroupsAccordion({ groups }: { readonly groups: readonly Meal
                       <NutrientMetricsRow compact hideCalories totals={group.totals} />
                     ) : null}
                   </span>
-                  <span className="flex shrink-0 items-center gap-2">
-                    <MealKcal value={group.totals.energyKcal} />
-                    {hasItems ? <Accordion.Indicator /> : null}
-                  </span>
+                  <MealKcal value={group.totals.energyKcal} />
                 </Accordion.Trigger>
               </Accordion.Heading>
               <Accordion.Panel>
@@ -92,10 +89,7 @@ export function MealGroupsAccordion({ groups }: { readonly groups: readonly Meal
                             </span>
                             <NutrientMetricsRow compact hideCalories totals={item.metrics} />
                           </div>
-                          <span className="flex shrink-0 items-center gap-2">
-                            <MealKcal compact value={item.metrics.energyKcal} />
-                            <ChevronRight className="size-4 shrink-0 text-muted" />
-                          </span>
+                          <MealKcal compact value={item.metrics.energyKcal} />
                         </li>
                       ))}
                     </ul>
