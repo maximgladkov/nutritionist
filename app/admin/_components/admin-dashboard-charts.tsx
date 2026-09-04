@@ -18,7 +18,7 @@ export function AdminDashboardCharts({ data }: { readonly data: AdminDashboard }
           <KPI.Header>
             <KPI.Title>Requests</KPI.Title>
           </KPI.Header>
-          <KPI.Content className="flex-none items-start">
+          <KPI.Content>
             <KPI.Value style="decimal" value={data.requestCount}>
               <NumberValue.Suffix> req</NumberValue.Suffix>
             </KPI.Value>
@@ -30,7 +30,7 @@ export function AdminDashboardCharts({ data }: { readonly data: AdminDashboard }
           <KPI.Header>
             <KPI.Title>Total cost (USD)</KPI.Title>
           </KPI.Header>
-          <KPI.Content className="flex-none items-start">
+          <KPI.Content>
             <KPI.Value currency="USD" maximumFractionDigits={4} style="currency" value={data.totalCostUsd} />
           </KPI.Content>
           <AdminKpiSparkline color="var(--chart-3)" data={data.daily} dataKey="costUsd" range={data.range} />
@@ -40,7 +40,7 @@ export function AdminDashboardCharts({ data }: { readonly data: AdminDashboard }
           <KPI.Header>
             <KPI.Title>Avg duration</KPI.Title>
           </KPI.Header>
-          <KPI.Content className="flex-none items-start">
+          <KPI.Content>
             <KPI.Value
               formatOptions={{
                 maximumFractionDigits: 1,
@@ -57,7 +57,7 @@ export function AdminDashboardCharts({ data }: { readonly data: AdminDashboard }
           <KPI.Header>
             <KPI.Title>p95 duration</KPI.Title>
           </KPI.Header>
-          <KPI.Content className="flex-none items-start">
+          <KPI.Content>
             <KPI.Value
               formatOptions={{
                 maximumFractionDigits: 1,

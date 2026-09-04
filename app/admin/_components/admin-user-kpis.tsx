@@ -28,7 +28,7 @@ export function AdminUserKpis({
           <KPI.Header>
             <KPI.Title>Requests</KPI.Title>
           </KPI.Header>
-          <KPI.Content className="flex-none items-start">
+          <KPI.Content>
             <KPI.Value style="decimal" value={data.requestCount}>
               <NumberValue.Suffix> req</NumberValue.Suffix>
             </KPI.Value>
@@ -40,7 +40,7 @@ export function AdminUserKpis({
           <KPI.Header>
             <KPI.Title>Requests / day</KPI.Title>
           </KPI.Header>
-          <KPI.Content className="flex-none items-start">
+          <KPI.Content>
             <KPI.Value maximumFractionDigits={2} style="decimal" value={rates.requestsPerDay}>
               <NumberValue.Suffix> req/day</NumberValue.Suffix>
             </KPI.Value>
@@ -51,7 +51,7 @@ export function AdminUserKpis({
           <KPI.Header>
             <KPI.Title>Total cost (USD)</KPI.Title>
           </KPI.Header>
-          <KPI.Content className="flex-none items-start">
+          <KPI.Content>
             <KPI.Value currency="USD" maximumFractionDigits={4} style="currency" value={data.totalCostUsd} />
           </KPI.Content>
           <AdminKpiSparkline color="var(--chart-3)" data={data.daily} dataKey="costUsd" range={data.range} />
@@ -61,7 +61,7 @@ export function AdminUserKpis({
           <KPI.Header>
             <KPI.Title>Cost / day</KPI.Title>
           </KPI.Header>
-          <KPI.Content className="flex-none items-start">
+          <KPI.Content>
             <KPI.Value currency="USD" maximumFractionDigits={4} style="currency" value={rates.costPerDay} />
           </KPI.Content>
         </KPI>
@@ -71,7 +71,7 @@ export function AdminUserKpis({
           <KPI.Header>
             <KPI.Title>Cost / request</KPI.Title>
           </KPI.Header>
-          <KPI.Content className="flex-none items-start">
+          <KPI.Content>
             <KPI.Value currency="USD" maximumFractionDigits={4} style="currency" value={rates.costPerRequest} />
           </KPI.Content>
         </KPI>
@@ -80,7 +80,7 @@ export function AdminUserKpis({
           <KPI.Header>
             <KPI.Title>Avg duration</KPI.Title>
           </KPI.Header>
-          <KPI.Content className="flex-none items-start">
+          <KPI.Content>
             <KPI.Value
               formatOptions={{
                 maximumFractionDigits: 1,
@@ -97,7 +97,7 @@ export function AdminUserKpis({
           <KPI.Header>
             <KPI.Title>p95 duration</KPI.Title>
           </KPI.Header>
-          <KPI.Content className="flex-none items-start">
+          <KPI.Content>
             <KPI.Value
               formatOptions={{
                 maximumFractionDigits: 1,
