@@ -42,6 +42,27 @@ msgstr "Аккаунты связаны. Память теперь следуе�
 msgid "Add photo"
 msgstr "Добавить фото"
 
+#: app/_components/products-app.tsx:454
+msgid "Add"
+msgstr "Добавить"
+
+#: app/_components/products-app.tsx:376
+msgid "Add to"
+msgstr "Добавить в"
+
+#: app/_components/products-app.tsx:266
+#: app/_components/products-app.tsx:359
+msgid "Add to favorites"
+msgstr "Добавить в избранное"
+
+#: app/_components/products-app.tsx:450
+msgid "Added to {mealName}."
+msgstr "Добавлено в {mealName}."
+
+#: app/_components/products-app.tsx:183
+msgid "All"
+msgstr "Все"
+
 #: app/actions/settings.ts:281
 msgid "Already linked."
 msgstr "Уже связано."
@@ -278,6 +299,93 @@ msgstr "Клетчатка"
 #: app/_components/mini-app-tab-bar.tsx:93
 msgid "Food"
 msgstr "Еда"
+
+#: app/_components/products-app.tsx:166
+msgid "Foods you have logged, ready to add again."
+msgstr "Продукты, которые вы уже записывали — можно добавить снова."
+
+#: app/_components/products-app.tsx:178
+msgid "Favorites"
+msgstr "Избранное"
+
+#: app/_components/products-app.tsx:208
+msgid "No favorites yet"
+msgstr "Пока нет избранного"
+
+#: app/_components/products-app.tsx:208
+msgid "No products yet"
+msgstr "Пока нет продуктов"
+
+#: app/_components/products-app.tsx:211
+msgid "Star foods you eat often so they show up here."
+msgstr "Отмечайте звёздочкой продукты, которые едите часто, чтобы они появились здесь."
+
+#: app/_components/products-app.tsx:213
+msgid "Log a meal in chat and it will appear here for one-tap adding."
+msgstr "Запишите приём пищи в чате — он появится здесь, чтобы добавлять его в один тап."
+
+#: app/_components/mini-app-tab-bar.tsx:93
+#: app/_components/mini-app-tab-bar.tsx:117
+#: app/_components/desktop-workspace.tsx:86
+#: app/_components/products-app.tsx:163
+#: app/products/page.tsx:14
+msgid "Products"
+msgstr "Продукты"
+
+#: app/_components/products-app.tsx:171
+msgid "Product lists"
+msgstr "Списки продуктов"
+
+#: app/_components/products-app.tsx:175
+msgid "Recent"
+msgstr "Недавние"
+
+#: app/_components/products-app.tsx:266
+#: app/_components/products-app.tsx:359
+msgid "Remove from favorites"
+msgstr "Убрать из избранного"
+
+#: app/_components/products-app.tsx:408
+msgid "Size"
+msgstr "Размер"
+
+#: app/_components/products-app.tsx:426
+msgid "Cancel"
+msgstr "Отмена"
+
+#: app/actions/products.ts:38
+msgid "Choose a valid product list."
+msgstr "Выберите список продуктов."
+
+#: app/actions/products.ts:49
+#: app/_components/products-app.tsx:147
+msgid "Could not load products."
+msgstr "Не удалось загрузить продукты."
+
+#: app/actions/products.ts:75
+msgid "Could not update favorites."
+msgstr "Не удалось обновить избранное."
+
+#: app/actions/products.ts:89
+msgid "Choose breakfast, lunch, dinner, or a snack."
+msgstr "Выберите завтрак, обед, ужин или перекус."
+
+#: app/actions/products.ts:92
+#: app/actions/products.ts:95
+msgid "Choose a valid amount."
+msgstr "Укажите корректное количество."
+
+#: app/actions/products.ts:100
+msgid "Choose a product."
+msgstr "Выберите продукт."
+
+#: app/actions/products.ts:125
+msgid "Could not add that food."
+msgstr "Не удалось добавить этот продукт."
+
+#: app/actions/products.ts:138
+msgid "Sign in to view your products."
+msgstr "Войдите, чтобы увидеть свои продукты."
 
 #: app/_components/settings-forms.tsx:711
 msgid "Generate"

@@ -47,7 +47,8 @@ export async function proxy(request: NextRequest) {
     pathname === "/" ||
     pathname.startsWith("/s") ||
     pathname.startsWith("/settings") ||
-    pathname.startsWith("/summary")
+    pathname.startsWith("/summary") ||
+    pathname.startsWith("/products")
   ) {
     if (token) {
       return withLocaleCookie(request, NextResponse.next());
@@ -66,7 +67,7 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/s/:path*", "/settings", "/summary", "/login", "/admin", "/admin/:path*"],
+  matcher: ["/", "/s/:path*", "/settings", "/summary", "/products", "/login", "/admin", "/admin/:path*"],
 };
 
 function withAdminUiHeader(request: NextRequest): Headers {

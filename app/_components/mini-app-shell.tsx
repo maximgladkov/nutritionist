@@ -3,6 +3,7 @@
 import { MiniAppGroups } from "@/app/_components/mini-app-groups";
 import { MiniAppSettings } from "@/app/_components/mini-app-settings";
 import { MiniAppTabBar, type MiniAppTab } from "@/app/_components/mini-app-tab-bar";
+import { ProductsApp } from "@/app/_components/products-app";
 import { cn } from "@/lib/utils";
 import { createContext, useContext, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
@@ -34,6 +35,14 @@ export function MiniAppShell({ children }: { readonly children: ReactNode }) {
           ref={foodRef}
         >
           {children}
+        </div>
+        <div
+          className={cn(
+            "h-full overflow-y-auto pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]",
+            tab === "products" ? "block" : "hidden",
+          )}
+        >
+          <ProductsApp embed />
         </div>
         {tab === "groups" ? (
           <div className="h-full overflow-y-auto pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]">

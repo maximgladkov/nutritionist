@@ -16,21 +16,22 @@ function createPrisma(): PrismaClient {
   return new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
 }
 
-function hasAgentTurn(client: PrismaClient | undefined): client is PrismaClient {
+function hasRequiredModels(client: PrismaClient | undefined): client is PrismaClient {
   return (
     typeof client?.agentTurn?.findUnique === "function" &&
-    typeof client?.agentTurnPendingAck?.findFirst === "function"
+    typeof client?.agentTurnPendingAck?.findFirst === "function" &&
+    typeof client?.productFavorite?.findMany === "function"
   );
 }
 
 function getPrisma(): PrismaClient {
   const cached = globalForPrisma.prisma;
-  if (hasAgentTurn(cached)) {
+  if (hasRequiredModels(cached)) {
     return cached;
   }
   const created = createPrisma();
-  if (!hasAgentTurn(created)) {
-    throw new Error("Prisma client is missing AgentTurn. Restart the eve runtime after prisma generate.");
+  if (!hasRequiredModels(created)) {
+    throw new Error("Prisma client is missing models. Restart the eve runtime after prisma generate.");
   }
   if (process.env.NODE_ENV !== "production") {
     globalForPrisma.prisma = created;

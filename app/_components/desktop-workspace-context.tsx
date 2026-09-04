@@ -2,7 +2,7 @@
 
 import { createContext, useContext } from "react";
 
-export type DesktopWidgetId = "chat" | "settings" | "summary";
+export type DesktopWidgetId = "chat" | "products" | "settings" | "summary";
 
 export const DesktopWorkspaceContext = createContext<{
   readonly focusWidget: (id: DesktopWidgetId) => void;

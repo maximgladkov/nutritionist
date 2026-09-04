@@ -24,6 +24,7 @@ model User {
   goals         UserGoal[]
   conversationMessages ConversationMessage[]
   catalogProducts CatalogProduct[]
+  productFavorites ProductFavorite[]
   agentTurns    AgentTurn[]
   pendingAcks   AgentTurnPendingAck[]
   createdAt     DateTime  @default(now())
@@ -304,6 +305,19 @@ model MealItem {
   createdAt         DateTime     @default(now())
 
   @@index([mealId])
+}
+
+model ProductFavorite {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key       String
+  barcode   String?
+  name      String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, key])
+  @@index([userId])
 }
 
 model ChatSdkEntry {

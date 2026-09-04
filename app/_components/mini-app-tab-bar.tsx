@@ -2,7 +2,7 @@
 
 import { useAppLocale } from "@/app/_components/lingui-client-provider";
 import { cn } from "@/lib/utils";
-import { ChartColumn, Comment, Gear, PersonFill } from "@gravity-ui/icons";
+import { ChartColumn, Comment, Gear, PersonFill, ShoppingBag } from "@gravity-ui/icons";
 import { Segment } from "@heroui-pro/react";
 import { useLingui } from "@lingui/react/macro";
 import type { ComponentType, SVGProps } from "react";
@@ -25,7 +25,7 @@ function Utensils(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-export const MINI_APP_TABS = ["food", "groups", "settings"] as const;
+export const MINI_APP_TABS = ["food", "products", "groups", "settings"] as const;
 export type MiniAppTab = (typeof MINI_APP_TABS)[number];
 
 export type AppTab<T extends string> = {
@@ -67,7 +67,7 @@ export function AppTabBar<T extends string>({
           const Icon = tab.icon;
           return (
             <Segment.Item
-              className="text-foreground h-auto min-w-[4.75rem] flex-col gap-0.5 px-3.5 py-1.5 text-[11px] leading-none data-[selected=true]:text-accent [&_svg]:size-5"
+              className="text-foreground h-auto min-w-[3.75rem] flex-col gap-0.5 px-2.5 py-1.5 text-[11px] leading-none data-[selected=true]:text-accent [&_svg]:size-5"
               id={tab.id}
               key={tab.id}
             >
@@ -91,6 +91,7 @@ export function MiniAppTabBar({
   const { t } = useLingui();
   const tabs: readonly AppTab<MiniAppTab>[] = [
     { id: "food", label: t`Food`, icon: Utensils },
+    { id: "products", label: t`Products`, icon: ShoppingBag },
     { id: "groups", label: t`Groups`, icon: PersonFill },
     { id: "settings", label: t`Settings`, icon: Gear },
   ];
@@ -100,7 +101,7 @@ export function MiniAppTabBar({
   );
 }
 
-export const WEB_APP_TABS = ["chat", "summary", "settings"] as const;
+export const WEB_APP_TABS = ["chat", "summary", "products", "settings"] as const;
 export type WebAppTab = (typeof WEB_APP_TABS)[number];
 
 export function WebAppTabBar({
@@ -114,6 +115,7 @@ export function WebAppTabBar({
   const tabs: readonly AppTab<WebAppTab>[] = [
     { id: "chat", label: t`Chat`, icon: Comment },
     { id: "summary", label: t`Summary`, icon: ChartColumn },
+    { id: "products", label: t`Products`, icon: ShoppingBag },
     { id: "settings", label: t`Settings`, icon: Gear },
   ];
 

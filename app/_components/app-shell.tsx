@@ -92,6 +92,9 @@ function tabFromPath(pathname: string): WebAppTab {
   if (pathname.startsWith("/summary")) {
     return "summary";
   }
+  if (pathname.startsWith("/products")) {
+    return "products";
+  }
   return "chat";
 }
 
@@ -101,6 +104,9 @@ function hrefForTab(tab: WebAppTab, pathname: string): string {
   }
   if (tab === "summary") {
     return "/summary";
+  }
+  if (tab === "products") {
+    return "/products";
   }
   if (pathname === "/" || pathname === "/s" || pathname.startsWith("/s/")) {
     return pathname;

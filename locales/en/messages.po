@@ -42,6 +42,27 @@ msgstr "Accounts linked. Memory now follows you across channels."
 msgid "Add photo"
 msgstr "Add photo"
 
+#: app/_components/products-app.tsx:454
+msgid "Add"
+msgstr "Add"
+
+#: app/_components/products-app.tsx:376
+msgid "Add to"
+msgstr "Add to"
+
+#: app/_components/products-app.tsx:266
+#: app/_components/products-app.tsx:359
+msgid "Add to favorites"
+msgstr "Add to favorites"
+
+#: app/_components/products-app.tsx:450
+msgid "Added to {mealName}."
+msgstr "Added to {mealName}."
+
+#: app/_components/products-app.tsx:183
+msgid "All"
+msgstr "All"
+
 #: app/actions/settings.ts:281
 msgid "Already linked."
 msgstr "Already linked."
@@ -278,6 +299,93 @@ msgstr "Fiber"
 #: app/_components/mini-app-tab-bar.tsx:93
 msgid "Food"
 msgstr "Food"
+
+#: app/_components/products-app.tsx:166
+msgid "Foods you have logged, ready to add again."
+msgstr "Foods you have logged, ready to add again."
+
+#: app/_components/products-app.tsx:178
+msgid "Favorites"
+msgstr "Favorites"
+
+#: app/_components/products-app.tsx:208
+msgid "No favorites yet"
+msgstr "No favorites yet"
+
+#: app/_components/products-app.tsx:208
+msgid "No products yet"
+msgstr "No products yet"
+
+#: app/_components/products-app.tsx:211
+msgid "Star foods you eat often so they show up here."
+msgstr "Star foods you eat often so they show up here."
+
+#: app/_components/products-app.tsx:213
+msgid "Log a meal in chat and it will appear here for one-tap adding."
+msgstr "Log a meal in chat and it will appear here for one-tap adding."
+
+#: app/_components/mini-app-tab-bar.tsx:93
+#: app/_components/mini-app-tab-bar.tsx:117
+#: app/_components/desktop-workspace.tsx:86
+#: app/_components/products-app.tsx:163
+#: app/products/page.tsx:14
+msgid "Products"
+msgstr "Products"
+
+#: app/_components/products-app.tsx:171
+msgid "Product lists"
+msgstr "Product lists"
+
+#: app/_components/products-app.tsx:175
+msgid "Recent"
+msgstr "Recent"
+
+#: app/_components/products-app.tsx:266
+#: app/_components/products-app.tsx:359
+msgid "Remove from favorites"
+msgstr "Remove from favorites"
+
+#: app/_components/products-app.tsx:408
+msgid "Size"
+msgstr "Size"
+
+#: app/_components/products-app.tsx:426
+msgid "Cancel"
+msgstr "Cancel"
+
+#: app/actions/products.ts:38
+msgid "Choose a valid product list."
+msgstr "Choose a valid product list."
+
+#: app/actions/products.ts:49
+#: app/_components/products-app.tsx:147
+msgid "Could not load products."
+msgstr "Could not load products."
+
+#: app/actions/products.ts:75
+msgid "Could not update favorites."
+msgstr "Could not update favorites."
+
+#: app/actions/products.ts:89
+msgid "Choose breakfast, lunch, dinner, or a snack."
+msgstr "Choose breakfast, lunch, dinner, or a snack."
+
+#: app/actions/products.ts:92
+#: app/actions/products.ts:95
+msgid "Choose a valid amount."
+msgstr "Choose a valid amount."
+
+#: app/actions/products.ts:100
+msgid "Choose a product."
+msgstr "Choose a product."
+
+#: app/actions/products.ts:125
+msgid "Could not add that food."
+msgstr "Could not add that food."
+
+#: app/actions/products.ts:138
+msgid "Sign in to view your products."
+msgstr "Sign in to view your products."
 
 #: app/_components/settings-forms.tsx:711
 msgid "Generate"

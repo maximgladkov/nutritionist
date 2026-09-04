@@ -195,6 +195,56 @@ export async function summarizeNutrition(input: {
   return summary;
 }
 
+export type TodaysMealWrite =
+  | { action: "append"; mealId: string }
+  | { action: "create" };
+
+export function todaysMealWrite(existingMealId: string | null | undefined): TodaysMealWrite {
+  if (existingMealId) {
+    return { action: "append", mealId: existingMealId };
+  }
+  return { action: "create" };
+}
+
+export async function addItemToTodaysMeal(input: {
+  userId: string;
+  label: MealLabel;
+  item: MealItemInput;
+  now?: Date;
+  country?: string;
+  signal?: AbortSignal;
+}): Promise<MealView> {
+  const timeZone = (await callerTimezone(input.userId)) ?? "UTC";
+  const { from, to } = localDayRange(input.now ?? new Date(), timeZone);
+  const existing = await prisma.meal.findFirst({
+    where: {
+      userId: input.userId,
+      label: input.label,
+      eatenAt: { gte: from, lt: to },
+    },
+    orderBy: { eatenAt: "desc" },
+    select: { id: true },
+  });
+  const write = todaysMealWrite(existing?.id);
+  if (write.action === "append") {
+    return addMealItems({
+      userId: input.userId,
+      mealId: write.mealId,
+      items: [input.item],
+      country: input.country,
+      signal: input.signal,
+    });
+  }
+  return logMeal({
+    userId: input.userId,
+    eatenAt: input.now,
+    label: input.label,
+    items: [input.item],
+    country: input.country,
+    signal: input.signal,
+  });
+}
+
 export async function deleteMeal(input: {
   userId: string;
   mealId: string;

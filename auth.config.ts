@@ -18,7 +18,7 @@ export const authConfig = {
       if (pathname === "/login" || pathname.startsWith("/api/auth")) {
         return true;
       }
-      if (pathname === "/" || pathname.startsWith("/s") || pathname.startsWith("/settings")) {
+      if (pathname === "/" || pathname.startsWith("/s") || pathname.startsWith("/settings") || pathname.startsWith("/products")) {
         return Boolean(auth?.user);
       }
       return true;

@@ -7,6 +7,7 @@ import {
   type DesktopWidgetId,
 } from "@/app/_components/desktop-workspace-context";
 import { NutritionSummaryApp } from "@/app/_components/nutrition-summary";
+import { ProductsApp } from "@/app/_components/products-app";
 import { signOutAction } from "@/app/actions/auth";
 import { cn } from "@/lib/utils";
 import { ArrowRightFromSquare } from "@gravity-ui/icons";
@@ -80,6 +81,15 @@ export function DesktopWorkspace({ email }: { readonly email?: string }) {
           />
         </DesktopScreen>
         <DesktopScreen
+          className="top-[22%] left-[22vw] translate-y-2 rotate-1"
+          front={front}
+          id="products"
+          label={t`Products`}
+          onFront={setFront}
+        >
+          <ProductsApp compact />
+        </DesktopScreen>
+        <DesktopScreen
           className="top-[16%] left-1/2 -translate-x-1/2 translate-y-4"
           front={front}
           id="summary"
@@ -125,7 +135,9 @@ function DesktopScreen({
     >
       <Widget aria-label={label} className="shadow-overlay ring-foreground/8 h-full w-full ring-1">
         <Widget.Content
-          className={id === "chat" ? "flex min-h-0 flex-col p-0" : "min-h-0 p-0"}
+          className={
+            id === "chat" || id === "products" ? "flex min-h-0 flex-col p-0" : "min-h-0 p-0"
+          }
         >
           {children}
         </Widget.Content>
@@ -140,6 +152,9 @@ function stackClass(id: DesktopWidgetId, front: DesktopWidgetId): string {
   }
   if (id === "summary") {
     return "z-20";
+  }
+  if (id === "products") {
+    return "z-[15]";
   }
   return "z-10";
 }
