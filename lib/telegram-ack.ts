@@ -24,7 +24,7 @@ type TelegramAckAttachment = {
   mediaType?: string;
 };
 
-type TelegramAckInput = {
+export type TelegramAckInput = {
   caption: string;
   files?: readonly TelegramAckFile[];
   text: string;

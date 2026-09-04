@@ -2,7 +2,7 @@ import { defineHook } from "eve/hooks";
 import type { HookContext } from "eve/hooks";
 import { resolveAuthenticatedUserId } from "../../lib/identity";
 import { prisma } from "../../lib/prisma";
-import { consumePendingAgentTurnAck } from "../../lib/agent-turn-ack";
+import { claimPendingAgentTurnAck } from "../../lib/agent-turn-ack";
 import {
   applyAckMessage,
   applyAssistantMessage,
@@ -11,6 +11,8 @@ import {
   applyToolRequested,
   applyToolResult,
   applyUserMessage,
+  drainAgentTurnPersist,
+  enqueueAgentTurnPersist,
   finalizeAgentTurn,
   findAgentTurnModel,
   normalizeChannelKind,
@@ -23,9 +25,8 @@ import {
 
 export default defineHook({
   events: {
-    async "turn.started"(event, ctx) {
-      await runQuietly("turn.started", async () => {
-        const scope = await turnScope(ctx, event.data.turnId, event.meta.at);
+    "turn.started"(event, ctx) {
+      persistTurnEvent("turn.started", ctx, event.data.turnId, event.meta.at, async (scope) => {
         await startAgentTurn({
           channel: scope.channel,
           sessionId: scope.sessionId,
@@ -34,8 +35,10 @@ export default defineHook({
           turnSequence: scope.turnSequence,
           userId: scope.userId,
         });
-        const pending = await consumePendingAgentTurnAck({
+        const pending = await claimPendingAgentTurnAck({
           channel: scope.channel,
+          sessionId: scope.sessionId,
+          turnId: scope.turnId,
           userId: scope.userId,
         });
         if (pending) {
@@ -43,9 +46,8 @@ export default defineHook({
         }
       });
     },
-    async "message.received"(event, ctx) {
-      await runQuietly("message.received", async () => {
-        const scope = await turnScope(ctx, event.data.turnId, event.meta.at);
+    "message.received"(event, ctx) {
+      persistTurnEvent("message.received", ctx, event.data.turnId, event.meta.at, async (scope) => {
         await patchAgentTurnTranscript(scope, (transcript) =>
           applyUserMessage(transcript, {
             at: event.meta.at,
@@ -55,9 +57,8 @@ export default defineHook({
         );
       });
     },
-    async "step.started"(event, ctx) {
-      await runQuietly("step.started", async () => {
-        const scope = await turnScope(ctx, event.data.turnId, event.meta.at);
+    "step.started"(event, ctx) {
+      persistTurnEvent("step.started", ctx, event.data.turnId, event.meta.at, async (scope) => {
         await patchAgentTurnTranscript(
           { ...scope, model: event.data.modelId },
           (transcript) => applyStepStarted(transcript, {
@@ -67,9 +68,8 @@ export default defineHook({
         );
       });
     },
-    async "actions.requested"(event, ctx) {
-      await runQuietly("actions.requested", async () => {
-        const scope = await turnScope(ctx, event.data.turnId, event.meta.at);
+    "actions.requested"(event, ctx) {
+      persistTurnEvent("actions.requested", ctx, event.data.turnId, event.meta.at, async (scope) => {
         await patchAgentTurnTranscript(scope, (transcript) => {
           let next = transcript;
           for (const call of toolCallsFromActions(event.data.actions)) {
@@ -85,13 +85,12 @@ export default defineHook({
         });
       });
     },
-    async "action.result"(event, ctx) {
-      await runQuietly("action.result", async () => {
+    "action.result"(event, ctx) {
+      persistTurnEvent("action.result", ctx, event.data.turnId, event.meta.at, async (scope) => {
         const extracted = toolResultFromAction(event.data.result);
         if (!extracted) {
           return;
         }
-        const scope = await turnScope(ctx, event.data.turnId, event.meta.at);
         await patchAgentTurnTranscript(scope, (transcript) =>
           applyToolResult(transcript, {
             at: event.meta.at,
@@ -104,13 +103,12 @@ export default defineHook({
         );
       });
     },
-    async "message.completed"(event, ctx) {
-      await runQuietly("message.completed", async () => {
+    "message.completed"(event, ctx) {
+      persistTurnEvent("message.completed", ctx, event.data.turnId, event.meta.at, async (scope) => {
         const text = event.data.message?.trim() ?? "";
         if (text.length === 0) {
           return;
         }
-        const scope = await turnScope(ctx, event.data.turnId, event.meta.at);
         await patchAgentTurnTranscript(scope, (transcript) =>
           applyAssistantMessage(transcript, {
             at: event.meta.at,
@@ -121,10 +119,9 @@ export default defineHook({
         );
       });
     },
-    async "step.completed"(event, ctx) {
-      await runQuietly("step.completed", async () => {
+    "step.completed"(event, ctx) {
+      persistTurnEvent("step.completed", ctx, event.data.turnId, event.meta.at, async (scope) => {
         const existing = await findAgentTurnModel(ctx.session.id, event.data.turnId);
-        const scope = await turnScope(ctx, event.data.turnId, event.meta.at);
         const model = existing?.model ?? "unknown";
         await patchAgentTurnTranscript({ ...scope, model }, (transcript) =>
           applyStepCompleted(transcript, {
@@ -140,7 +137,7 @@ export default defineHook({
       });
     },
     async "turn.completed"(event, ctx) {
-      await runQuietly("turn.completed", async () => {
+      persistTurnEvent("turn.completed", ctx, event.data.turnId, event.meta.at, async () => {
         await finalizeAgentTurn({
           endedAt: new Date(event.meta.at),
           sessionId: ctx.session.id,
@@ -148,9 +145,10 @@ export default defineHook({
           turnId: event.data.turnId,
         });
       });
+      await drainAgentTurnPersist(ctx.session.id, event.data.turnId);
     },
     async "turn.failed"(event, ctx) {
-      await runQuietly("turn.failed", async () => {
+      persistTurnEvent("turn.failed", ctx, event.data.turnId, event.meta.at, async () => {
         await finalizeAgentTurn({
           endedAt: new Date(event.meta.at),
           errorCode: event.data.code,
@@ -160,9 +158,10 @@ export default defineHook({
           turnId: event.data.turnId,
         });
       });
+      await drainAgentTurnPersist(ctx.session.id, event.data.turnId);
     },
     async "turn.cancelled"(event, ctx) {
-      await runQuietly("turn.cancelled", async () => {
+      persistTurnEvent("turn.cancelled", ctx, event.data.turnId, event.meta.at, async () => {
         await finalizeAgentTurn({
           endedAt: new Date(event.meta.at),
           sessionId: ctx.session.id,
@@ -170,6 +169,7 @@ export default defineHook({
           turnId: event.data.turnId,
         });
       });
+      await drainAgentTurnPersist(ctx.session.id, event.data.turnId);
     },
   },
 });
@@ -182,6 +182,21 @@ type TurnScope = {
   turnSequence: number;
   userId: string | null;
 };
+
+function persistTurnEvent(
+  event: string,
+  ctx: HookContext,
+  turnId: string,
+  at: string,
+  work: (scope: TurnScope) => Promise<void>,
+): void {
+  void enqueueAgentTurnPersist(ctx.session.id, turnId, async () => {
+    await runQuietly(event, async () => {
+      const scope = await turnScope(ctx, turnId, at);
+      await work(scope);
+    });
+  });
+}
 
 async function turnScope(
   ctx: HookContext,

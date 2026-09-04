@@ -178,6 +178,31 @@ describe("transcript reducers", () => {
     assert.equal(summary.model, "zai/glm-5.3-flash");
   });
 
+  it("inserts a late quick answer after the user message", () => {
+    let transcript = applyUserMessage(emptyTranscript(), {
+      at: "2026-09-04T10:00:00.000Z",
+      text: "calories?",
+    });
+    transcript = applyAssistantMessage(transcript, {
+      at: "2026-09-04T10:00:01.000Z",
+      finishReason: "stop",
+      stepIndex: 0,
+      text: "1,200 kcal",
+    });
+    transcript = applyAckMessage(transcript, {
+      at: "2026-09-04T10:00:00.500Z",
+      costUsd: 0.0001,
+      inputTokens: 20,
+      model: "google/gemini-3.5-flash-lite",
+      outputTokens: 4,
+      text: "Checking calories…",
+    });
+    assert.deepEqual(
+      transcript.items.map((item) => item.type),
+      ["user", "ack", "assistant"],
+    );
+  });
+
   it("clips oversized tool payloads", () => {
     const huge = "x".repeat(TOOL_JSON_MAX_CHARS + 10);
     const clipped = clipJson({ body: huge }) as { preview: string; truncated: boolean };

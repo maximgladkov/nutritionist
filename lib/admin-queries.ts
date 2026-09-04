@@ -1,6 +1,6 @@
 import { Prisma, type AgentTurnStatus } from "../generated/prisma/client";
-import { sortAdminUserRows } from "./admin-format.ts";
-import { parseTranscript } from "./agent-turn-model.ts";
+import { fillDailyRange, sortAdminUserRows } from "./admin-format.ts";
+import { normalizeChannelKind, parseTranscript } from "./agent-turn-model.ts";
 import { prisma } from "./prisma.ts";
 
 export type AdminRange = "7d" | "30d" | "all";
@@ -165,7 +165,7 @@ export async function loadAdminDashboard(range: AdminRange): Promise<AdminDashbo
       model: item.model ?? "(unknown)",
       requests: item._count._all,
     })),
-    daily: mapDailyPoints(daily),
+    daily: range === "all" ? mapDailyPoints(daily) : fillDailyRange(mapDailyPoints(daily), range),
     p95DurationMs: row?.p95DurationMs ?? null,
     range,
     requestCount: Number(row?.requestCount ?? 0),
@@ -279,7 +279,7 @@ export async function listAdminUsers(input: {
   const channelsByUser = new Map<string, string[]>();
   for (const row of sessionChannels) {
     const channels = channelsByUser.get(row.userId) ?? [];
-    channels.push(row.channel);
+    channels.push(normalizeChannelKind(row.channel));
     channelsByUser.set(row.userId, channels);
   }
   return sortAdminUserRows(
@@ -357,7 +357,7 @@ export async function loadAdminUser(userId: string, range: AdminRange): Promise<
     })),
     country: user.profile?.country ?? null,
     createdAt: user.createdAt.toISOString(),
-    daily: mapDailyPoints(daily),
+    daily: range === "all" ? mapDailyPoints(daily) : fillDailyRange(mapDailyPoints(daily), range),
     id: user.id,
     identities: user.identities.map((identity) => ({
       createdAt: identity.createdAt.toISOString(),

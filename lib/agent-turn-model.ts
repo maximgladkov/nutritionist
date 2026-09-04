@@ -168,23 +168,25 @@ export function applyAckMessage(
   if (transcript.items.some((item) => item.type === "ack")) {
     return transcript;
   }
-  return {
-    ...transcript,
-    items: [
-      ...transcript.items,
-      {
-        at: input.at,
-        cacheReadTokens: input.cacheReadTokens ?? 0,
-        cacheWriteTokens: input.cacheWriteTokens ?? 0,
-        costUsd: input.costUsd ?? 0,
-        inputTokens: input.inputTokens ?? 0,
-        model: input.model,
-        outputTokens: input.outputTokens ?? 0,
-        text: input.text,
-        type: "ack" as const,
-      },
-    ],
+  const items = [...transcript.items];
+  const next: AgentTurnAckMessage = {
+    at: input.at,
+    cacheReadTokens: input.cacheReadTokens ?? 0,
+    cacheWriteTokens: input.cacheWriteTokens ?? 0,
+    costUsd: input.costUsd ?? 0,
+    inputTokens: input.inputTokens ?? 0,
+    model: input.model,
+    outputTokens: input.outputTokens ?? 0,
+    text: input.text,
+    type: "ack",
   };
+  const insertAt = items.findIndex((item) => item.type !== "user");
+  if (insertAt === -1) {
+    items.push(next);
+  } else {
+    items.splice(insertAt, 0, next);
+  }
+  return { ...transcript, items };
 }
 
 export function applyAssistantMessage(

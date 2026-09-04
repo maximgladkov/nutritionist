@@ -2,8 +2,12 @@ import { createTelegramFetchFile, telegramChannel } from "eve/channels/telegram"
 import type { TelegramContext, TelegramMessage } from "eve/channels/telegram";
 import { handleChannelLink, resolveChannelUser, saveChannelThreadId } from "../lib/channel-identity";
 import { telegramSummaryMiniAppUrl } from "../../lib/app-url";
-import { TELEGRAM_ACK_TURN_CONTEXT, postTelegramAck, telegramAckFiles } from "../../lib/telegram-ack";
-import { enqueuePendingAgentTurnAck } from "../../lib/agent-turn-ack";
+import { telegramAckFiles } from "../../lib/telegram-ack";
+import {
+  generateTelegramAckOrFalse,
+  markTelegramTurnReplyPosted,
+  startTelegramAckTurn,
+} from "../../lib/telegram-ack-turn";
 import { applyTelegramHiddenMedia, telegramMessageHasInboundContent } from "../../lib/telegram-media";
 import { claimTelegramMessage } from "../../lib/telegram-message-claim";
 import { markdownToTelegramHtml, telegramHtmlMessage } from "../../lib/telegram-html";
@@ -38,6 +42,7 @@ export default wrapTelegramLastMessageChannel(
           } catch {
             await channel.telegram.post(data.message);
           }
+          markTelegramTurnReplyPosted(ctx.session.id, ctx.session.turn.id);
           const caller = ctx.session.auth.current ?? ctx.session.auth.initiator;
           await persistTelegramConversationMessage({
             role: "assistant",
@@ -85,7 +90,7 @@ export default wrapTelegramLastMessageChannel(
         void ctx.telegram.startTyping();
         applyTelegramHiddenMedia(message);
         const files = telegramAckFiles(message.attachments);
-        const ackPosted = postTelegramAck(ctx.telegram, {
+        const ackGenerated = generateTelegramAckOrFalse({
           caption: message.caption,
           files,
           text: message.text,
@@ -96,34 +101,23 @@ export default wrapTelegramLastMessageChannel(
           name: [from.firstName, from.lastName].filter(Boolean).join(" ") || from.username,
         });
         if (message.chat.type === "private") {
-          await saveChannelThreadId({
+          void saveChannelThreadId({
             provider: "telegram",
             providerUserId: String(from.id),
             threadId: String(message.chat.id),
+          }).catch((error) => {
+            console.error("telegram thread persist failed", error);
           });
           void ensureSummaryMenuButton(ctx);
         }
-        const ack = await ackPosted.catch((): false => false);
-        if (ack !== false) {
-          try {
-            await enqueuePendingAgentTurnAck({
-              cacheReadTokens: ack.cacheReadTokens,
-              cacheWriteTokens: ack.cacheWriteTokens,
-              channel: "telegram",
-              costUsd: ack.costUsd,
-              inputTokens: ack.inputTokens,
-              model: ack.model,
-              outputTokens: ack.outputTokens,
-              text: ack.text,
-              userId: user.id,
-            });
-          } catch (error) {
-            console.error("telegram ack persist failed", error);
-          }
-        }
+        const ackTurn = await startTelegramAckTurn({
+          generate: ackGenerated,
+          telegram: ctx.telegram,
+          userId: user.id,
+        });
         return {
           auth: appPrincipal(user.id, "telegram"),
-          ...(ack ? { context: [TELEGRAM_ACK_TURN_CONTEXT] } : {}),
+          context: ackTurn.context,
         };
       },
     }),

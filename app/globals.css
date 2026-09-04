@@ -55,3 +55,12 @@ body {
   flex-direction: column;
   gap: 0.5rem;
 }
+
+.kpi-group [data-slot="kpi"] {
+  justify-content: flex-start;
+}
+
+.kpi-group .kpi__content {
+  flex: none;
+  align-items: start;
+}

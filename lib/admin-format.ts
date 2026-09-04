@@ -1,3 +1,5 @@
+import { normalizeChannelKind } from "./agent-turn-model.ts";
+
 export function formatUsd(value: number): string {
   if (!Number.isFinite(value) || value === 0) {
     return "$0";
@@ -63,19 +65,20 @@ export function formatDateTime(value: string): string {
 }
 
 export function formatChannelLabel(channel: string): string {
-  if (channel === "web") {
+  const kind = normalizeChannelKind(channel);
+  if (kind === "web") {
     return "Web";
   }
-  if (channel === "telegram") {
+  if (kind === "telegram") {
     return "Telegram";
   }
-  if (channel === "whatsapp") {
+  if (kind === "whatsapp") {
     return "WhatsApp";
   }
-  if (channel === "email") {
+  if (kind === "email") {
     return "Email";
   }
-  return channel;
+  return kind;
 }
 
 export function adminUserPath(userId: string, range?: string): string {
@@ -138,6 +141,55 @@ export function sortAdminUserRows<T extends { costUsd: number; id: string; lastT
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const MAX_FILLED_DAYS = 3660;
+
+type AdminDailyPointLike = {
+  readonly costUsd: number;
+  readonly day: string;
+  readonly requests: number;
+};
+
+function utcDayString(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function shiftUtcDay(day: string, days: number): string {
+  const date = new Date(`${day}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return utcDayString(date);
+}
+
+function emptyDailyPoint(day: string): AdminDailyPointLike {
+  return { costUsd: 0, day, requests: 0 };
+}
+
+export function fillDailyRange(
+  points: readonly AdminDailyPointLike[],
+  range: "7d" | "30d" | "all",
+  now = new Date(),
+): AdminDailyPointLike[] {
+  const active = points.filter((point) => point.requests > 0 || point.costUsd > 0);
+  const first = active[0];
+  if (!first) {
+    return [];
+  }
+  const byDay = new Map(active.map((point) => [point.day, point]));
+  const end = utcDayString(now);
+  const windowDays = range === "30d" ? 30 : range === "7d" ? 7 : null;
+  let start = windowDays === null ? first.day : shiftUtcDay(end, -(windowDays - 1));
+  if (first.day < start) {
+    start = first.day;
+  }
+  const filled: AdminDailyPointLike[] = [];
+  for (let day = start; day <= end && filled.length < MAX_FILLED_DAYS; day = shiftUtcDay(day, 1)) {
+    filled.push(byDay.get(day) ?? emptyDailyPoint(day));
+  }
+  const only = filled.length === 1 ? filled[0] : undefined;
+  if (only) {
+    return [emptyDailyPoint(shiftUtcDay(only.day, -1)), only];
+  }
+  return filled;
+}
 
 export function adminRangeDayCount(
   range: "7d" | "30d" | "all",

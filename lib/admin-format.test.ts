@@ -5,6 +5,7 @@ import {
   adminRangeDayCount,
   adminUserPath,
   adminUserRateMetrics,
+  fillDailyRange,
   formatChannelLabel,
   formatRequestCount,
   formatRequestPerDay,
@@ -73,6 +74,8 @@ describe("formatChannelLabel", () => {
     assert.equal(formatChannelLabel("telegram"), "Telegram");
     assert.equal(formatChannelLabel("whatsapp"), "WhatsApp");
     assert.equal(formatChannelLabel("email"), "Email");
+    assert.equal(formatChannelLabel("channel:telegram"), "Telegram");
+    assert.equal(formatChannelLabel("http"), "Web");
     assert.equal(formatChannelLabel("sms"), "sms");
   });
 });
@@ -95,6 +98,39 @@ describe("adminUserPath", () => {
   it("encodes the user id and optional range", () => {
     assert.equal(adminUserPath("abc/def"), "/admin/users/abc%2Fdef");
     assert.equal(adminUserPath("user-1", "7d"), "/admin/users/user-1?range=7d");
+  });
+});
+
+describe("fillDailyRange", () => {
+  const now = new Date("2026-09-04T12:00:00.000Z");
+
+  it("returns an empty series when there is no activity", () => {
+    assert.deepEqual(fillDailyRange([], "7d", now), []);
+    assert.deepEqual(fillDailyRange([{ costUsd: 0, day: "2026-09-04", requests: 0 }], "7d", now), []);
+  });
+
+  it("fills missing days in a 7d window so a sparkline can draw", () => {
+    const filled = fillDailyRange([{ costUsd: 0.0018, day: "2026-09-04", requests: 1 }], "7d", now);
+    assert.equal(filled.length, 7);
+    assert.equal(filled[0]?.day, "2026-08-29");
+    assert.equal(filled[0]?.requests, 0);
+    assert.equal(filled[6]?.day, "2026-09-04");
+    assert.equal(filled[6]?.requests, 1);
+    assert.equal(filled[6]?.costUsd, 0.0018);
+  });
+
+  it("fills a 30d window", () => {
+    const filled = fillDailyRange([{ costUsd: 1, day: "2026-08-20", requests: 4 }], "30d", now);
+    assert.equal(filled.length, 30);
+    assert.equal(filled[0]?.day, "2026-08-06");
+    assert.equal(filled.find((point) => point.day === "2026-08-20")?.requests, 4);
+  });
+
+  it("pads a single all-time point with a leading zero day", () => {
+    const filled = fillDailyRange([{ costUsd: 1, day: "2026-09-04", requests: 2 }], "all", now);
+    assert.equal(filled.length, 2);
+    assert.deepEqual(filled[0], { costUsd: 0, day: "2026-09-03", requests: 0 });
+    assert.deepEqual(filled[1], { costUsd: 1, day: "2026-09-04", requests: 2 });
   });
 });
 

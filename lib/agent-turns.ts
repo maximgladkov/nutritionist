@@ -9,6 +9,7 @@ import {
 import { prisma } from "./prisma.ts";
 
 export * from "./agent-turn-model.ts";
+export { drainAgentTurnPersist, enqueueAgentTurnPersist, resetAgentTurnPersistQueue } from "./agent-turn-persist.ts";
 
 function agentTurns() {
   const delegate = prisma["agentTurn"];
@@ -107,6 +108,20 @@ export async function findAgentTurnModel(sessionId: string, turnId: string) {
     select: { model: true },
     where: { sessionId_turnId: { sessionId, turnId } },
   });
+}
+
+export async function loadAgentTurnAckDelivery(sessionId: string, turnId: string) {
+  const row = await agentTurns().findUnique({
+    select: { messages: true, status: true },
+    where: { sessionId_turnId: { sessionId, turnId } },
+  });
+  if (!row) {
+    return null;
+  }
+  return {
+    hasAssistant: parseTranscript(row.messages).items.some((item) => item.type === "assistant"),
+    status: row.status as AgentTurnStatus,
+  };
 }
 
 export async function finalizeAgentTurn(input: {

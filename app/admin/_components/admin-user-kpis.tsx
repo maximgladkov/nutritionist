@@ -1,5 +1,6 @@
 "use client";
 
+import { AdminKpiSparkline } from "@/app/admin/_components/admin-kpi-sparkline";
 import { adminUserRateMetrics } from "@/lib/admin-format";
 import type { AdminUserDetail } from "@/lib/admin-queries";
 import { KPIGroup, NumberValue } from "@heroui-pro/react";
@@ -27,21 +28,19 @@ export function AdminUserKpis({
           <KPI.Header>
             <KPI.Title>Requests</KPI.Title>
           </KPI.Header>
-          <KPI.Content>
+          <KPI.Content className="flex-none items-start">
             <KPI.Value style="decimal" value={data.requestCount}>
               <NumberValue.Suffix> req</NumberValue.Suffix>
             </KPI.Value>
           </KPI.Content>
-          {data.daily.length > 0 ? (
-            <KPI.Chart color="var(--chart-1)" data={[...data.daily]} dataKey="requests" height={64} />
-          ) : null}
+          <AdminKpiSparkline color="var(--chart-1)" data={data.daily} dataKey="requests" range={data.range} />
         </KPI>
         <KPIGroup.Separator />
         <KPI>
           <KPI.Header>
             <KPI.Title>Requests / day</KPI.Title>
           </KPI.Header>
-          <KPI.Content>
+          <KPI.Content className="flex-none items-start">
             <KPI.Value maximumFractionDigits={2} style="decimal" value={rates.requestsPerDay}>
               <NumberValue.Suffix> req/day</NumberValue.Suffix>
             </KPI.Value>
@@ -52,19 +51,17 @@ export function AdminUserKpis({
           <KPI.Header>
             <KPI.Title>Total cost (USD)</KPI.Title>
           </KPI.Header>
-          <KPI.Content>
+          <KPI.Content className="flex-none items-start">
             <KPI.Value currency="USD" maximumFractionDigits={4} style="currency" value={data.totalCostUsd} />
           </KPI.Content>
-          {data.daily.length > 0 ? (
-            <KPI.Chart color="var(--chart-3)" data={[...data.daily]} dataKey="costUsd" height={64} />
-          ) : null}
+          <AdminKpiSparkline color="var(--chart-3)" data={data.daily} dataKey="costUsd" range={data.range} />
         </KPI>
         <KPIGroup.Separator />
         <KPI>
           <KPI.Header>
             <KPI.Title>Cost / day</KPI.Title>
           </KPI.Header>
-          <KPI.Content>
+          <KPI.Content className="flex-none items-start">
             <KPI.Value currency="USD" maximumFractionDigits={4} style="currency" value={rates.costPerDay} />
           </KPI.Content>
         </KPI>
@@ -74,7 +71,7 @@ export function AdminUserKpis({
           <KPI.Header>
             <KPI.Title>Cost / request</KPI.Title>
           </KPI.Header>
-          <KPI.Content>
+          <KPI.Content className="flex-none items-start">
             <KPI.Value currency="USD" maximumFractionDigits={4} style="currency" value={rates.costPerRequest} />
           </KPI.Content>
         </KPI>
@@ -83,7 +80,7 @@ export function AdminUserKpis({
           <KPI.Header>
             <KPI.Title>Avg duration</KPI.Title>
           </KPI.Header>
-          <KPI.Content>
+          <KPI.Content className="flex-none items-start">
             <KPI.Value
               formatOptions={{
                 maximumFractionDigits: 1,
@@ -100,7 +97,7 @@ export function AdminUserKpis({
           <KPI.Header>
             <KPI.Title>p95 duration</KPI.Title>
           </KPI.Header>
-          <KPI.Content>
+          <KPI.Content className="flex-none items-start">
             <KPI.Value
               formatOptions={{
                 maximumFractionDigits: 1,

@@ -1,5 +1,6 @@
 "use client";
 
+import { AdminKpiSparkline } from "@/app/admin/_components/admin-kpi-sparkline";
 import {
   AdminChannelSpendChart,
   AdminDailyUsageChart,
@@ -17,33 +18,29 @@ export function AdminDashboardCharts({ data }: { readonly data: AdminDashboard }
           <KPI.Header>
             <KPI.Title>Requests</KPI.Title>
           </KPI.Header>
-          <KPI.Content>
+          <KPI.Content className="flex-none items-start">
             <KPI.Value style="decimal" value={data.requestCount}>
               <NumberValue.Suffix> req</NumberValue.Suffix>
             </KPI.Value>
           </KPI.Content>
-          {data.daily.length > 0 ? (
-            <KPI.Chart color="var(--chart-1)" data={[...data.daily]} dataKey="requests" height={64} />
-          ) : null}
+          <AdminKpiSparkline color="var(--chart-1)" data={data.daily} dataKey="requests" range={data.range} />
         </KPI>
         <KPIGroup.Separator />
         <KPI>
           <KPI.Header>
             <KPI.Title>Total cost (USD)</KPI.Title>
           </KPI.Header>
-          <KPI.Content>
+          <KPI.Content className="flex-none items-start">
             <KPI.Value currency="USD" maximumFractionDigits={4} style="currency" value={data.totalCostUsd} />
           </KPI.Content>
-          {data.daily.length > 0 ? (
-            <KPI.Chart color="var(--chart-3)" data={[...data.daily]} dataKey="costUsd" height={64} />
-          ) : null}
+          <AdminKpiSparkline color="var(--chart-3)" data={data.daily} dataKey="costUsd" range={data.range} />
         </KPI>
         <KPIGroup.Separator />
         <KPI>
           <KPI.Header>
             <KPI.Title>Avg duration</KPI.Title>
           </KPI.Header>
-          <KPI.Content>
+          <KPI.Content className="flex-none items-start">
             <KPI.Value
               formatOptions={{
                 maximumFractionDigits: 1,
@@ -60,7 +57,7 @@ export function AdminDashboardCharts({ data }: { readonly data: AdminDashboard }
           <KPI.Header>
             <KPI.Title>p95 duration</KPI.Title>
           </KPI.Header>
-          <KPI.Content>
+          <KPI.Content className="flex-none items-start">
             <KPI.Value
               formatOptions={{
                 maximumFractionDigits: 1,
