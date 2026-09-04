@@ -30,7 +30,7 @@ function MealKcal({
     <span className="flex shrink-0 items-baseline gap-1">
       <Typography
         className="tabular-nums leading-none"
-        type={compact ? "body-sm" : "h5"}
+        type={compact ? "body-sm" : "h6"}
         weight="semibold"
       >
         {kcal}
