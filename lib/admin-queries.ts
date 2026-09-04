@@ -49,6 +49,7 @@ export type AdminSessionTurn = {
   readonly messages: ReturnType<typeof parseTranscript>["items"];
   readonly model: string | null;
   readonly outputTokens: number;
+  readonly sessionId: string;
   readonly startedAt: string;
   readonly status: AgentTurnStatus;
   readonly turnId: string;
@@ -58,6 +59,10 @@ export type AdminSessionTurn = {
   readonly userName: string | null;
   readonly userPreview: string | null;
 };
+
+type AdminTurnRow = Prisma.AgentTurnGetPayload<{
+  include: { user: { select: { email: true; name: true } } };
+}>;
 
 export type AdminUserRow = {
   readonly channels: readonly string[];
@@ -377,6 +382,17 @@ export async function loadAdminUser(userId: string, range: AdminRange): Promise<
   };
 }
 
+export async function loadAdminRequest(id: string): Promise<AdminSessionTurn | null> {
+  const row = await prisma.agentTurn.findUnique({
+    include: { user: { select: { email: true, name: true } } },
+    where: { id },
+  });
+  if (!row) {
+    return null;
+  }
+  return mapAdminSessionTurn(row);
+}
+
 export async function loadAdminSession(sessionId: string): Promise<readonly AdminSessionTurn[] | null> {
   const rows = await prisma.agentTurn.findMany({
     include: { user: { select: { email: true, name: true } } },
@@ -386,27 +402,7 @@ export async function loadAdminSession(sessionId: string): Promise<readonly Admi
   if (rows.length === 0) {
     return null;
   }
-  return rows.map((row) => ({
-    channel: row.channel,
-    costUsd: decimalToNumber(row.costUsd),
-    durationMs: row.durationMs,
-    endedAt: row.endedAt?.toISOString() ?? null,
-    errorCode: row.errorCode,
-    errorMessage: row.errorMessage,
-    id: row.id,
-    inputTokens: row.inputTokens,
-    messages: parseTranscript(row.messages).items,
-    model: row.model,
-    outputTokens: row.outputTokens,
-    startedAt: row.startedAt.toISOString(),
-    status: row.status,
-    turnId: row.turnId,
-    turnSequence: row.turnSequence,
-    userEmail: row.user?.email ?? null,
-    userId: row.userId,
-    userName: row.user?.name ?? null,
-    userPreview: row.userPreview,
-  }));
+  return rows.map(mapAdminSessionTurn);
 }
 
 async function loadDailyTurnPoints(startedAt: Date | null, userId?: string) {
@@ -429,6 +425,31 @@ function mapDailyPoints(rows: readonly { costUsd: number; day: Date; requests: b
     day: item.day.toISOString().slice(0, 10),
     requests: Number(item.requests),
   }));
+}
+
+function mapAdminSessionTurn(row: AdminTurnRow): AdminSessionTurn {
+  return {
+    channel: row.channel,
+    costUsd: decimalToNumber(row.costUsd),
+    durationMs: row.durationMs,
+    endedAt: row.endedAt?.toISOString() ?? null,
+    errorCode: row.errorCode,
+    errorMessage: row.errorMessage,
+    id: row.id,
+    inputTokens: row.inputTokens,
+    messages: parseTranscript(row.messages).items,
+    model: row.model,
+    outputTokens: row.outputTokens,
+    sessionId: row.sessionId,
+    startedAt: row.startedAt.toISOString(),
+    status: row.status,
+    turnId: row.turnId,
+    turnSequence: row.turnSequence,
+    userEmail: row.user?.email ?? null,
+    userId: row.userId,
+    userName: row.user?.name ?? null,
+    userPreview: row.userPreview,
+  };
 }
 
 function decimalToNumber(value: Prisma.Decimal | number | null | undefined): number {

@@ -35,7 +35,7 @@ export function AdminRequestsTable({
             {rows.map((row) => (
               <Table.Row key={row.id}>
                 <Table.Cell>
-                  <NextLink className="text-sm underline-offset-2 hover:underline" href={`/admin/sessions/${encodeURIComponent(row.sessionId)}`}>
+                  <NextLink className="text-sm underline-offset-2 hover:underline" href={`/admin/requests/${encodeURIComponent(row.id)}`}>
                     {formatDateTime(row.startedAt)}
                   </NextLink>
                 </Table.Cell>

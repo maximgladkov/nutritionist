@@ -47,7 +47,8 @@ const NAV_SECTIONS: readonly {
         icon: ListCheck,
         id: "requests",
         label: "Requests",
-        match: (pathname) => pathname === "/admin/requests" || pathname.startsWith("/admin/sessions/"),
+        match: (pathname) =>
+          pathname === "/admin/requests" || pathname.startsWith("/admin/requests/") || pathname.startsWith("/admin/sessions/"),
       },
     ],
     label: "Activity",
