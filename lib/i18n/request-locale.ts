@@ -4,9 +4,12 @@ import { cookies, headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { getI18nInstance } from "./app-router-i18n";
 import { initLingui } from "./init-lingui";
-import { isLocale, LOCALE_COOKIE_NAME, negotiateLocale, type Locale } from "./locales";
+import { isLocale, LOCALE_COOKIE_NAME, ADMIN_UI_HEADER, negotiateLocale, type Locale, sourceLocale } from "./locales";
 
 export async function resolveRequestLocale(userId?: string): Promise<Locale> {
+  if ((await headers()).get(ADMIN_UI_HEADER) === "1") {
+    return sourceLocale;
+  }
   if (userId) {
     const profile = await prisma.userProfile.findUnique({
       where: { userId },

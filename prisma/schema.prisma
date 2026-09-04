@@ -24,6 +24,7 @@ model User {
   goals         UserGoal[]
   conversationMessages ConversationMessage[]
   catalogProducts CatalogProduct[]
+  agentTurns    AgentTurn[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -111,6 +112,45 @@ model CatalogProduct {
 
   @@index([createdByUserId])
   @@index([name])
+}
+
+enum AgentTurnStatus {
+  running
+  completed
+  failed
+  cancelled
+}
+
+model AgentTurn {
+  id               String          @id @default(cuid())
+  userId           String?
+  user             User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  sessionId        String
+  turnId           String
+  turnSequence     Int
+  channel          String
+  status           AgentTurnStatus @default(running)
+  model            String?
+  startedAt        DateTime
+  endedAt          DateTime?
+  durationMs       Int?
+  inputTokens      Int             @default(0)
+  outputTokens     Int             @default(0)
+  cacheReadTokens  Int             @default(0)
+  cacheWriteTokens Int             @default(0)
+  costUsd          Decimal         @default(0) @db.Decimal(12, 6)
+  errorCode        String?
+  errorMessage     String?
+  userPreview      String?         @db.Text
+  messages         Json
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@unique([sessionId, turnId])
+  @@index([startedAt])
+  @@index([userId, startedAt])
+  @@index([sessionId, turnSequence])
+  @@index([channel, startedAt])
 }
 
 model ConversationMessage {

@@ -5,7 +5,8 @@ import {
   hasAuthSessionCookie,
   readAuthJwt,
 } from "./lib/auth-cookies";
-import { isLocale, localeCookieOptions, LOCALE_COOKIE_NAME, negotiateLocale } from "./lib/i18n/locales";
+import { isValidAdminBasicAuth } from "./lib/admin-auth";
+import { isLocale, localeCookieOptions, LOCALE_COOKIE_NAME, negotiateLocale, ADMIN_UI_HEADER } from "./lib/i18n/locales";
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -13,6 +14,21 @@ export async function proxy(request: NextRequest) {
   const staleCookie = hasAuthSessionCookie(request) && token === null;
   const telegramEmbed =
     pathname.startsWith("/summary") && request.nextUrl.searchParams.get("embed") === "tg";
+
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) {
+    if (!isValidAdminBasicAuth(request.headers.get("authorization"))) {
+      return new NextResponse("Authentication required.", {
+        headers: { "WWW-Authenticate": 'Basic realm="Admin"' },
+        status: 401,
+      });
+    }
+    return withLocaleCookie(
+      request,
+      NextResponse.next({
+        request: { headers: withAdminUiHeader(request) },
+      }),
+    );
+  }
 
   if (pathname === "/login") {
     if (!staleCookie) {
@@ -50,8 +66,14 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/s/:path*", "/settings", "/summary", "/login"],
+  matcher: ["/", "/s/:path*", "/settings", "/summary", "/login", "/admin", "/admin/:path*"],
 };
+
+function withAdminUiHeader(request: NextRequest): Headers {
+  const headers = new Headers(request.headers);
+  headers.set(ADMIN_UI_HEADER, "1");
+  return headers;
+}
 
 function withLocaleCookie(request: NextRequest, response: NextResponse): NextResponse {
   const existing = request.cookies.get(LOCALE_COOKIE_NAME)?.value;

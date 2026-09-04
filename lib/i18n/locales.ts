@@ -3,6 +3,7 @@ export type Locale = (typeof locales)[number];
 export const sourceLocale: Locale = "en";
 
 export const LOCALE_COOKIE_NAME = "locale";
+export const ADMIN_UI_HEADER = "x-admin-ui";
 export const LOCALE_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
 const RTL_LOCALES = new Set(["ar", "he", "fa", "ur"]);

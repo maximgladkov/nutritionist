@@ -174,6 +174,10 @@ export async function mergeUsers(survivorId: string, absorbedId: string): Promis
       where: { userId: absorbedId },
       data: { userId: survivorId },
     });
+    await tx.agentTurn.updateMany({
+      where: { userId: absorbedId },
+      data: { userId: survivorId },
+    });
     await tx.catalogProduct.updateMany({
       where: { createdByUserId: absorbedId },
       data: { createdByUserId: survivorId },

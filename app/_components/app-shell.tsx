@@ -27,7 +27,7 @@ export function AppShell({
   const isChat = pathname === "/" || pathname === "/s" || pathname.startsWith("/s/");
   const selected = tabFromPath(pathname);
 
-  if (pathname === "/login") {
+  if (pathname === "/login" || pathname.startsWith("/admin")) {
     return children;
   }
 

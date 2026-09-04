@@ -1,0 +1,14 @@
+---
+description: Admin UI is English-only and must not be translated
+globs: app/admin/**/*
+alwaysApply: false
+---
+
+# Admin UI is English-only
+
+`app/admin` is an internal console. Keep copy in English.
+
+- Do not wrap admin strings in Lingui `t`, `Trans`, or `msg`
+- Do not add admin copy to `locales/`
+- Do not follow the signed-in user locale or `Accept-Language`
+- Format numbers and dates in English (`en` / `en-US` / `en-GB`)

@@ -25,7 +25,7 @@ msgstr "{label} goal"
 msgid "{title} time"
 msgstr "{title} time"
 
-#: app/_components/nutrition-summary.tsx:334
+#: app/_components/nutrition-summary.tsx:315
 msgid "<0>Set daily goals</0> to track them as you eat."
 msgstr "<0>Set daily goals</0> to track them as you eat."
 
@@ -79,11 +79,15 @@ msgstr "Breakfast"
 msgid "BTR.me"
 msgstr "BTR.me"
 
+#: app/_components/day-ring-strip.tsx:494
+msgid "Calendar"
+msgstr "Calendar"
+
 #: app/_components/i18n-labels.ts:8
 msgid "Calories"
 msgstr "Calories"
 
-#: app/_components/nutrition-summary.tsx:249
+#: app/_components/nutrition-summary.tsx:247
 msgid "Calories and macros for the meals you have logged."
 msgstr "Calories and macros for the meals you have logged."
 
@@ -145,7 +149,7 @@ msgstr "Could not load settings."
 msgid "Could not load that day."
 msgstr "Could not load that day."
 
-#: app/_components/nutrition-summary.tsx:219
+#: app/_components/nutrition-summary.tsx:217
 #: app/actions/summary.ts:40
 msgid "Could not load that summary."
 msgstr "Could not load that summary."
@@ -333,10 +337,6 @@ msgstr "Linked Accounts"
 msgid "Loading day"
 msgstr "Loading day"
 
-#: app/_components/nutrition-summary.tsx:312
-msgid "Log a meal in chat to see totals here."
-msgstr "Log a meal in chat to see totals here."
-
 #: app/_components/day-ring-strip.tsx:372
 msgid "Log a meal today to start your streak"
 msgstr "Log a meal today to start your streak"
@@ -358,10 +358,6 @@ msgstr "Navigation"
 msgid "New chat"
 msgstr "New chat"
 
-#: app/_components/nutrition-summary.tsx:309
-msgid "No meals logged"
-msgstr "No meals logged"
-
 #: app/_components/settings-forms.tsx:272
 msgid "Not set"
 msgstr "Not set"
@@ -370,7 +366,7 @@ msgstr "Not set"
 msgid "Not set (worldwide)"
 msgstr "Not set (worldwide)"
 
-#: app/_components/nutrition-summary.tsx:212
+#: app/_components/nutrition-summary.tsx:210
 #: app/actions/settings.ts:75
 #: app/actions/summary.ts:109
 msgid "Open this from the Telegram bot."
@@ -387,6 +383,10 @@ msgstr "Other"
 #: app/_components/agent-message.tsx:148
 msgid "Photo"
 msgstr "Photo"
+
+#: app/_components/day-ring-strip.tsx:497
+msgid "Pick a day"
+msgstr "Pick a day"
 
 #: app/_components/i18n-labels.ts:12
 msgid "Protein"
@@ -444,7 +444,7 @@ msgstr "Send /link CODE in a private chat with the bot."
 msgid "Set a time zone first to turn reminders on."
 msgstr "Set a time zone first to turn reminders on."
 
-#: app/_components/nutrition-summary.tsx:328
+#: app/_components/nutrition-summary.tsx:309
 msgid "Set daily goals in chat to track them here."
 msgstr "Set daily goals in chat to track them here."
 
@@ -498,7 +498,7 @@ msgstr "Stop"
 
 #: app/_components/desktop-workspace.tsx:86
 #: app/_components/mini-app-tab-bar.tsx:116
-#: app/_components/nutrition-summary.tsx:246
+#: app/_components/nutrition-summary.tsx:244
 #: app/summary/page.tsx:15
 msgid "Summary"
 msgstr "Summary"
@@ -547,7 +547,7 @@ msgstr "Time zone cleared."
 msgid "Time zone saved."
 msgstr "Time zone saved."
 
-#: app/_components/nutrition-summary.tsx:267
+#: app/_components/nutrition-summary.tsx:265
 msgid "Times use UTC until you save a time zone in Settings."
 msgstr "Times use UTC until you save a time zone in Settings."
 

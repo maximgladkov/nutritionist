@@ -13,7 +13,7 @@ import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type SVGProps } from "react";
 
-const CELL_WIDTH = 60;
+const CELL_WIDTH = 64;
 const CELL_HEIGHT = 72;
 const MARKER_SIZE = 32;
 const INITIAL_COUNT = 90;
@@ -287,7 +287,7 @@ export function DayRingStrip({
       {streakDays != null ? <MealStreakLine days={streakDays} /> : null}
       {calendarOpen && today && calendarMin && calendarValue ? (
         <div className="flex w-full justify-center">
-          <Card className="w-fit">
+          <Card className="w-fit mt-8">
             <Card.Content>
               <Calendar
                 aria-label={t`Jump to date`}
@@ -491,9 +491,11 @@ function CalendarDayCell({
       </span>
       <span className="flex flex-col items-center leading-tight">
         <span className={cn("text-[11px] font-medium", open ? "text-foreground" : "text-muted")}>
-          Calendar
+          <Trans>Calendar</Trans>
         </span>
-        <span className={cn("text-[10px]", open ? "text-foreground" : "text-muted")}>Pick a day</span>
+        <span className={cn("text-[10px]", open ? "text-foreground" : "text-muted")}>
+          <Trans>Pick a day</Trans>
+        </span>
       </span>
     </button>
   );

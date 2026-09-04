@@ -25,7 +25,7 @@ msgstr "цель: {label}"
 msgid "{title} time"
 msgstr "время: {title}"
 
-#: app/_components/nutrition-summary.tsx:334
+#: app/_components/nutrition-summary.tsx:315
 msgid "<0>Set daily goals</0> to track them as you eat."
 msgstr "<0>Задайте дневные цели</0>, чтобы отслеживать их по мере еды."
 
@@ -79,11 +79,15 @@ msgstr "Завтрак"
 msgid "BTR.me"
 msgstr "BTR.me"
 
+#: app/_components/day-ring-strip.tsx:494
+msgid "Calendar"
+msgstr "Календарь"
+
 #: app/_components/i18n-labels.ts:8
 msgid "Calories"
 msgstr "Калории"
 
-#: app/_components/nutrition-summary.tsx:249
+#: app/_components/nutrition-summary.tsx:247
 msgid "Calories and macros for the meals you have logged."
 msgstr "Калории и макронутриенты по записанным приёмам пищи."
 
@@ -145,7 +149,7 @@ msgstr "Не удалось загрузить настройки."
 msgid "Could not load that day."
 msgstr "Не удалось загрузить этот день."
 
-#: app/_components/nutrition-summary.tsx:219
+#: app/_components/nutrition-summary.tsx:217
 #: app/actions/summary.ts:40
 msgid "Could not load that summary."
 msgstr "Не удалось загрузить сводку."
@@ -333,10 +337,6 @@ msgstr "Связанные аккаунты"
 msgid "Loading day"
 msgstr "Загрузка дня"
 
-#: app/_components/nutrition-summary.tsx:312
-msgid "Log a meal in chat to see totals here."
-msgstr "Запишите приём пищи в чате, чтобы увидеть итоги здесь."
-
 #: app/_components/day-ring-strip.tsx:372
 msgid "Log a meal today to start your streak"
 msgstr "Запишите приём пищи сегодня, чтобы начать свою серию"
@@ -358,10 +358,6 @@ msgstr "Навигация"
 msgid "New chat"
 msgstr "Новый чат"
 
-#: app/_components/nutrition-summary.tsx:309
-msgid "No meals logged"
-msgstr "Нет записей о еде"
-
 #: app/_components/settings-forms.tsx:272
 msgid "Not set"
 msgstr "Не задано"
@@ -370,7 +366,7 @@ msgstr "Не задано"
 msgid "Not set (worldwide)"
 msgstr "Не задано (весь мир)"
 
-#: app/_components/nutrition-summary.tsx:212
+#: app/_components/nutrition-summary.tsx:210
 #: app/actions/settings.ts:75
 #: app/actions/summary.ts:109
 msgid "Open this from the Telegram bot."
@@ -387,6 +383,10 @@ msgstr "Другое"
 #: app/_components/agent-message.tsx:148
 msgid "Photo"
 msgstr "Фото"
+
+#: app/_components/day-ring-strip.tsx:497
+msgid "Pick a day"
+msgstr "Выб. день"
 
 #: app/_components/i18n-labels.ts:12
 msgid "Protein"
@@ -444,7 +444,7 @@ msgstr "Отправьте /link CODE в личный чат с ботом."
 msgid "Set a time zone first to turn reminders on."
 msgstr "Сначала задайте часовой пояс, чтобы включить напоминания."
 
-#: app/_components/nutrition-summary.tsx:328
+#: app/_components/nutrition-summary.tsx:309
 msgid "Set daily goals in chat to track them here."
 msgstr "Задайте дневные цели в чате, чтобы отслеживать их здесь."
 
@@ -498,7 +498,7 @@ msgstr "Стоп"
 
 #: app/_components/desktop-workspace.tsx:86
 #: app/_components/mini-app-tab-bar.tsx:116
-#: app/_components/nutrition-summary.tsx:246
+#: app/_components/nutrition-summary.tsx:244
 #: app/summary/page.tsx:15
 msgid "Summary"
 msgstr "Сводка"
@@ -547,7 +547,7 @@ msgstr "Часовой пояс сброшен."
 msgid "Time zone saved."
 msgstr "Часовой пояс сохранён."
 
-#: app/_components/nutrition-summary.tsx:267
+#: app/_components/nutrition-summary.tsx:265
 msgid "Times use UTC until you save a time zone in Settings."
 msgstr "Время считается по UTC, пока вы не сохраните часовой пояс в Настройках."
 

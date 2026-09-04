@@ -54,6 +54,10 @@ A setup may report `eve link` as a prerequisite; run it, then retry the continua
 
 Run the validation the task requests. When it does not establish the behavior you changed, run the narrowest relevant check.
 
+## Admin UI is English-only
+
+`app/admin` is an internal console. Keep all admin copy in English. Do not wrap admin strings in Lingui `t` / `Trans` / `msg`, do not add them to `locales/`, and do not follow the signed-in user or browser locale. Number and date formatting in admin must stay English (`en` / `en-US` / `en-GB`).
+
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know
 
