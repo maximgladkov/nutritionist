@@ -6,7 +6,7 @@ import { NutrientMetricsRow } from "@/app/_components/nutrient-metrics-row";
 import { formatAmount, formatKcal } from "@/app/_components/nutrition-format";
 import type { MealGroupView } from "@/lib/meal-groups";
 import type { MealView } from "@/lib/meals";
-import { CircleDashed, Cup, Moon, Sun } from "@gravity-ui/icons";
+import { ChevronRight, CircleDashed, Cup, Moon, Sun } from "@gravity-ui/icons";
 import { Accordion, Card, Typography } from "@heroui/react";
 import { useLingui } from "@lingui/react/macro";
 
@@ -18,6 +18,32 @@ const MEAL_ICONS: Record<MealView["label"], typeof CircleDashed> = {
   snack: CircleDashed,
 };
 
+function MealKcal({
+  compact = false,
+  value,
+}: {
+  readonly compact?: boolean;
+  readonly value: number | null;
+}) {
+  const kcal = formatKcal(value);
+  return (
+    <span className="flex shrink-0 items-baseline gap-1">
+      <Typography
+        className="tabular-nums leading-none"
+        type={compact ? "body-sm" : "h5"}
+        weight="semibold"
+      >
+        {kcal}
+      </Typography>
+      {kcal !== "—" ? (
+        <Typography className="leading-none" color="muted" type={compact ? "body-xs" : "body-sm"}>
+          kcal
+        </Typography>
+      ) : null}
+    </span>
+  );
+}
+
 export function MealGroupsAccordion({ groups }: { readonly groups: readonly MealGroupView[] }) {
   const { t } = useLingui();
   const { locale } = useAppLocale();
@@ -25,22 +51,20 @@ export function MealGroupsAccordion({ groups }: { readonly groups: readonly Meal
     return null;
   }
   return (
-
     <Card className="p-0">
       <Accordion allowsMultipleExpanded className="w-full" key={locale}>
         {groups.map((group) => {
           const Icon = MEAL_ICONS[group.label];
-          const kcal = formatKcal(group.totals.energyKcal);
           const hasItems = group.items.length > 0;
           return (
             <Accordion.Item id={group.label} isDisabled={!hasItems} key={group.label}>
               <Accordion.Heading>
                 <Accordion.Trigger className="flex items-center gap-3 aria-disabled:opacity-100">
-                  <span className="bg-default text-foreground flex size-10 shrink-0 items-center justify-center rounded-lg">
+                  <span className="bg-default text-foreground flex size-11 shrink-0 items-center justify-center rounded-lg">
                     <Icon className="size-4" />
                   </span>
                   <span className="flex min-w-0 flex-1 flex-col items-stretch gap-1.5">
-                    <span className="text-foreground truncate text-left text-sm font-medium">
+                    <span className="text-foreground truncate text-left text-base font-medium">
                       {t(MEAL_LABELS[group.label])}
                     </span>
                     {hasItems ? (
@@ -48,16 +72,7 @@ export function MealGroupsAccordion({ groups }: { readonly groups: readonly Meal
                     ) : null}
                   </span>
                   <span className="flex shrink-0 items-center gap-2">
-                    <span className="flex items-baseline gap-1">
-                      <Typography className="tabular-nums leading-none" type="h5" weight="semibold">
-                        {kcal}
-                      </Typography>
-                      {kcal !== "—" ? (
-                        <Typography className="leading-none" color="muted" type="body-sm">
-                          kcal
-                        </Typography>
-                      ) : null}
-                    </span>
+                    <MealKcal value={group.totals.energyKcal} />
                     {hasItems ? <Accordion.Indicator /> : null}
                   </span>
                 </Accordion.Trigger>
@@ -67,14 +82,20 @@ export function MealGroupsAccordion({ groups }: { readonly groups: readonly Meal
                   {hasItems ? (
                     <ul className="m-0 flex list-none flex-col gap-3 p-0">
                       {group.items.map((item) => (
-                        <li className="flex flex-col gap-1.5 pt-1" key={item.id}>
-                          <div className="flex min-w-0 items-baseline justify-between gap-3">
-                            <span className="text-foreground min-w-0 truncate text-sm">{item.name}</span>
-                            <span className="text-muted shrink-0 text-xs">
-                              {formatAmount(item.amount, item.unit)}
+                        <li className="flex items-center gap-3 pt-1" key={item.id}>
+                          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                            <span className="flex min-w-0 items-baseline gap-1.5">
+                              <span className="text-foreground min-w-0 truncate text-sm">{item.name}</span>
+                              <span className="text-muted shrink-0 text-xs tabular-nums">
+                                {formatAmount(item.amount, item.unit)}
+                              </span>
                             </span>
+                            <NutrientMetricsRow compact hideCalories totals={item.metrics} />
                           </div>
-                          <NutrientMetricsRow compact totals={item.metrics} />
+                          <span className="flex shrink-0 items-center gap-2">
+                            <MealKcal compact value={item.metrics.energyKcal} />
+                            <ChevronRight className="size-4 shrink-0 text-muted" />
+                          </span>
                         </li>
                       ))}
                     </ul>
