@@ -1,5 +1,7 @@
+import { AdminJsonViewer } from "@/app/admin/_components/admin-json-viewer";
 import type { AgentTurnMessage } from "@/lib/agent-turn-model";
 import { formatTokenCount, formatUsd } from "@/lib/admin-format";
+import { Chip } from "@heroui/react";
 
 export function AdminTranscript({ messages }: { readonly messages: readonly AgentTurnMessage[] }) {
   if (messages.length === 0) {
@@ -30,16 +32,21 @@ export function AdminTranscript({ messages }: { readonly messages: readonly Agen
           ) : null}
           {message.type === "tool" ? (
             <div className="flex flex-col gap-2">
-              <p className="text-sm font-medium">{message.toolName}</p>
-              {message.input !== undefined ? (
-                <pre className="bg-surface-secondary overflow-x-auto rounded-lg p-2 text-xs">
-                  {stringify(message.input)}
-                </pre>
-              ) : null}
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-medium">{message.toolName}</p>
+                {message.isError ? (
+                  <Chip color="danger" size="sm" variant="soft">
+                    Error
+                  </Chip>
+                ) : null}
+              </div>
+              {message.input !== undefined ? <AdminJsonViewer label="Input" value={message.input} /> : null}
               {message.output !== undefined ? (
-                <pre className="bg-surface-secondary overflow-x-auto rounded-lg p-2 text-xs">
-                  {stringify(message.output)}
-                </pre>
+                <AdminJsonViewer
+                  label="Output"
+                  tone={message.isError ? "danger" : "neutral"}
+                  value={message.output}
+                />
               ) : null}
             </div>
           ) : null}
@@ -47,12 +54,4 @@ export function AdminTranscript({ messages }: { readonly messages: readonly Agen
       ))}
     </div>
   );
-}
-
-function stringify(value: unknown): string {
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
 }

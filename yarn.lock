@@ -1985,6 +1985,11 @@
   dependencies:
     "@types/yargs-parser" "*"
 
+"@uiw/react-json-view@^2.0.0-alpha.43":
+  version "2.0.0-alpha.43"
+  resolved "https://registry.yarnpkg.com/@uiw/react-json-view/-/react-json-view-2.0.0-alpha.43.tgz#5c60c16de7a4eaa6f487fd1c3a7f4bd34fb3ddcb"
+  integrity sha512-PMj+6xRDCPbVGccfLUDhx7yGrmVBSeFx3py6bqDds4QIYScXo9GEgtTbWXn3gXpoehsmOu//6dveYTf872wu3Q==
+
 "@ungap/structured-clone@^1.0.0":
   version "1.4.0"
   resolved "https://registry.yarnpkg.com/@ungap/structured-clone/-/structured-clone-1.4.0.tgz#5e2e1374c0a30b5a42e8b083523a225c6945f88a"
