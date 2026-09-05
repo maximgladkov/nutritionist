@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { Avatar } from "@heroui/react";
+import { useEffect, useState } from "react";
 
 export function FoodThumb({
   alt,
@@ -12,10 +12,28 @@ export function FoodThumb({
   readonly className?: string;
   readonly src: string | null | undefined;
 }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
+  const showImage = Boolean(src) && !failed;
   return (
-    <Avatar className={cn("size-11 rounded-lg", className)}>
-      {src ? <Avatar.Image alt={alt} className="object-cover" src={src} /> : null}
-      <Avatar.Fallback className="rounded-lg bg-surface-secondary" />
-    </Avatar>
+    <span
+      className={cn(
+        "bg-surface-secondary flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-lg p-0.5",
+        className,
+      )}
+    >
+      {showImage ? (
+        <img
+          alt={alt}
+          className="max-w-full max-h-full rounded"
+          src={src}
+          onError={() => {
+            setFailed(true);
+          }}
+        />
+      ) : null}
+    </span>
   );
 }

@@ -1,0 +1,35 @@
+name: Import Open Food Facts
+
+on:
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: full downloads the JSONL dump then applies deltas; delta only applies new daily files
+        type: choice
+        default: delta
+        options:
+          - delta
+          - full
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: yarn
+      - run: yarn install --frozen-lockfile
+      - run: yarn prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL_UNPOOLED: ${{ secrets.DATABASE_URL_UNPOOLED }}
+      - run: yarn db:import-off -- --mode ${{ github.event.inputs.mode || 'delta' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL_UNPOOLED: ${{ secrets.DATABASE_URL_UNPOOLED }}
+          OFF_IMPORT_COUNTRIES: ${{ vars.OFF_IMPORT_COUNTRIES }}

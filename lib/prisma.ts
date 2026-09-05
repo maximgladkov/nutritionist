@@ -4,22 +4,30 @@ config({ path: ".env.local" });
 config();
 
 import { PrismaPg } from "@prisma/adapter-pg";
+import { withAccelerate } from "@prisma/extension-accelerate";
 import { PrismaClient } from "../generated/prisma/client.ts";
+import { isAccelerateUrl, resolveRuntimeDatabaseUrl } from "./prisma-url.ts";
 
-const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+const runtimeDatabaseUrl = resolveRuntimeDatabaseUrl();
+
+export const usingAccelerate = isAccelerateUrl(runtimeDatabaseUrl);
 
 function createPrisma(): PrismaClient {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
-    throw new Error("DATABASE_URL is not set");
+  if (usingAccelerate) {
+    return new PrismaClient({ accelerateUrl: runtimeDatabaseUrl }).$extends(
+      withAccelerate(),
+    ) as unknown as PrismaClient;
   }
-  return new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+  return new PrismaClient({ adapter: new PrismaPg({ connectionString: runtimeDatabaseUrl }) });
 }
+
+const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 function hasRequiredModels(client: PrismaClient | undefined): client is PrismaClient {
   return (
     typeof client?.agentTurn?.findUnique === "function" &&
     typeof client?.agentTurnPendingAck?.findFirst === "function" &&
+    typeof client?.offProduct?.findUnique === "function" &&
     typeof client?.productFavorite?.findMany === "function"
   );
 }

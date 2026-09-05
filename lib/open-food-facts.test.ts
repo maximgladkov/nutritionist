@@ -4,8 +4,27 @@ import { listCountries, normalizeCountryCode, toOpenFoodFactsCountry } from "./c
 import {
   getProductByBarcode,
   InvalidBarcodeError,
+  offCatalog,
   searchProductsByName,
 } from "./open-food-facts.ts";
+import type { Product } from "./open-food-facts-map.ts";
+
+function product(name: string, barcode = "3017624010701"): Product {
+  return {
+    allergens: null,
+    barcode,
+    brands: "Ferrero",
+    countries: ["fr"],
+    imageUrl: "https://example.com/nutella-small.jpg",
+    ingredients: "Sugar, palm oil",
+    name,
+    novaGroup: 4,
+    nutriments: { energyKcal100g: 539 },
+    nutriscoreGrade: "e",
+    quantity: "400 g",
+    servingSize: "15 g",
+  };
+}
 
 describe("normalizeCountryCode", () => {
   it("lowercases and trims ISO alpha-2 codes", () => {
@@ -43,124 +62,35 @@ describe("listCountries", () => {
 });
 
 describe("getProductByBarcode", () => {
-  const previousFrom = process.env.AUTH_EMAIL_FROM;
+  const originalFind = offCatalog.findByBarcode;
 
   afterEach(() => {
+    offCatalog.findByBarcode = originalFind;
     mock.restoreAll();
-    if (previousFrom === undefined) {
-      delete process.env.AUTH_EMAIL_FROM;
-    } else {
-      process.env.AUTH_EMAIL_FROM = previousFrom;
-    }
   });
 
-  it("requests selected fields with User-Agent and cc", async () => {
-    const fetchMock = mock.method(globalThis, "fetch", async (input: URL | RequestInfo) => {
-      const url = String(input);
-      assert.match(url, /\/api\/v3\/product\/3017624010701/);
-      assert.match(url, /fields=/);
-      assert.match(url, /[?&]cc=us(?:&|$)/);
-      return jsonResponse({
-        product: {
-          code: "3017624010701",
-          product_name: "Nutella",
-          brands: "Ferrero",
-          quantity: "400 g",
-          serving_size: "15 g",
-          nutriscore_grade: "e",
-          nova_group: 4,
-          ingredients_text: "Sugar, palm oil",
-          allergens: "en:milk,en:soybeans",
-          nutriments: {
-            "energy-kcal_100g": 539,
-            proteins_100g: 6.3,
-            carbohydrates_100g: 57.5,
-            sugars_100g: 56.3,
-            fat_100g: 30.9,
-            "saturated-fat_100g": 10.6,
-            fiber_100g: 0,
-            salt_100g: 0.107,
-            "energy-kcal_100ml": 539,
-            proteins_100ml: 6.3,
-          },
-          image_small_url: "https://example.com/nutella-small.jpg",
-          image_url: "https://example.com/nutella.jpg",
-          countries_tags: ["en:france"],
-        },
-      });
+  it("returns a local catalog hit without fetching", async () => {
+    offCatalog.findByBarcode = async () => product("Nutella");
+    const fetchMock = mock.method(globalThis, "fetch", async () => {
+      throw new Error("should not fetch");
     });
-
-    process.env.AUTH_EMAIL_FROM = "BTR.me <hello@example.com>";
     const result = await getProductByBarcode("3017624010701", { country: "us" });
-
     assert.equal(result.found, true);
     if (!result.found) {
       return;
     }
-    assert.match(String(fetchMock.mock.calls[0]?.arguments[0]), /image_small_url/);
-    assert.equal(result.product.imageUrl, "https://example.com/nutella-small.jpg");
     assert.equal(result.product.name, "Nutella");
-    assert.equal(result.product.nutriments.energyKcal100g, 539);
-    assert.equal(result.product.nutriments.energyKcal100ml, 539);
-    assert.equal(result.product.nutriments.proteins100ml, 6.3);
-    assert.equal(result.product.nutriments.saturatedFat100g, 10.6);
-    assert.deepEqual(result.product.countries, ["en:france"]);
-    assert.equal(fetchMock.mock.callCount(), 1);
-    const [, init] = fetchMock.mock.calls[0]?.arguments ?? [];
-    const headers = new Headers(init?.headers);
-    assert.equal(headers.get("User-Agent"), "BTR.me/0.0.0 (hello@example.com)");
+    assert.equal(fetchMock.mock.callCount(), 0);
   });
 
-  it("maps gb to uk in cc", async () => {
-    mock.method(globalThis, "fetch", async (input: URL | RequestInfo) => {
-      assert.match(String(input), /[?&]cc=uk(?:&|$)/);
-      return jsonResponse({ product: { code: "12345678", product_name: "Tea" } });
+  it("returns not found on a local miss without fetching", async () => {
+    offCatalog.findByBarcode = async () => null;
+    const fetchMock = mock.method(globalThis, "fetch", async () => {
+      throw new Error("should not fetch");
     });
-    const result = await getProductByBarcode("12345678", { country: "gb" });
-    assert.equal(result.found, true);
-  });
-
-  it("falls back to a localized product name when product_name is empty", async () => {
-    mock.method(globalThis, "fetch", async () =>
-      jsonResponse({
-        product: {
-          code: "7622210103253",
-          product_name: "",
-          product_name_en: "PHILADELPHIA LIGHT",
-          product_name_es: "Philadelphia Light",
-        },
-      }),
-    );
-    const result = await getProductByBarcode("7622210103253", { country: "es" });
-    assert.equal(result.found, true);
-    if (!result.found) {
-      return;
-    }
-    assert.equal(result.product.name, "Philadelphia Light");
-  });
-
-  it("falls back to image_url when image_small_url is missing", async () => {
-    mock.method(globalThis, "fetch", async () =>
-      jsonResponse({
-        product: {
-          code: "3017624010701",
-          product_name: "Nutella",
-          image_url: "https://example.com/nutella.jpg",
-        },
-      }),
-    );
-    const result = await getProductByBarcode("3017624010701");
-    assert.equal(result.found, true);
-    if (!result.found) {
-      return;
-    }
-    assert.equal(result.product.imageUrl, "https://example.com/nutella.jpg");
-  });
-
-  it("returns not found on 404", async () => {
-    mock.method(globalThis, "fetch", async () => new Response(null, { status: 404 }));
     const result = await getProductByBarcode("00000000");
     assert.deepEqual(result, { found: false, barcode: "00000000" });
+    assert.equal(fetchMock.mock.callCount(), 0);
   });
 
   it("rejects invalid barcodes without fetching", async () => {
@@ -173,40 +103,51 @@ describe("getProductByBarcode", () => {
 });
 
 describe("searchProductsByName", () => {
+  const originalSearch = offCatalog.searchByName;
+
   afterEach(() => {
+    offCatalog.searchByName = originalSearch;
     mock.restoreAll();
   });
 
-  it("sends CGI search params and country tags", async () => {
-    const fetchMock = mock.method(globalThis, "fetch", async (input: URL | RequestInfo) => {
-      const url = new URL(String(input));
-      assert.equal(url.pathname, "/cgi/search.pl");
-      assert.equal(url.searchParams.get("search_terms"), "oat milk");
-      assert.equal(url.searchParams.get("search_simple"), "1");
-      assert.equal(url.searchParams.get("action"), "process");
-      assert.equal(url.searchParams.get("json"), "1");
-      assert.equal(url.searchParams.get("page_size"), "10");
-      assert.equal(url.searchParams.get("cc"), "us");
-      assert.equal(url.searchParams.get("tagtype_0"), "countries");
-      assert.equal(url.searchParams.get("tag_contains_0"), "contains");
-      assert.equal(url.searchParams.get("tag_0"), "us");
-      return jsonResponse({
-        count: 1,
-        page: 1,
-        products: [{ code: "1", product_name: "Oatly" }],
-      });
+  it("searches the local catalog and does not fetch", async () => {
+    const fetchMock = mock.method(globalThis, "fetch", async () => {
+      throw new Error("should not fetch");
     });
+    offCatalog.searchByName = async (query, options) => {
+      assert.equal(query, "Wasa Vitalité Kaura");
+      assert.equal(options.country, "fr");
+      assert.equal(options.pageSize, 10);
+      return [
+        {
+          allergens: null,
+          barcode: "7300400481595",
+          brands: "Wasa",
+          countries: ["fr"],
+          imageUrl: null,
+          ingredients: null,
+          name: "Vitalité Kaura",
+          novaGroup: null,
+          nutriments: {},
+          nutriscoreGrade: null,
+          quantity: null,
+          servingSize: null,
+        },
+      ];
+    };
 
-    const result = await searchProductsByName("oat milk", { country: "us" });
+    const result = await searchProductsByName("Wasa Vitalité Kaura", { country: "fr" });
     assert.equal(result.count, 1);
-    assert.equal(result.products[0]?.name, "Oatly");
-    assert.equal(fetchMock.mock.callCount(), 1);
+    assert.equal(result.products[0]?.name, "Vitalité Kaura");
+    assert.equal(result.products[0]?.brands, "Wasa");
+    assert.equal(fetchMock.mock.callCount(), 0);
+  });
+
+  it("returns an empty page for blank queries", async () => {
+    offCatalog.searchByName = async () => {
+      throw new Error("should not search");
+    };
+    const result = await searchProductsByName("   ");
+    assert.deepEqual(result, { count: 0, page: 1, products: [] });
   });
 });
-
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}

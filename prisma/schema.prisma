@@ -107,6 +107,7 @@ model CatalogProduct {
   quantity        String?
   servingSize     String?
   nutriments      Json
+  searchText      String   @default(dbgenerated("lower(immutable_unaccent(TRIM(BOTH FROM COALESCE(\"name\", '') || ' ' || COALESCE(\"brands\", ''))))"))
   createdByUserId String?
   createdBy       User?    @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
   createdAt       DateTime @default(now())
@@ -114,6 +115,35 @@ model CatalogProduct {
 
   @@index([createdByUserId])
   @@index([name])
+}
+
+model OffProduct {
+  barcode         String    @id
+  name            String?
+  names           Json
+  brands          String?
+  quantity        String?
+  servingSize     String?
+  nutriscoreGrade String?
+  novaGroup       Int?
+  ingredients     String?   @db.Text
+  allergens       String?
+  nutriments      Json
+  imageUrl        String?
+  countryCodes    String[]
+  searchSource    String    @db.Text
+  searchText      String    @default(dbgenerated("lower(immutable_unaccent(COALESCE(\"searchSource\", '')))"))
+  lastModifiedAt  DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model OffImportState {
+  id               String    @id @default("default")
+  lastDeltaFile    String?
+  lastFullImportAt DateTime?
+  countryCodes     String[]
+  updatedAt        DateTime  @updatedAt
 }
 
 enum AgentTurnStatus {

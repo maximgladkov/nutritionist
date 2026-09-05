@@ -12,7 +12,13 @@ import {
   sumNutrients,
 } from "./nutrition.ts";
 import { prisma } from "./prisma.ts";
-import { formatDateInTimeZone, localDayRange, normalizeTimezone } from "./timezone.ts";
+import {
+  formatDateInTimeZone,
+  localDayRange,
+  localInclusiveDateRange,
+  normalizeTimezone,
+  parseYmd,
+} from "./timezone.ts";
 import type { MealItemUnit, MealLabel, Prisma } from "../generated/prisma/client";
 
 export class MealError extends Error {
@@ -260,6 +266,28 @@ export async function deleteMeal(input: {
   return { deleted: true, mealId: input.mealId };
 }
 
+export async function deleteMealItem(input: {
+  userId: string;
+  itemId: string;
+}): Promise<{ deleted: true; itemId: string; mealId: string; mealDeleted: boolean }> {
+  return prisma.$transaction(async (tx) => {
+    const item = await tx.mealItem.findFirst({
+      where: { id: input.itemId, meal: { userId: input.userId } },
+      select: { id: true, mealId: true },
+    });
+    if (!item) {
+      throw new MealError("Meal item not found");
+    }
+    await tx.mealItem.delete({ where: { id: item.id } });
+    const remaining = await tx.mealItem.count({ where: { mealId: item.mealId } });
+    const mealDeleted = remaining === 0;
+    if (mealDeleted) {
+      await tx.meal.delete({ where: { id: item.mealId } });
+    }
+    return { deleted: true as const, itemId: item.id, mealId: item.mealId, mealDeleted };
+  });
+}
+
 export function parseIsoDate(value: string, field: string): Date {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -291,16 +319,21 @@ export function mealQueryRange(input: {
 }): { from: Date; to: Date } {
   const fromValue = input.from?.trim() ?? "";
   const toValue = input.to?.trim() ?? "";
-  if ((fromValue === "") !== (toValue === "")) {
-    throw new MealError("from and to must both be provided");
-  }
-  if (fromValue === "" || toValue === "") {
+  if (fromValue === "" && toValue === "") {
     return localDayRange(input.now ?? new Date(), input.timeZone);
   }
-  const from = parseIsoDate(fromValue, "from");
-  const to = parseIsoDate(toValue, "to");
-  assertRange(from, to);
-  return { from, to };
+  const fromDate = parseQueryDate(fromValue || toValue, fromValue ? "from" : "to");
+  const toDate = parseQueryDate(toValue || fromValue, toValue ? "to" : "from");
+  const start = fromDate <= toDate ? fromDate : toDate;
+  const end = fromDate <= toDate ? toDate : fromDate;
+  try {
+    return localInclusiveDateRange(input.timeZone, start, end);
+  } catch (error) {
+    if (error instanceof RangeError) {
+      throw new MealError(error.message);
+    }
+    throw error;
+  }
 }
 
 async function resolveItems(
@@ -492,6 +525,13 @@ function toItemView(item: {
     metrics,
     incomplete: incompleteNutrients([metrics]),
   };
+}
+
+function parseQueryDate(value: string, field: string): string {
+  if (!parseYmd(value)) {
+    throw new MealError(`${field} must be a valid YYYY-MM-DD date`);
+  }
+  return value.trim();
 }
 
 function assertRange(from: Date, to: Date): void {

@@ -4,6 +4,7 @@ import {
   mergeProductSearch,
   pickNutriments,
 } from "./catalog-product-query.ts";
+import { searchCatalogProductsFuzzy } from "./off-product-store.ts";
 import {
   getProductByBarcode,
   InvalidBarcodeError,
@@ -49,22 +50,14 @@ export async function resolveProductByBarcode(
     throw new InvalidBarcodeError(barcode);
   }
 
-  let offError: unknown;
-  try {
-    const off = await getProductByBarcode(normalizedBarcode, options);
-    if (off.found) {
-      return { found: true, product: off.product, source: "open-food-facts" };
-    }
-  } catch (error) {
-    offError = error;
+  const off = await getProductByBarcode(normalizedBarcode, options);
+  if (off.found) {
+    return { found: true, product: off.product, source: "open-food-facts" };
   }
 
   const local = await findCatalogProduct(normalizedBarcode);
   if (local) {
     return { found: true, product: local, source: "catalog" };
-  }
-  if (offError) {
-    throw offError;
   }
   return { found: false, barcode: normalizedBarcode };
 }
@@ -73,17 +66,10 @@ export async function searchCatalogAndOpenFoodFacts(
   query: string,
   options: { country?: string; pageSize?: number; signal?: AbortSignal } = {},
 ): Promise<ProductSearchResult> {
-  let remote: ProductSearchResult = { count: 0, page: 1, products: [] };
-  let remoteError: unknown;
-  try {
-    remote = await searchProductsByName(query, options);
-  } catch (error) {
-    remoteError = error;
-  }
-  const local = await searchCatalogProducts(query);
-  if (local.length === 0 && remoteError) {
-    throw remoteError;
-  }
+  const [remote, local] = await Promise.all([
+    searchProductsByName(query, options),
+    searchCatalogProducts(query),
+  ]);
   return mergeProductSearch(local, remote);
 }
 
@@ -101,13 +87,9 @@ export async function saveCatalogProduct(input: SaveCatalogProductInput): Promis
     return { error: "Nutrition per 100g or 100ml is required.", status: "invalid" };
   }
 
-  try {
-    const off = await getProductByBarcode(barcode);
-    if (off.found) {
-      return { product: off.product, source: "open-food-facts", status: "exists" };
-    }
-  } catch {
-    return { error: "Could not check Open Food Facts. Try again in a moment.", status: "invalid" };
+  const off = await getProductByBarcode(barcode);
+  if (off.found) {
+    return { product: off.product, source: "open-food-facts", status: "exists" };
   }
 
   const existing = await findCatalogProduct(barcode);
@@ -145,16 +127,7 @@ async function findCatalogProduct(barcode: string): Promise<Product | undefined>
 }
 
 async function searchCatalogProducts(query: string): Promise<Product[]> {
-  const name = query.trim();
-  if (name.length === 0) {
-    return [];
-  }
-  const rows = await prisma.catalogProduct.findMany({
-    orderBy: { updatedAt: "desc" },
-    take: 10,
-    where: { name: { contains: name, mode: "insensitive" } },
-  });
-  return rows.map(catalogRowToProduct);
+  return searchCatalogProductsFuzzy(query, 10);
 }
 
 function catalogRowToProduct(row: {

@@ -6,7 +6,7 @@ import { requireUser } from "../lib/require-user";
 
 export default defineTool({
   description:
-    "Save a packaged food that Open Food Facts does not have, using the barcode plus name and nutrition from a label photo or the user. Nutrition must be per 100g or 100ml. Other users can look it up later. Call lookup_product first; do not save if it was already found.",
+    "Save a packaged food that the product catalog does not have, using the barcode plus name and nutrition from a label photo or the user. Nutrition must be per 100g or 100ml. Other users can look it up later. Call lookup_product first; do not save if it was already found.",
   inputSchema: z.object({
     barcode: z.string().min(1),
     name: z.string().min(1),
