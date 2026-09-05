@@ -16,7 +16,6 @@ export function FoodThumb({
   useEffect(() => {
     setFailed(false);
   }, [src]);
-  const showImage = Boolean(src) && !failed;
   return (
     <span
       className={cn(
@@ -24,7 +23,7 @@ export function FoodThumb({
         className,
       )}
     >
-      {showImage ? (
+      {src && !failed ? (
         <img
           alt={alt}
           className="max-w-full max-h-full rounded"

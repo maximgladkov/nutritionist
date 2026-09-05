@@ -119,6 +119,23 @@ function createProgress(label: string) {
   };
 }
 
+export function dedupeByBarcode(rows: SlimOffProduct[]): SlimOffProduct[] {
+  const byBarcode = new Map<string, SlimOffProduct>();
+  for (const row of rows) {
+    const existing = byBarcode.get(row.barcode);
+    if (!existing) {
+      byBarcode.set(row.barcode, row);
+      continue;
+    }
+    const existingTime = existing.lastModifiedAt?.getTime() ?? -1;
+    const nextTime = row.lastModifiedAt?.getTime() ?? -1;
+    if (nextTime >= existingTime) {
+      byBarcode.set(row.barcode, row);
+    }
+  }
+  return [...byBarcode.values()];
+}
+
 export function deltaFilesToApply(indexLines: string[], lastDeltaFile: string | null): string[] {
   const files = indexLines.map((line) => line.trim()).filter((line) => line.length > 0);
   files.sort();
@@ -257,10 +274,11 @@ async function importFromUrl(
 }
 
 async function upsertBatch(client: Client, rows: SlimOffProduct[]): Promise<number> {
+  const uniqueRows = dedupeByBarcode(rows);
   const values: string[] = [];
   const params: unknown[] = [];
   let index = 1;
-  for (const row of rows) {
+  for (const row of uniqueRows) {
     values.push(
       `($${index++}, $${index++}, $${index++}::jsonb, $${index++}, $${index++}, $${index++}, $${index++}, $${index++}, $${index++}, $${index++}, $${index++}::jsonb, $${index++}, $${index++}::text[], $${index++}, $${index++}, NOW())`,
     );
@@ -307,7 +325,7 @@ async function upsertBatch(client: Client, rows: SlimOffProduct[]): Promise<numb
        "updatedAt" = EXCLUDED."updatedAt"`,
     params,
   );
-  return rows.length;
+  return uniqueRows.length;
 }
 
 async function* jsonDocuments(

@@ -6,7 +6,7 @@ import {
   intersectCountryCodes,
   parseCountryList,
 } from "./off-country.ts";
-import { databaseHost, deltaFilesToApply, formatBytes, formatDuration } from "./off-import-run.ts";
+import { databaseHost, dedupeByBarcode, deltaFilesToApply, formatBytes, formatDuration } from "./off-import-run.ts";
 import { buildSearchSource, extractLocalizedNames, slimOffDocument, stripNullBytes } from "./off-import.ts";
 import { MIN_SEARCH_TOKEN_LENGTH, fuzzyTokenFilters, searchTokens } from "./product-search.ts";
 
@@ -130,6 +130,36 @@ describe("searchTokens", () => {
     assert.deepEqual(searchTokens("a bb"), ["bb"]);
     assert.deepEqual(searchTokens("Kaura Wasa Vitalité"), ["Kaura", "Wasa", "Vitalité"]);
     assert.equal(fuzzyTokenFilters(searchTokens("Wasa Vitalité Kaura")).length, 3);
+  });
+});
+
+describe("dedupeByBarcode", () => {
+  it("keeps one row per barcode and prefers the later lastModifiedAt", () => {
+    const older = {
+      allergens: null,
+      barcode: "3017624010701",
+      brands: "Ferrero",
+      countryCodes: ["fr"],
+      imageUrl: null,
+      ingredients: null,
+      lastModifiedAt: new Date("2024-01-01T00:00:00Z"),
+      name: "Nutella old",
+      names: {},
+      novaGroup: null,
+      nutriments: {},
+      nutriscoreGrade: null,
+      quantity: null,
+      searchSource: "Nutella old Ferrero",
+      servingSize: null,
+    };
+    const newer = { ...older, name: "Nutella", lastModifiedAt: new Date("2025-01-01T00:00:00Z") };
+    const other = { ...older, barcode: "3274080005003", name: "Eau" };
+    const unique = dedupeByBarcode([older, other, newer, other]);
+    assert.deepEqual(
+      unique.map((row) => row.barcode),
+      ["3017624010701", "3274080005003"],
+    );
+    assert.equal(unique[0]?.name, "Nutella");
   });
 });
 
