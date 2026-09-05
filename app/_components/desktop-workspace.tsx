@@ -10,15 +10,23 @@ import { NutritionSummaryApp } from "@/app/_components/nutrition-summary";
 import { ProductsApp } from "@/app/_components/products-app";
 import { signOutAction } from "@/app/actions/auth";
 import { cn } from "@/lib/utils";
-import { ArrowRightFromSquare } from "@gravity-ui/icons";
+import { ArrowRightFromSquare, ChartColumn, Comment, Gear, ShoppingBag } from "@gravity-ui/icons";
 import { Widget } from "@heroui-pro/react";
-import { Button, Tooltip } from "@heroui/react";
+import { Button, ScrollShadow, Tooltip } from "@heroui/react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { usePathname } from "next/navigation";
-import { useLayoutEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+  type ReactNode,
+  type SVGProps,
+} from "react";
 
 const DESKTOP_MQ = "(min-width: 1024px)";
-const SCREEN_SIZE = "h-[min(44rem,72dvh)] w-[36vw] min-w-[22rem]";
+const SCREEN_SIZE = "h-[min(44rem,calc(100dvh-9rem))] w-[min(28rem,80vw)] min-w-[22rem]";
 
 export function useDesktopLayout() {
   const [matches, setMatches] = useState<boolean | null>(null);
@@ -41,19 +49,25 @@ export function useDesktopLayout() {
 export function DesktopWorkspace({ email }: { readonly email?: string }) {
   const { t } = useLingui();
   const pathname = usePathname();
-  const [front, setFront] = useState<DesktopWidgetId>("summary");
+  const screenRefs = useRef<Partial<Record<DesktopWidgetId, HTMLDivElement | null>>>({});
   const chat = chatSessionFromPath(pathname);
   const api = useMemo(
     () => ({
-      focusWidget: setFront,
+      focusWidget: (id: DesktopWidgetId) => {
+        screenRefs.current[id]?.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+          inline: "center",
+        });
+      },
     }),
     [],
   );
 
   return (
     <DesktopWorkspaceContext.Provider value={api}>
-      <div className="bg-background relative h-dvh overflow-hidden">
-        <div className="absolute top-4 right-6 z-40 flex max-w-[min(24rem,calc(100%-2rem))] items-center gap-3">
+      <div className="bg-background flex h-dvh flex-col overflow-hidden">
+        <div className="flex shrink-0 items-center justify-end gap-3 px-6 py-3">
           {email ? <p className="text-muted min-w-0 truncate text-sm">{email}</p> : null}
           <form action={signOutAction}>
             <Tooltip delay={0}>
@@ -66,47 +80,55 @@ export function DesktopWorkspace({ email }: { readonly email?: string }) {
             </Tooltip>
           </form>
         </div>
-        <DesktopScreen
-          className="top-[12%] left-[5vw] -translate-y-4 -rotate-2"
-          front={front}
-          id="chat"
-          label={t`Chat`}
-          onFront={setFront}
-        >
-          <AgentChat
-            compact
-            key={chat.sessionId ?? (chat.sessionless ? "new" : "home")}
-            sessionId={chat.sessionId}
-            sessionless={chat.sessionless}
-          />
-        </DesktopScreen>
-        <DesktopScreen
-          className="top-[22%] left-[22vw] translate-y-2 rotate-1"
-          front={front}
-          id="products"
-          label={t`Products`}
-          onFront={setFront}
-        >
-          <ProductsApp compact />
-        </DesktopScreen>
-        <DesktopScreen
-          className="top-[16%] left-1/2 -translate-x-1/2 translate-y-4"
-          front={front}
-          id="summary"
-          label={t`Summary`}
-          onFront={setFront}
-        >
-          <NutritionSummaryApp compact embed={false} />
-        </DesktopScreen>
-        <DesktopScreen
-          className="top-[13%] right-[5vw] -translate-y-1 rotate-2"
-          front={front}
-          id="settings"
-          label={t`Settings`}
-          onFront={setFront}
-        >
-          <DesktopSettings />
-        </DesktopScreen>
+        <ScrollShadow hideScrollBar className="min-h-0 w-full flex-1" orientation="horizontal">
+          <div className="flex min-h-full w-max items-center gap-8 px-8 py-4">
+            <DesktopScreen
+              icon={Comment}
+              id="chat"
+              label={t`Chat`}
+              screenRef={(node) => {
+                screenRefs.current.chat = node;
+              }}
+            >
+              <AgentChat
+                compact
+                key={chat.sessionId ?? (chat.sessionless ? "new" : "home")}
+                sessionId={chat.sessionId}
+                sessionless={chat.sessionless}
+              />
+            </DesktopScreen>
+            <DesktopScreen
+              icon={ChartColumn}
+              id="summary"
+              label={t`Summary`}
+              screenRef={(node) => {
+                screenRefs.current.summary = node;
+              }}
+            >
+              <NutritionSummaryApp compact embed={false} />
+            </DesktopScreen>
+            <DesktopScreen
+              icon={ShoppingBag}
+              id="products"
+              label={t`Products`}
+              screenRef={(node) => {
+                screenRefs.current.products = node;
+              }}
+            >
+              <ProductsApp compact />
+            </DesktopScreen>
+            <DesktopScreen
+              icon={Gear}
+              id="settings"
+              label={t`Settings`}
+              screenRef={(node) => {
+                screenRefs.current.settings = node;
+              }}
+            >
+              <DesktopSettings />
+            </DesktopScreen>
+          </div>
+        </ScrollShadow>
       </div>
     </DesktopWorkspaceContext.Provider>
   );
@@ -114,29 +136,27 @@ export function DesktopWorkspace({ email }: { readonly email?: string }) {
 
 function DesktopScreen({
   children,
-  className,
-  front,
+  icon: Icon,
   id,
   label,
-  onFront,
+  screenRef,
 }: {
   readonly children: ReactNode;
-  readonly className: string;
-  readonly front: DesktopWidgetId;
+  readonly icon: ComponentType<SVGProps<SVGSVGElement>>;
   readonly id: DesktopWidgetId;
   readonly label: string;
-  readonly onFront: (id: DesktopWidgetId) => void;
+  readonly screenRef: (node: HTMLDivElement | null) => void;
 }) {
   return (
-    <div
-      className={cn("absolute", SCREEN_SIZE, className, stackClass(id, front))}
-      onPointerDown={() => onFront(id)}
-      onPointerEnter={() => onFront(id)}
-    >
-      <Widget aria-label={label} className="shadow-overlay ring-foreground/8 h-full w-full ring-1">
+    <div className={cn("flex shrink-0 flex-col gap-3", SCREEN_SIZE)} ref={screenRef}>
+      <div className="flex items-center gap-2 px-1">
+        <Icon aria-hidden className="text-muted size-5 shrink-0" />
+        <h2 className="text-foreground text-sm font-semibold">{label}</h2>
+      </div>
+      <Widget aria-label={label} className="shadow-overlay ring-foreground/8 min-h-0 flex-1 ring-1">
         <Widget.Content
           className={
-            id === "chat" || id === "products" ? "flex min-h-0 flex-col p-0" : "min-h-0 p-0"
+            id === "chat" || id === "products" ? "flex min-h-0 flex-1 flex-col p-0" : "min-h-0 flex-1 p-0"
           }
         >
           {children}
@@ -144,19 +164,6 @@ function DesktopScreen({
       </Widget>
     </div>
   );
-}
-
-function stackClass(id: DesktopWidgetId, front: DesktopWidgetId): string {
-  if (id === front) {
-    return "z-30";
-  }
-  if (id === "summary") {
-    return "z-20";
-  }
-  if (id === "products") {
-    return "z-[15]";
-  }
-  return "z-10";
 }
 
 function chatSessionFromPath(pathname: string): {
