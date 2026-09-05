@@ -33,6 +33,7 @@ function item(input: {
     barcode: null,
     grams: input.amount,
     id: input.id,
+    imageUrl: null,
     incomplete: [],
     metrics: {
       ...emptyNutrients(),

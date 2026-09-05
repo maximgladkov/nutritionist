@@ -10,6 +10,7 @@ export type LoggedProductRow = {
   barcode: string | null;
   createdAt: Date;
   energyKcal: number | null;
+  imageUrl: string | null;
   name: string;
   unit: AmountUnit;
 };
@@ -26,6 +27,7 @@ export type UserProductView = {
   barcode: string | null;
   energyKcal: number | null;
   favorite: boolean;
+  imageUrl: string | null;
   key: string;
   lastUsedAt: string;
   name: string;
@@ -54,6 +56,7 @@ export function groupLoggedProducts(rows: readonly LoggedProductRow[]): UserProd
       barcode: row.barcode,
       energyKcal: row.energyKcal,
       favorite: false,
+      imageUrl: row.imageUrl,
       key,
       lastUsedAt: row.createdAt.toISOString(),
       name: row.name,
@@ -102,6 +105,7 @@ export function applyFavorites(
       barcode: favorite.barcode,
       energyKcal: null,
       favorite: true,
+      imageUrl: null,
       key: favorite.key,
       lastUsedAt: favorite.createdAt.toISOString(),
       name: favorite.name,

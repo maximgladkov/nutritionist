@@ -18,6 +18,7 @@ const PRODUCT_FIELDS = [
   "ingredients_text",
   "allergens",
   "nutriments",
+  "image_small_url",
   "image_url",
   "countries_tags",
 ].join(",");
@@ -91,6 +92,7 @@ type OffProduct = {
   brands?: unknown;
   code?: unknown;
   countries_tags?: unknown;
+  image_small_url?: unknown;
   image_url?: unknown;
   ingredients_text?: unknown;
   nova_group?: unknown;
@@ -236,7 +238,7 @@ function mapProduct(product: OffProduct, fallbackBarcode?: string, country?: str
     ingredients: stringOrNull(product.ingredients_text),
     allergens: stringOrNull(product.allergens),
     nutriments: mapNutriments(product.nutriments),
-    imageUrl: stringOrNull(product.image_url),
+    imageUrl: stringOrNull(product.image_small_url) ?? stringOrNull(product.image_url),
     countries: stringArray(product.countries_tags),
   };
 }

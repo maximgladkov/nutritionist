@@ -1,5 +1,6 @@
 "use client";
 
+import { FoodThumb } from "@/app/_components/food-thumb";
 import { MEAL_LABELS } from "@/app/_components/i18n-labels";
 import { useAppLocale } from "@/app/_components/lingui-client-provider";
 import { NutrientMetricsRow } from "@/app/_components/nutrient-metrics-row";
@@ -80,6 +81,7 @@ export function MealGroupsAccordion({ groups }: { readonly groups: readonly Meal
                     <ul className="m-0 flex list-none flex-col gap-3 p-0">
                       {group.items.map((item) => (
                         <li className="flex items-center gap-3 pt-1" key={item.id}>
+                          <FoodThumb alt={item.name} src={item.imageUrl} />
                           <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                             <span className="flex min-w-0 items-baseline gap-1.5">
                               <span className="text-foreground min-w-0 truncate text-sm">{item.name}</span>

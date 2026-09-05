@@ -34,6 +34,7 @@ export type MealItemView = {
   id: string;
   name: string;
   barcode: string | null;
+  imageUrl: string | null;
   amount: number;
   unit: AmountUnit;
   grams: number;
@@ -69,6 +70,7 @@ export type NutritionSummary = {
 type ResolvedItem = {
   name: string;
   barcode: string | null;
+  imageUrl: string | null;
   amount: number;
   unit: AmountUnit;
   grams: number;
@@ -333,6 +335,7 @@ async function resolveItem(
 
   let name: string | undefined = item.name?.trim() || undefined;
   let barcode: string | null = null;
+  let imageUrl: string | null = null;
   let nutriments: ProductNutriments = item.nutrimentsPer100g ?? {};
   let servingSize: string | null = null;
 
@@ -343,6 +346,7 @@ async function resolveItem(
         throw new MealError(`Product not found for barcode ${result.barcode}`);
       }
       barcode = result.product.barcode;
+      imageUrl = result.product.imageUrl;
       name = choosePackagedFoodName({
         barcode: result.product.barcode,
         productName: result.product.name,
@@ -371,6 +375,7 @@ async function resolveItem(
     return {
       name,
       barcode,
+      imageUrl,
       amount: item.amount,
       unit: item.unit,
       grams: computed.grams,
@@ -389,6 +394,7 @@ function toCreateData(item: ResolvedItem): Prisma.MealItemCreateWithoutMealInput
   return {
     name: item.name,
     barcode: item.barcode,
+    imageUrl: item.imageUrl,
     amount: item.amount,
     unit: item.unit as MealItemUnit,
     grams: item.grams,
@@ -422,6 +428,7 @@ function toMealView(meal: {
     id: string;
     name: string;
     barcode: string | null;
+    imageUrl: string | null;
     amount: number;
     unit: MealItemUnit;
     grams: number;
@@ -451,6 +458,7 @@ function toItemView(item: {
   id: string;
   name: string;
   barcode: string | null;
+  imageUrl: string | null;
   amount: number;
   unit: MealItemUnit;
   grams: number;
@@ -477,6 +485,7 @@ function toItemView(item: {
     id: item.id,
     name: item.name,
     barcode: item.barcode,
+    imageUrl: item.imageUrl,
     amount: item.amount,
     unit: item.unit,
     grams: item.grams,

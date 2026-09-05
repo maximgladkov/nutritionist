@@ -1,5 +1,6 @@
 "use client";
 
+import { FoodThumb } from "@/app/_components/food-thumb";
 import { MEAL_LABELS } from "@/app/_components/i18n-labels";
 import { useAppLocale } from "@/app/_components/lingui-client-provider";
 import { formatAmount, formatKcal } from "@/app/_components/nutrition-format";
@@ -247,6 +248,7 @@ export function ProductsApp({
                   setSelected(product);
                 }}
               >
+                <FoodThumb alt={product.name} src={product.imageUrl} />
                 <span className="flex min-w-0 flex-1 flex-col gap-1">
                   <span className="text-foreground truncate text-sm">{product.name}</span>
                   <span className="text-muted text-xs tabular-nums">
@@ -325,7 +327,10 @@ function AddProductSheet({
             <Sheet.Handle />
             <Sheet.CloseTrigger />
             <Sheet.Header>
-              <Sheet.Heading className="min-w-0 truncate">{product?.name ?? ""}</Sheet.Heading>
+              <Sheet.Heading className="flex min-w-0 items-center gap-3">
+                <FoodThumb alt={product?.name ?? ""} src={product?.imageUrl} />
+                <span className="min-w-0 truncate">{product?.name ?? ""}</span>
+              </Sheet.Heading>
             </Sheet.Header>
             <Sheet.Body className="flex flex-col gap-5">
               <RadioButtonGroup

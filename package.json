@@ -19,6 +19,7 @@
     "db:generate": "prisma generate",
     "db:validate": "prisma validate",
     "db:migrate": "prisma migrate dev",
+    "db:backfill-images": "node --experimental-strip-types scripts/backfill-meal-item-images.ts",
     "postinstall": "prisma generate && node node_modules/@heroui-pro/react/dist/postinstall/index.js",
     "build:eve": "eve build",
     "dev:eve": "eve dev",

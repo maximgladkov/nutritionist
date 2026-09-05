@@ -83,6 +83,7 @@ describe("getProductByBarcode", () => {
             "energy-kcal_100ml": 539,
             proteins_100ml: 6.3,
           },
+          image_small_url: "https://example.com/nutella-small.jpg",
           image_url: "https://example.com/nutella.jpg",
           countries_tags: ["en:france"],
         },
@@ -96,6 +97,8 @@ describe("getProductByBarcode", () => {
     if (!result.found) {
       return;
     }
+    assert.match(String(fetchMock.mock.calls[0]?.arguments[0]), /image_small_url/);
+    assert.equal(result.product.imageUrl, "https://example.com/nutella-small.jpg");
     assert.equal(result.product.name, "Nutella");
     assert.equal(result.product.nutriments.energyKcal100g, 539);
     assert.equal(result.product.nutriments.energyKcal100ml, 539);
@@ -134,6 +137,24 @@ describe("getProductByBarcode", () => {
       return;
     }
     assert.equal(result.product.name, "Philadelphia Light");
+  });
+
+  it("falls back to image_url when image_small_url is missing", async () => {
+    mock.method(globalThis, "fetch", async () =>
+      jsonResponse({
+        product: {
+          code: "3017624010701",
+          product_name: "Nutella",
+          image_url: "https://example.com/nutella.jpg",
+        },
+      }),
+    );
+    const result = await getProductByBarcode("3017624010701");
+    assert.equal(result.found, true);
+    if (!result.found) {
+      return;
+    }
+    assert.equal(result.product.imageUrl, "https://example.com/nutella.jpg");
   });
 
   it("returns not found on 404", async () => {

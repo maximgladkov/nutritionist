@@ -25,6 +25,7 @@ export async function listUserProducts(input: {
             barcode: true,
             createdAt: true,
             energyKcal: true,
+            imageUrl: true,
             name: true,
             unit: true,
           },

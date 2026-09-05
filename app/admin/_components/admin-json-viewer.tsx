@@ -1,9 +1,11 @@
 "use client";
 
-import { cn } from "@/lib/utils";
 import { ScrollShadow } from "@heroui/react";
 import JsonView from "@uiw/react-json-view";
-import { useMemo, type CSSProperties } from "react";
+import { useMemo, type CSSProperties, type ReactNode } from "react";
+import { FoodThumb } from "@/app/_components/food-thumb";
+import { looksLikeImageUrl } from "@/lib/product-image-preview";
+import { cn } from "@/lib/utils";
 
 const jsonViewTheme = {
   "--w-rjv-arrow-color": "var(--muted)",
@@ -71,9 +73,39 @@ export function AdminJsonViewer({
           style={jsonViewTheme}
           value={objectValue}
           className="text-xs leading-5"
-        />
+        >
+          <JsonView.Url
+            render={(props, result) => renderJsonValue(props as JsonValueProps, result)}
+          />
+          <JsonView.String
+            render={(props, result) => renderJsonValue(props as JsonValueProps, result)}
+          />
+        </JsonView>
       </ScrollShadow>
     </div>
+  );
+}
+
+type JsonValueProps = {
+  children?: ReactNode;
+  className?: string;
+  href?: string;
+  style?: CSSProperties;
+};
+
+function renderJsonValue(
+  props: JsonValueProps,
+  result: { keyName: number | string; type: "type" | "value"; value?: unknown },
+): ReactNode {
+  const isLink = typeof props.href === "string";
+  if (result.type !== "value" || typeof result.value !== "string" || !looksLikeImageUrl(result.value, result.keyName)) {
+    return isLink ? <a {...props} /> : <span {...props} />;
+  }
+  return (
+    <span className="inline-flex items-center gap-2 align-middle">
+      <FoodThumb alt="Product photo" className="size-8" src={result.value} />
+      {isLink ? <a {...props} /> : <span {...props} />}
+    </span>
   );
 }
 

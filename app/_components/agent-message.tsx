@@ -27,6 +27,8 @@ import type {
 } from "eve/react";
 import { useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
+import { FoodThumb } from "@/app/_components/food-thumb";
+import { productImagePreviews } from "@/lib/product-image-preview";
 
 export type AgentInputResponse = {
   readonly optionId?: string;
@@ -230,6 +232,7 @@ function AgentMessagePart({
 
       return (
         <>
+          <ProductToolPreview output={part.output} />
           <ChatTool
             argsText={stringifyUnknown(part.input)}
             defaultExpanded={
@@ -250,6 +253,23 @@ function AgentMessagePart({
       );
     }
   }
+}
+
+function ProductToolPreview({ output }: { readonly output: unknown }) {
+  const previews = productImagePreviews(output);
+  if (previews.length === 0) {
+    return null;
+  }
+  return (
+    <ul className="m-0 flex list-none flex-col gap-2 p-0">
+      {previews.map((preview) => (
+        <li className="flex items-center gap-3" key={preview.imageUrl}>
+          <FoodThumb alt={preview.name} src={preview.imageUrl} />
+          <span className="text-foreground min-w-0 truncate text-sm">{preview.name}</span>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 function QuestionRequest({

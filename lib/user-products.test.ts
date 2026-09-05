@@ -14,6 +14,7 @@ function row(input: {
   barcode?: string | null;
   createdAt: string;
   energyKcal?: number | null;
+  imageUrl?: string | null;
   name: string;
   unit?: LoggedProductRow["unit"];
 }): LoggedProductRow {
@@ -22,6 +23,7 @@ function row(input: {
     barcode: input.barcode ?? null,
     createdAt: new Date(input.createdAt),
     energyKcal: input.energyKcal ?? 120,
+    imageUrl: input.imageUrl ?? null,
     name: input.name,
     unit: input.unit ?? "g",
   };
@@ -71,14 +73,35 @@ describe("groupLoggedProducts", () => {
       grouped.map((product) => ({
         amount: product.amount,
         energyKcal: product.energyKcal,
+        imageUrl: product.imageUrl,
         key: product.key,
         name: product.name,
       })),
       [
-        { amount: 30, energyKcal: 80, key: "b:123", name: "Yogurt A" },
-        { amount: 200, energyKcal: 90, key: "n:apple", name: "Apple" },
+        { amount: 30, energyKcal: 80, imageUrl: null, key: "b:123", name: "Yogurt A" },
+        { amount: 200, energyKcal: 90, imageUrl: null, key: "n:apple", name: "Apple" },
       ],
     );
+  });
+
+  it("keeps the latest imageUrl per barcode", () => {
+    const grouped = groupLoggedProducts([
+      row({
+        amount: 30,
+        barcode: "123",
+        createdAt: "2026-09-04T12:00:00.000Z",
+        imageUrl: "https://example.com/yogurt.jpg",
+        name: "Yogurt A",
+      }),
+      row({
+        amount: 150,
+        barcode: "123",
+        createdAt: "2026-09-03T12:00:00.000Z",
+        imageUrl: "https://example.com/old.jpg",
+        name: "Yogurt B",
+      }),
+    ]);
+    assert.equal(grouped[0]?.imageUrl, "https://example.com/yogurt.jpg");
   });
 });
 
