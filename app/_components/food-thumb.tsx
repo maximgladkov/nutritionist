@@ -14,7 +14,7 @@ export function FoodThumb({
 }) {
   return (
     <Avatar className={cn("size-11 rounded-lg", className)}>
-      {src ? <Avatar.Image alt={alt} src={src} /> : null}
+      {src ? <Avatar.Image alt={alt} className="object-cover" src={src} /> : null}
       <Avatar.Fallback className="rounded-lg bg-surface-secondary" />
     </Avatar>
   );
