@@ -1,4 +1,5 @@
 import { resolveProductByBarcode } from "./catalog-product.ts";
+import { inferMealLabel } from "./meal-label.ts";
 import { choosePackagedFoodName } from "./open-food-facts-name.ts";
 import type { ProductNutriments } from "./open-food-facts.ts";
 import { InvalidBarcodeError } from "./open-food-facts.ts";
@@ -90,17 +91,20 @@ const MAX_ITEMS = 50;
 export async function logMeal(input: {
   userId: string;
   eatenAt?: Date;
-  label: MealLabel;
+  label?: MealLabel;
   items: MealItemInput[];
   country?: string;
   signal?: AbortSignal;
 }): Promise<MealView> {
   const resolved = await resolveItems(input.items, input.country, input.signal);
+  const now = new Date();
+  const eatenAt = input.eatenAt ?? now;
+  const label = input.label ?? (await inferMealLabelForUser(input.userId, now));
   const meal = await prisma.meal.create({
     data: {
       userId: input.userId,
-      eatenAt: input.eatenAt ?? new Date(),
-      label: input.label,
+      eatenAt,
+      label,
       items: { create: resolved.map(toCreateData) },
     },
     include: { items: true },
@@ -294,6 +298,11 @@ export function parseIsoDate(value: string, field: string): Date {
     throw new MealError(`${field} must be a valid ISO datetime`);
   }
   return date;
+}
+
+async function inferMealLabelForUser(userId: string, now: Date): Promise<MealLabel> {
+  const timeZone = (await callerTimezone(userId)) ?? "UTC";
+  return inferMealLabel(now, timeZone);
 }
 
 export async function callerTimezone(userId: string, override?: string): Promise<string | undefined> {

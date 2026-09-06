@@ -10,6 +10,7 @@ import {
   logProductAction,
   toggleProductFavoriteAction,
 } from "@/app/actions/products";
+import { mealLabelFromHour } from "@/lib/meal-label";
 import {
   PRODUCT_MEAL_LABELS,
   PRODUCT_SEGMENTS,
@@ -52,18 +53,8 @@ async function fetchProducts([, segment, initData]: ProductsSWRKey): Promise<rea
   return result.data;
 }
 
-function defaultMealLabel(now = new Date()): ProductMealLabel {
-  const hour = now.getHours();
-  if (hour < 5 || hour >= 21) {
-    return "snack";
-  }
-  if (hour < 11) {
-    return "breakfast";
-  }
-  if (hour < 16) {
-    return "lunch";
-  }
-  return "dinner";
+function defaultMealLabel(now = new Date()) {
+  return mealLabelFromHour(now.getHours());
 }
 
 function amountStep(unit: UserProductView["unit"]): number {

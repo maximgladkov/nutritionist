@@ -6,7 +6,7 @@ import { resolveLookupCountry } from "../lib/resolve-country";
 
 export default defineTool({
   description:
-    "Look up a packaged food by barcode in the product catalog. Uses the user's saved country unless country is passed. Pass country only to override for a product from another country. If it is not found, read the label or ask the user, then save_product.",
+    "Look up a packaged food by barcode. Checks the custom catalog first, then Open Food Facts. Custom catalog wins when it has nutrition. Uses the user's saved country unless country is passed. Pass country only to override for a product from another country. If hasNutrition is true, use that product and do not save_product. If it is missing or hasNutrition is false, read the label or ask the user, then save_product.",
   inputSchema: z.object({
     barcode: z.string().min(1),
     country: z.string().length(2).optional(),

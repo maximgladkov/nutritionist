@@ -1,8 +1,12 @@
 import type { Prisma } from "../generated/prisma/client";
 import {
   catalogNutrimentsHaveValues,
+  decideCatalogSave,
   mergeProductSearch,
   pickNutriments,
+  preferProduct,
+  type CatalogSearchResult,
+  type ProductSource,
 } from "./catalog-product-query.ts";
 import { searchCatalogProductsFuzzy } from "./off-product-store.ts";
 import {
@@ -13,12 +17,11 @@ import {
   searchProductsByName,
   type Product,
   type ProductNutriments,
-  type ProductSearchResult,
 } from "./open-food-facts.ts";
 import { prisma } from "./prisma.ts";
 
 export type ResolvedProductLookup =
-  | { found: true; product: Product; source: "catalog" | "open-food-facts" }
+  | { found: true; hasNutrition: boolean; product: Product; source: ProductSource }
   | { found: false; barcode: string };
 
 export type SaveCatalogProductInput = {
@@ -32,13 +35,15 @@ export type SaveCatalogProductInput = {
 };
 
 export type SaveCatalogProductResult =
-  | { product: Product; source: "catalog"; status: "created" | "exists" }
-  | { product: Product; source: "open-food-facts"; status: "exists" }
+  | { hasNutrition: boolean; product: Product; source: ProductSource; status: "created" | "updated" | "exists" }
   | { error: string; status: "invalid" };
 
 export {
   catalogNutrimentsHaveValues,
   mergeProductSearch,
+  preferProduct,
+  type CatalogSearchResult,
+  type ProductSource,
 } from "./catalog-product-query.ts";
 
 export async function resolveProductByBarcode(
@@ -50,22 +55,26 @@ export async function resolveProductByBarcode(
     throw new InvalidBarcodeError(barcode);
   }
 
-  const off = await getProductByBarcode(normalizedBarcode, options);
-  if (off.found) {
-    return { found: true, product: off.product, source: "open-food-facts" };
+  const [off, local] = await Promise.all([
+    getProductByBarcode(normalizedBarcode, options),
+    findCatalogProduct(normalizedBarcode),
+  ]);
+  const preferred = preferProduct(local, off.found ? off.product : undefined);
+  if (!preferred) {
+    return { found: false, barcode: normalizedBarcode };
   }
-
-  const local = await findCatalogProduct(normalizedBarcode);
-  if (local) {
-    return { found: true, product: local, source: "catalog" };
-  }
-  return { found: false, barcode: normalizedBarcode };
+  return {
+    found: true,
+    hasNutrition: catalogNutrimentsHaveValues(preferred.product.nutriments),
+    product: preferred.product,
+    source: preferred.source,
+  };
 }
 
 export async function searchCatalogAndOpenFoodFacts(
   query: string,
   options: { country?: string; pageSize?: number; signal?: AbortSignal } = {},
-): Promise<ProductSearchResult> {
+): Promise<CatalogSearchResult> {
   const [remote, local] = await Promise.all([
     searchProductsByName(query, options),
     searchCatalogProducts(query),
@@ -87,38 +96,64 @@ export async function saveCatalogProduct(input: SaveCatalogProductInput): Promis
     return { error: "Nutrition per 100g or 100ml is required.", status: "invalid" };
   }
 
-  const off = await getProductByBarcode(barcode);
-  if (off.found) {
-    return { product: off.product, source: "open-food-facts", status: "exists" };
+  const [off, existing] = await Promise.all([
+    getProductByBarcode(barcode),
+    findCatalogProduct(barcode),
+  ]);
+  const decision = decideCatalogSave(existing, off.found ? off.product : undefined);
+  if (decision.action === "exists") {
+    return savedResult(decision.product, decision.source, "exists");
   }
 
-  const existing = await findCatalogProduct(barcode);
-  if (existing) {
-    return { product: existing, source: "catalog", status: "exists" };
+  const data = {
+    barcode,
+    brands: emptyToNull(input.brands),
+    createdByUserId: input.createdByUserId,
+    name,
+    nutriments: nutriments as Prisma.InputJsonValue,
+    quantity: emptyToNull(input.quantity),
+    servingSize: emptyToNull(input.servingSize),
+  };
+
+  if (decision.action === "update") {
+    const updated = await prisma.catalogProduct.update({
+      where: { barcode },
+      data: {
+        brands: data.brands,
+        name: data.name,
+        nutriments: data.nutriments,
+        quantity: data.quantity,
+        servingSize: data.servingSize,
+      },
+    });
+    return savedResult(catalogRowToProduct(updated), "custom-catalog", "updated");
   }
 
   try {
-    const created = await prisma.catalogProduct.create({
-      data: {
-        barcode,
-        brands: emptyToNull(input.brands),
-        createdByUserId: input.createdByUserId,
-        name,
-        nutriments: nutriments as Prisma.InputJsonValue,
-        quantity: emptyToNull(input.quantity),
-        servingSize: emptyToNull(input.servingSize),
-      },
-    });
-    return { product: catalogRowToProduct(created), source: "catalog", status: "created" };
+    const created = await prisma.catalogProduct.create({ data });
+    return savedResult(catalogRowToProduct(created), "custom-catalog", "created");
   } catch (error) {
     if (isUniqueConstraintError(error)) {
       const raced = await findCatalogProduct(barcode);
       if (raced) {
-        return { product: raced, source: "catalog", status: "exists" };
+        return savedResult(raced, "custom-catalog", "exists");
       }
     }
     throw error;
   }
+}
+
+function savedResult(
+  product: Product,
+  source: ProductSource,
+  status: "created" | "updated" | "exists",
+): SaveCatalogProductResult {
+  return {
+    hasNutrition: catalogNutrimentsHaveValues(product.nutriments),
+    product,
+    source,
+    status,
+  };
 }
 
 async function findCatalogProduct(barcode: string): Promise<Product | undefined> {

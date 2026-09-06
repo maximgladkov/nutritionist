@@ -1,9 +1,15 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { catalogNutrimentsHaveValues, mergeProductSearch, pickNutriments } from "./catalog-product-query.ts";
+import {
+  catalogNutrimentsHaveValues,
+  decideCatalogSave,
+  mergeProductSearch,
+  pickNutriments,
+  preferProduct,
+} from "./catalog-product-query.ts";
 import type { Product } from "./open-food-facts.ts";
 
-function product(barcode: string, name: string): Product {
+function product(barcode: string, name: string, nutriments: Product["nutriments"] = {}): Product {
   return {
     allergens: null,
     barcode,
@@ -13,7 +19,7 @@ function product(barcode: string, name: string): Product {
     ingredients: null,
     name,
     novaGroup: null,
-    nutriments: {},
+    nutriments,
     nutriscoreGrade: null,
     quantity: null,
     servingSize: null,
@@ -41,19 +47,90 @@ describe("pickNutriments", () => {
   });
 });
 
+describe("preferProduct", () => {
+  it("prefers a custom catalog product that has nutrition", () => {
+    const catalog = product("111", "Custom", { energyKcal100g: 10 });
+    const off = product("111", "Off", { energyKcal100g: 20 });
+    assert.deepEqual(preferProduct(catalog, off), { product: catalog, source: "custom-catalog" });
+  });
+
+  it("uses Open Food Facts when the custom catalog has no nutrition", () => {
+    const catalog = product("111", "Custom");
+    const off = product("111", "Off", { energyKcal100g: 20 });
+    assert.deepEqual(preferProduct(catalog, off), { product: off, source: "open-food-facts" });
+  });
+
+  it("falls back to the custom catalog when neither has nutrition", () => {
+    const catalog = product("111", "Custom");
+    const off = product("111", "Off");
+    assert.deepEqual(preferProduct(catalog, off), { product: catalog, source: "custom-catalog" });
+  });
+
+  it("returns undefined when neither source has the product", () => {
+    assert.equal(preferProduct(undefined, undefined), undefined);
+  });
+});
+
+describe("decideCatalogSave", () => {
+  it("does not overwrite a custom catalog product that already has nutrition", () => {
+    const catalog = product("111", "Custom", { energyKcal100g: 10 });
+    assert.deepEqual(decideCatalogSave(catalog, product("111", "Off")), {
+      action: "exists",
+      product: catalog,
+      source: "custom-catalog",
+    });
+  });
+
+  it("updates a custom catalog product that has no nutrition", () => {
+    const catalog = product("111", "Custom");
+    assert.deepEqual(decideCatalogSave(catalog, product("111", "Off", { energyKcal100g: 20 })), {
+      action: "update",
+      product: catalog,
+    });
+  });
+
+  it("skips saving when Open Food Facts already has nutrition", () => {
+    const off = product("111", "Off", { energyKcal100g: 20 });
+    assert.deepEqual(decideCatalogSave(undefined, off), {
+      action: "exists",
+      product: off,
+      source: "open-food-facts",
+    });
+  });
+
+  it("creates a custom catalog product when Open Food Facts has no nutrition", () => {
+    assert.deepEqual(decideCatalogSave(undefined, product("111", "Off")), { action: "create" });
+  });
+});
+
 describe("mergeProductSearch", () => {
-  it("prepends catalog hits that Open Food Facts does not have", () => {
-    const local = [product("111", "Local Soy"), product("222", "Dup")];
+  it("lists custom catalog hits first and prefers them over Open Food Facts for the same barcode", () => {
+    const local = [product("111", "Local Soy"), product("222", "Local Dup", { energyKcal100g: 5 })];
     const merged = mergeProductSearch(local, {
       count: 1,
       page: 1,
-      products: [product("222", "Off Dup")],
+      products: [product("222", "Off Dup", { energyKcal100g: 9 })],
     });
     assert.equal(merged.count, 2);
     assert.deepEqual(
-      merged.products.map((item) => item.barcode),
-      ["111", "222"],
+      merged.products.map((item) => ({ barcode: item.barcode, name: item.name, source: item.source })),
+      [
+        { barcode: "111", name: "Local Soy", source: "custom-catalog" },
+        { barcode: "222", name: "Local Dup", source: "custom-catalog" },
+      ],
     );
-    assert.equal(merged.products[1]?.name, "Off Dup");
+    assert.equal(merged.products[0]?.hasNutrition, false);
+    assert.equal(merged.products[1]?.hasNutrition, true);
+  });
+
+  it("keeps Open Food Facts when the custom catalog hit has no nutrition", () => {
+    const merged = mergeProductSearch([product("222", "Local Dup")], {
+      count: 1,
+      page: 1,
+      products: [product("222", "Off Dup", { proteins100g: 3 })],
+    });
+    assert.equal(merged.products[0]?.name, "Off Dup");
+    assert.equal(merged.products[0]?.source, "open-food-facts");
+    assert.equal(merged.products[0]?.hasNutrition, true);
   });
 });

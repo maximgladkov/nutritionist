@@ -21,17 +21,90 @@ const NUTRIMENT_KEYS = [
 
 export { NUTRIMENT_KEYS };
 
+export type ProductSource = "custom-catalog" | "open-food-facts";
+
+export type CatalogSearchProduct = Product & {
+  hasNutrition: boolean;
+  source: ProductSource;
+};
+
+export type CatalogSearchResult = {
+  count: number;
+  page: number;
+  products: CatalogSearchProduct[];
+};
+
+export type CatalogSaveDecision =
+  | { action: "create" }
+  | { action: "exists"; product: Product; source: ProductSource }
+  | { action: "update"; product: Product };
+
 export function catalogNutrimentsHaveValues(nutriments: ProductNutriments) {
   return NUTRIMENT_KEYS.some((key) => typeof nutriments[key] === "number" && Number.isFinite(nutriments[key]));
 }
 
-export function mergeProductSearch(local: Product[], remote: ProductSearchResult): ProductSearchResult {
-  const seen = new Set(remote.products.map((product) => product.barcode));
-  const extra = local.filter((product) => product.barcode.length > 0 && !seen.has(product.barcode));
+export function preferProduct(
+  catalog: Product | undefined,
+  off: Product | undefined,
+): { product: Product; source: ProductSource } | undefined {
+  if (catalog && catalogNutrimentsHaveValues(catalog.nutriments)) {
+    return { product: catalog, source: "custom-catalog" };
+  }
+  if (off && catalogNutrimentsHaveValues(off.nutriments)) {
+    return { product: off, source: "open-food-facts" };
+  }
+  if (catalog) {
+    return { product: catalog, source: "custom-catalog" };
+  }
+  if (off) {
+    return { product: off, source: "open-food-facts" };
+  }
+  return undefined;
+}
+
+export function decideCatalogSave(
+  catalog: Product | undefined,
+  off: Product | undefined,
+): CatalogSaveDecision {
+  if (catalog && catalogNutrimentsHaveValues(catalog.nutriments)) {
+    return { action: "exists", product: catalog, source: "custom-catalog" };
+  }
+  if (catalog) {
+    return { action: "update", product: catalog };
+  }
+  if (off && catalogNutrimentsHaveValues(off.nutriments)) {
+    return { action: "exists", product: off, source: "open-food-facts" };
+  }
+  return { action: "create" };
+}
+
+export function mergeProductSearch(local: Product[], remote: ProductSearchResult): CatalogSearchResult {
+  const localByBarcode = indexByBarcode(local);
+  const remoteByBarcode = indexByBarcode(remote.products);
+  const barcodes: string[] = [...localByBarcode.keys()];
+  for (const barcode of remoteByBarcode.keys()) {
+    if (!localByBarcode.has(barcode)) {
+      barcodes.push(barcode);
+    }
+  }
+
+  const products: CatalogSearchProduct[] = [];
+  for (const barcode of barcodes) {
+    const preferred = preferProduct(localByBarcode.get(barcode), remoteByBarcode.get(barcode));
+    if (!preferred) {
+      continue;
+    }
+    products.push({
+      ...preferred.product,
+      hasNutrition: catalogNutrimentsHaveValues(preferred.product.nutriments),
+      source: preferred.source,
+    });
+  }
+
   return {
-    count: remote.count + extra.length,
+    count: products.length,
     page: remote.page,
-    products: [...extra, ...remote.products],
+    products,
   };
 }
 
@@ -44,4 +117,14 @@ export function pickNutriments(value: ProductNutriments | Record<string, unknown
     }
   }
   return nutriments;
+}
+
+function indexByBarcode(products: Product[]) {
+  const byBarcode = new Map<string, Product>();
+  for (const product of products) {
+    if (product.barcode.length > 0 && !byBarcode.has(product.barcode)) {
+      byBarcode.set(product.barcode, product);
+    }
+  }
+  return byBarcode;
 }
