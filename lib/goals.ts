@@ -21,6 +21,7 @@ export {
   goalRingsForToday,
   hasAnyGoal,
   planGoalMerge,
+  remainingVsGoals,
   resolveCalorieGoalWrite,
   resolveGoalWrite,
   resolveGoalsPatch,
@@ -29,6 +30,7 @@ export {
 export type {
   CalorieGoalWrite,
   GoalField,
+  GoalRemaining,
   GoalRing,
   GoalWrite,
   GoalsPatch,

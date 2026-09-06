@@ -6,7 +6,7 @@ import { isAudioMediaType, isVideoMediaType, looksLikeAudioFilename, looksLikeVi
 export const TELEGRAM_ACK_MODEL = "google/gemini-3.5-flash-lite";
 export const TELEGRAM_ACK_TIMEOUT_MS = 4000;
 export const TELEGRAM_ACK_TURN_CONTEXT =
-  "A short acknowledgement was already sent to the user. Do not narrate what you are about to do. Call tools if needed, then send only the actual result.";
+  "A short acknowledgement was already sent to the user. Do not narrate what you are about to do. For logged intake, remaining budget, meals, or goals, call get_nutrition_summary this turn before answering. Do not reuse numbers from chat. Then send only the actual result.";
 
 export const TELEGRAM_ACK_SYSTEM =
   `You are ${APP_NAME} sending one Telegram acknowledgement. Reply with a very short, natural chat status that matches what they just asked, as if you already started. A few words is enough. Sound like a person, not a canned bot status. Vary the wording every time. Examples of the kind of reply, not lines to copy: calories or totals — Checking calories… / Смотрю калории… / Гляну, сколько вышло…; logging a meal — Logging that… / Записываю… / Сейчас внесу…; a photo — Looking at the photo… / Смотрю фото…; a voice note — Listening… / Слушаю…; a video — Watching the video… / Смотрю видео…; other — One sec… / Hang on… / Сейчас гляну…. Match look / listen / watch to the attachments listed for this turn. If there are several attachments, you can name the mix in a few words. Match the language of the latest user message. Do not use markdown. Do not ask a question. Do not say you will get back later. Do not claim the work is done.`;

@@ -21,11 +21,24 @@ export type CompletedPendingAgentTurnAck = PendingAgentTurnAck & {
 export function oldestUnclaimedPendingAck<T extends { createdAt: Date; sessionId: string | null }>(
   rows: readonly T[],
 ): T | undefined {
+  return pendingAckToClaim(rows);
+}
+
+export function pendingAckToClaim<T extends { createdAt: Date; sessionId: string | null }>(
+  rows: readonly T[],
+  previousTurnStartedAt?: Date | null,
+): T | undefined {
   const unclaimed = rows.filter((row) => row.sessionId === null);
   if (unclaimed.length === 0) {
     return undefined;
   }
-  return unclaimed.reduce((oldest, row) => (row.createdAt.getTime() < oldest.createdAt.getTime() ? row : oldest));
+  const ordered = [...unclaimed].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  if (previousTurnStartedAt === undefined || previousTurnStartedAt === null) {
+    return ordered[0];
+  }
+  const previousAt = previousTurnStartedAt.getTime();
+  const fresh = ordered.filter((row) => row.createdAt.getTime() >= previousAt);
+  return fresh[0] ?? ordered[0];
 }
 
 export function pendingAckIsReady(row: { model: string | null; text: string | null }): boolean {
@@ -56,6 +69,7 @@ export async function reservePendingAgentTurnAck(input: {
 export async function claimPendingAgentTurnAck(input: {
   channel: string;
   sessionId: string;
+  startedAt: Date;
   turnId: string;
   userId: string | null;
 }): Promise<PendingAgentTurnAck | null> {
@@ -63,17 +77,51 @@ export async function claimPendingAgentTurnAck(input: {
   if (userId === null) {
     return null;
   }
+  const turns = prisma["agentTurn"];
+  if (turns === undefined) {
+    throw new Error("Prisma client is missing AgentTurn. Restart the eve runtime after prisma generate.");
+  }
+  const previous = await turns.findFirst({
+    select: { startedAt: true },
+    orderBy: { startedAt: "desc" },
+    where: {
+      channel: input.channel,
+      startedAt: { lt: input.startedAt },
+      userId,
+    },
+  });
   return prisma.$transaction(async (tx) => {
-    const row = await tx.agentTurnPendingAck.findFirst({
-      orderBy: { createdAt: "asc" },
-      where: { channel: input.channel, sessionId: null, userId },
-    });
+    const fresh = previous
+      ? await tx.agentTurnPendingAck.findFirst({
+          orderBy: { createdAt: "asc" },
+          where: {
+            channel: input.channel,
+            createdAt: { gte: previous.startedAt },
+            sessionId: null,
+            userId,
+          },
+        })
+      : null;
+    const row =
+      fresh ??
+      (await tx.agentTurnPendingAck.findFirst({
+        orderBy: { createdAt: "asc" },
+        where: { channel: input.channel, sessionId: null, userId },
+      }));
     if (!row) {
       return null;
     }
     await tx.agentTurnPendingAck.update({
       data: { sessionId: input.sessionId, turnId: input.turnId },
       where: { id: row.id },
+    });
+    await tx.agentTurnPendingAck.deleteMany({
+      where: {
+        channel: input.channel,
+        createdAt: { lt: row.createdAt },
+        sessionId: null,
+        userId,
+      },
     });
     bindTelegramAckPosted(row.id, input.sessionId, input.turnId);
     const claimed = await tx.agentTurnPendingAck.findUnique({ where: { id: row.id } });

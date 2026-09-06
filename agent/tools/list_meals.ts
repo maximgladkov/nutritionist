@@ -6,7 +6,7 @@ import { requireUser } from "../lib/require-user";
 
 export default defineTool({
   description:
-    "List the caller's meals for nutrition dates in a range, grouped into breakfast, lunch, dinner, and snack. Omit from and to to use today's nutrition day (04:00 to 04:00 the next morning in the saved timezone). from and to are inclusive YYYY-MM-DD nutrition dates. If only one is passed, that single day is used. If they are reversed, they are swapped. Do not pass a meal type; the payload includes currentLabel from the local clock.",
+    "Required when stating what the caller ate. Do not reconstruct meals from chat. Lists meals for nutrition dates in a range, grouped into breakfast, lunch, dinner, and snack. Omit from and to to use today's nutrition day (04:00 to 04:00 the next morning in the saved timezone). from and to are inclusive YYYY-MM-DD nutrition dates. If only one is passed, that single day is used. If they are reversed, they are swapped. Do not pass a meal type; the payload includes currentLabel from the local clock. Use get_nutrition_summary for totals and remaining vs goals.",
   inputSchema: z.object({
     from: z.string().min(1).optional(),
     to: z.string().min(1).optional(),

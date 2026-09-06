@@ -29,13 +29,51 @@ export type PersistTurnMediaFile = {
 
 const MAX_WORKFLOW_FILE_BYTES = 1024 * 1024;
 const telegramFileBytes = new Map<string, Buffer>();
+const telegramTurnMedia = new Map<string, PersistTurnMediaFile[]>();
 
 export function rememberTelegramFileBytes(fileId: string, bytes: Buffer): void {
   telegramFileBytes.set(fileId, bytes);
 }
 
+export function rememberTelegramTurnMedia(
+  sessionId: string,
+  file: Omit<PersistTurnMediaFile, "bytesBase64">,
+): void {
+  const files = telegramTurnMedia.get(sessionId) ?? [];
+  files.push(file);
+  telegramTurnMedia.set(sessionId, files);
+}
+
+export function takeRememberedTelegramTurnMedia(sessionId: string): PersistTurnMediaFile[] {
+  const files = telegramTurnMedia.get(sessionId) ?? [];
+  telegramTurnMedia.delete(sessionId);
+  return files.map((file) => {
+    const bytesBase64 = telegramFileBytesBase64(file.fileId);
+    return bytesBase64 === undefined ? file : { ...file, bytesBase64 };
+  });
+}
+
+export function filesForTurnMediaPersist(
+  sessionId: string,
+  parts: readonly { filename?: string; mediaType?: string; type: string; url?: string }[] | undefined,
+): PersistTurnMediaFile[] {
+  const fromParts = persistTurnMediaFilesFromParts(parts);
+  const remembered = takeRememberedTelegramTurnMedia(sessionId);
+  if (fromParts.length === 0) {
+    return remembered;
+  }
+  return fromParts.map((file) => {
+    const match = remembered.find((row) => row.fileId === file.fileId);
+    if (match?.bytesBase64 === undefined) {
+      return file;
+    }
+    return { ...file, bytesBase64: match.bytesBase64 };
+  });
+}
+
 export function resetTelegramFileBytes(): void {
   telegramFileBytes.clear();
+  telegramTurnMedia.clear();
 }
 
 function telegramFileBytesBase64(fileId: string): string | undefined {

@@ -8,6 +8,7 @@ import {
   goalRingsForToday,
   hasAnyGoal,
   planGoalMerge,
+  remainingVsGoals,
   resolveCalorieGoalWrite,
   resolveGoalWrite,
   resolveGoalsPatch,
@@ -105,6 +106,46 @@ describe("hasAnyGoal", () => {
 
   it("is true when any goal is set", () => {
     assert.equal(hasAnyGoal({ ...emptyGoalsView(), fiberGPerDay: 25 }), true);
+  });
+});
+
+describe("remainingVsGoals", () => {
+  it("subtracts eaten from each set goal and leaves unset goals null", () => {
+    assert.deepEqual(
+      remainingVsGoals(
+        { ...emptyGoalsView(), caloriesPerDay: 2244, proteinGPerDay: 140 },
+        {
+          carbohydrates: 80,
+          energyKcal: 1296,
+          fat: 40,
+          fiber: 10,
+          proteins: 90,
+        },
+      ),
+      {
+        carbohydrates: null,
+        energyKcal: 948,
+        fat: null,
+        fiber: null,
+        proteins: 50,
+      },
+    );
+  });
+
+  it("returns null remaining when intake is incomplete", () => {
+    assert.equal(
+      remainingVsGoals(
+        { ...emptyGoalsView(), caloriesPerDay: 2000 },
+        {
+          carbohydrates: null,
+          energyKcal: null,
+          fat: null,
+          fiber: null,
+          proteins: null,
+        },
+      ).energyKcal,
+      null,
+    );
   });
 });
 

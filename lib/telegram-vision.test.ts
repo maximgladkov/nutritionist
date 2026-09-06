@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { isImageMediaType, looksLikeImageFilename, sniffImageMediaType } from "./image-bytes.ts";
 import {
+  filesForTurnMediaPersist,
+} from "./persist-turn-media.ts";
+import {
   attachTelegramVision,
   inlineTelegramImages,
   isAudioMediaType,
@@ -112,6 +115,32 @@ describe("inlineTelegramImages", () => {
     assert.deepEqual(content, [part]);
   });
 
+  it("remembers inlined telegram files for later persist when a session id is present", async () => {
+    const content = await inlineTelegramImages(
+      [
+        { type: "text", text: "lunch" },
+        {
+          type: "file",
+          mediaType: "image/jpeg",
+          filename: "photo.jpg",
+          data: "telegram-file:AgACinlineSess",
+        },
+      ],
+      async () => ({ bytes: jpeg, mediaType: "image/jpeg" }),
+      "sess-inline",
+    );
+    assert.equal(Array.isArray(content) ? content[1]?.type : undefined, "image");
+    assert.deepEqual(filesForTurnMediaPersist("sess-inline", [{ type: "file", mediaType: "image/jpeg" }]), [
+      {
+        bytesBase64: jpeg.toString("base64"),
+        fileId: "AgACinlineSess",
+        filename: "photo.jpg",
+        index: 1,
+        mediaType: "image/jpeg",
+      },
+    ]);
+  });
+
   it("inlines images on channel deliver before the harness stages files", async () => {
     const channel = {
       adapter: {
@@ -132,17 +161,18 @@ describe("inlineTelegramImages", () => {
             type: "file",
             mediaType: "image/jpeg",
             filename: "photo.jpg",
-            data: "telegram-file:AgACAgIAphoto",
+            data: "telegram-file:AgACdeliverSess",
           },
         ],
       },
-      {},
+      { session: { id: "sess-deliver" } },
     );
 
     const message = (result as { message: Array<{ type: string; image?: string; mediaType?: string }> }).message[0];
     assert.equal(message?.type, "image");
     assert.equal(message?.mediaType, "image/jpeg");
     assert.equal(message?.image, jpeg.toString("base64"));
+    assert.equal(filesForTurnMediaPersist("sess-deliver", [{ type: "file", mediaType: "image/jpeg" }])[0]?.fileId, "AgACdeliverSess");
   });
 
   it("builds a persist scope from telegram deliver context without a turn id", () => {

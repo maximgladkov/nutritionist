@@ -5,6 +5,7 @@ import type { TelegramAckGeneration } from "./telegram-ack.ts";
 import {
   oldestUnclaimedPendingAck,
   pendingAckIsReady,
+  pendingAckToClaim,
 } from "./agent-turn-ack.ts";
 import {
   shouldDeliverTelegramAck,
@@ -47,6 +48,54 @@ describe("oldestUnclaimedPendingAck", () => {
       { createdAt: new Date("2026-09-04T10:00:01.000Z"), id: "next", sessionId: null },
     ];
     assert.equal(oldestUnclaimedPendingAck(rows)?.id, "next");
+  });
+});
+
+describe("pendingAckToClaim", () => {
+  it("skips a leftover ack from before the previous turn", () => {
+    const leftover = {
+      createdAt: new Date("2026-09-06T11:48:16.157Z"),
+      id: "juice",
+      sessionId: null as string | null,
+    };
+    const current = {
+      createdAt: new Date("2026-09-06T12:40:15.357Z"),
+      id: "calories",
+      sessionId: null,
+    };
+    assert.equal(
+      pendingAckToClaim([leftover, current], new Date("2026-09-06T12:08:35.748Z"))?.id,
+      "calories",
+    );
+  });
+
+  it("keeps webhook order for acks reserved while the previous turn was still running", () => {
+    const first = {
+      createdAt: new Date("2026-09-06T10:00:10.000Z"),
+      id: "first",
+      sessionId: null as string | null,
+    };
+    const second = {
+      createdAt: new Date("2026-09-06T10:00:20.000Z"),
+      id: "second",
+      sessionId: null,
+    };
+    assert.equal(
+      pendingAckToClaim([second, first], new Date("2026-09-06T10:00:00.000Z"))?.id,
+      "first",
+    );
+  });
+
+  it("falls back to the oldest unclaimed ack when all reservations predate the previous turn", () => {
+    const queued = {
+      createdAt: new Date("2026-09-06T10:00:20.000Z"),
+      id: "queued",
+      sessionId: null as string | null,
+    };
+    assert.equal(
+      pendingAckToClaim([queued], new Date("2026-09-06T10:01:00.000Z"))?.id,
+      "queued",
+    );
   });
 });
 

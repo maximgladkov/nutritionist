@@ -125,6 +125,31 @@ export function hasAnyGoal(goals: GoalsView): boolean {
   return GOAL_FIELDS.some((field) => goals[field] !== null);
 }
 
+export type GoalRemaining = {
+  carbohydrates: number | null;
+  energyKcal: number | null;
+  fat: number | null;
+  fiber: number | null;
+  proteins: number | null;
+};
+
+export function remainingVsGoals(goals: GoalsView, totals: GoalRemaining): GoalRemaining {
+  return {
+    carbohydrates: subtractGoal(goals.carbsGPerDay, totals.carbohydrates),
+    energyKcal: subtractGoal(goals.caloriesPerDay, totals.energyKcal),
+    fat: subtractGoal(goals.fatGPerDay, totals.fat),
+    fiber: subtractGoal(goals.fiberGPerDay, totals.fiber),
+    proteins: subtractGoal(goals.proteinGPerDay, totals.proteins),
+  };
+}
+
+function subtractGoal(goal: number | null, eaten: number | null) {
+  if (goal === null || eaten === null) {
+    return null;
+  }
+  return goal - eaten;
+}
+
 export function resolveGoalWrite(field: GoalField, value: unknown): GoalWrite {
   if (value === null || value === undefined || value === "") {
     return { op: "clear" };

@@ -3,8 +3,11 @@ import { describe, it } from "node:test";
 import { emptyTranscript } from "./agent-turn-model.ts";
 import {
   applyStoredAttachmentsToTranscript,
+  filesForTurnMediaPersist,
   persistTurnMediaFilesFromMessage,
   persistTurnMediaFilesFromParts,
+  rememberTelegramFileBytes,
+  rememberTelegramTurnMedia,
 } from "./persist-turn-media.ts";
 import type { PersistedUserAttachment } from "./user-attachments.ts";
 
@@ -54,6 +57,60 @@ describe("persistTurnMediaFilesFromMessage", () => {
   });
 });
 
+describe("filesForTurnMediaPersist", () => {
+  it("uses inlined telegram bytes when received parts have no file urls", () => {
+    rememberTelegramFileBytes("AgACremember1", Buffer.from("jpeg-bytes"));
+    rememberTelegramTurnMedia("sess-no-url", {
+      fileId: "AgACremember1",
+      filename: "photo.jpg",
+      index: 0,
+      mediaType: "image/jpeg",
+    });
+    assert.deepEqual(
+      filesForTurnMediaPersist("sess-no-url", [{ type: "file", mediaType: "image/jpeg" }]),
+      [
+        {
+          bytesBase64: Buffer.from("jpeg-bytes").toString("base64"),
+          fileId: "AgACremember1",
+          filename: "photo.jpg",
+          index: 0,
+          mediaType: "image/jpeg",
+        },
+      ],
+    );
+    assert.deepEqual(filesForTurnMediaPersist("sess-no-url", [{ type: "file", mediaType: "image/jpeg" }]), []);
+  });
+
+  it("keeps part file ids and attaches remembered bytes", () => {
+    rememberTelegramFileBytes("AgACremember2", Buffer.from("jpeg-bytes"));
+    rememberTelegramTurnMedia("sess-with-url", {
+      fileId: "AgACremember2",
+      filename: "photo.jpg",
+      index: 0,
+      mediaType: "image/jpeg",
+    });
+    assert.deepEqual(
+      filesForTurnMediaPersist("sess-with-url", [
+        {
+          type: "file",
+          filename: "photo.jpg",
+          mediaType: "image/jpeg",
+          url: "telegram-file:AgACremember2",
+        },
+      ]),
+      [
+        {
+          bytesBase64: Buffer.from("jpeg-bytes").toString("base64"),
+          fileId: "AgACremember2",
+          filename: "photo.jpg",
+          index: 0,
+          mediaType: "image/jpeg",
+        },
+      ],
+    );
+  });
+});
+
 describe("applyStoredAttachmentsToTranscript", () => {
   it("writes admin URLs onto url-less file parts and synthesizes leftovers", () => {
     const stored: PersistedUserAttachment[] = [
@@ -84,6 +141,30 @@ describe("applyStoredAttachmentsToTranscript", () => {
     }
     assert.equal(user.parts?.[1]?.url, "/admin/attachments/att-a");
     assert.equal(user.parts?.[2]?.url, "/admin/attachments/att-b");
+  });
+
+  it("writes admin URLs onto filename-less file parts", () => {
+    const patched = applyStoredAttachmentsToTranscript(
+      {
+        ...emptyTranscript(),
+        items: [
+          {
+            at: "2026-09-06T12:55:00.000Z",
+            parts: [{ type: "file", mediaType: "image/jpeg" }],
+            text: "[image: image/jpeg]",
+            type: "user",
+          },
+        ],
+      },
+      [storedAttachment("att-a", "photo.jpg")],
+    );
+    const user = patched.items[0];
+    assert.equal(user?.type, "user");
+    if (user?.type !== "user") {
+      return;
+    }
+    assert.equal(user.parts?.[0]?.url, "/admin/attachments/att-a");
+    assert.equal(user.parts?.[0]?.filename, "photo.jpg");
   });
 });
 

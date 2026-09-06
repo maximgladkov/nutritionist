@@ -1,7 +1,7 @@
 import type { FilePart, ImagePart, UserContent } from "ai";
 import { normalizeChannelKind } from "./agent-turn-model.ts";
 import { isImageMediaType, looksLikeImageFilename, sniffImageMediaType } from "./image-bytes.ts";
-import { rememberTelegramFileBytes } from "./persist-turn-media.ts";
+import { rememberTelegramFileBytes, rememberTelegramTurnMedia } from "./persist-turn-media.ts";
 import { PENDING_ATTACHMENT_TURN_ID, telegramFileIdFromUrl } from "./user-attachments-query.ts";
 
 export function isAudioMediaType(mediaType: string | undefined): boolean {
@@ -39,11 +39,14 @@ const INLINE_FETCH_CONCURRENCY = 4;
 export async function inlineTelegramImages(
   content: string | UserContent,
   fetchFile: TelegramFileFetch,
+  sessionId?: string,
 ): Promise<string | UserContent> {
   if (typeof content === "string" || !Array.isArray(content)) {
     return content;
   }
-  return mapPool(content, INLINE_FETCH_CONCURRENCY, (part) => inlineTelegramImagePart(part, fetchFile)) as Promise<UserContent>;
+  return mapPool(content, INLINE_FETCH_CONCURRENCY, (part, index) =>
+    inlineTelegramImagePart(part, fetchFile, sessionId, index),
+  ) as Promise<UserContent>;
 }
 
 export function attachTelegramVision<T extends object>(channel: T, fetchFile: TelegramFileFetch): T {
@@ -66,11 +69,13 @@ export function attachTelegramVision<T extends object>(channel: T, fetchFile: Te
       return delivered ?? payload;
     }
     const originalMessage = step.message as string | UserContent;
+    const scope = persistScopeFromDeliver(ctx);
     return {
       ...step,
       message: await inlineTelegramImages(
         originalMessage,
         (url) => (adapter.fetchFile === undefined ? fetchFile(url) : adapter.fetchFile(url)),
+        scope?.sessionId,
       ),
     };
   };
@@ -101,6 +106,8 @@ export function withSniffedImageType(
 async function inlineTelegramImagePart(
   part: unknown,
   fetchFile: TelegramFileFetch,
+  sessionId: string | undefined,
+  index: number,
 ) {
   if (!isFilePart(part)) {
     return part;
@@ -126,6 +133,14 @@ async function inlineTelegramImagePart(
     const fileId = telegramFileIdFromUrl(url);
     if (fileId) {
       rememberTelegramFileBytes(fileId, Buffer.from(bytes));
+      if (sessionId !== undefined && sessionId.length > 0) {
+        rememberTelegramTurnMedia(sessionId, {
+          fileId,
+          index,
+          ...(part.filename === undefined ? {} : { filename: part.filename }),
+          mediaType,
+        });
+      }
     }
     return visionMediaPart(bytes, mediaType, part.filename);
   } catch {
@@ -161,7 +176,11 @@ function visionMediaPart(bytes: Uint8Array, mediaType: string, filename?: string
   };
 }
 
-async function mapPool<T, R>(items: readonly T[], concurrency: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+async function mapPool<T, R>(
+  items: readonly T[],
+  concurrency: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
   const results: R[] = new Array(items.length);
   let next = 0;
   async function worker() {
@@ -171,7 +190,7 @@ async function mapPool<T, R>(items: readonly T[], concurrency: number, fn: (item
       if (index >= items.length) {
         return;
       }
-      results[index] = await fn(items[index] as T);
+      results[index] = await fn(items[index] as T, index);
     }
   }
   const workers = Math.min(Math.max(concurrency, 1), items.length);

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   TELEGRAM_ACK_SYSTEM,
+  TELEGRAM_ACK_TURN_CONTEXT,
   coalesceTelegramAckTurns,
   telegramAckErrorMessage,
   telegramAckFileSummary,
@@ -110,6 +111,8 @@ describe("telegramAckMessages", () => {
     assert.match(TELEGRAM_ACK_SYSTEM, /Checking calories/);
     assert.match(TELEGRAM_ACK_SYSTEM, /Listening/);
     assert.match(TELEGRAM_ACK_SYSTEM, /Watching the video/);
+    assert.match(TELEGRAM_ACK_TURN_CONTEXT, /get_nutrition_summary/);
+    assert.match(TELEGRAM_ACK_TURN_CONTEXT, /Do not reuse numbers from chat/);
     assert.ok(telegramAckSystem(input).startsWith(TELEGRAM_ACK_SYSTEM));
   });
 });

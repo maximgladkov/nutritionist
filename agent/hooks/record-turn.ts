@@ -24,7 +24,7 @@ import {
   toolResultFromAction,
   type AgentTurnUserPart,
 } from "../../lib/agent-turns";
-import { persistTurnMediaFilesFromParts, schedulePersistTurnMedia } from "../../lib/persist-turn-media";
+import { filesForTurnMediaPersist, schedulePersistTurnMedia } from "../../lib/persist-turn-media";
 
 export default defineHook({
   events: {
@@ -42,6 +42,7 @@ export default defineHook({
         const pending = await claimPendingAgentTurnAck({
           channel: scope.channel,
           sessionId: scope.sessionId,
+          startedAt: scope.at,
           turnId: scope.turnId,
           userId: scope.userId,
         });
@@ -62,7 +63,7 @@ export default defineHook({
         );
         schedulePersistTurnMedia({
           channel: scope.channel,
-          files: persistTurnMediaFilesFromParts(event.data.parts),
+          files: filesForTurnMediaPersist(scope.sessionId, event.data.parts),
           sessionId: scope.sessionId,
           turnId: scope.turnId,
           userId: scope.userId,

@@ -72,7 +72,7 @@ describe("formatRecentConversation", () => {
     assert.equal(
       formatted,
       [
-        "Recent Telegram turns. The current user message follows separately.",
+        "Recent Telegram turns for chat context only. Totals, remaining budget, and goals are not live here. The current user message follows separately.",
         "Assistant: That looks like yogurt, 150g.",
         "User: yes",
       ].join("\n"),
@@ -85,7 +85,7 @@ describe("formatRecentConversation", () => {
     ]);
     assert.equal(
       formatted,
-      ["Recent Telegram turns. The current user message follows separately.", "User: lunch"].join("\n"),
+      ["Recent Telegram turns for chat context only. Totals, remaining budget, and goals are not live here. The current user message follows separately.", "User: lunch"].join("\n"),
     );
   });
 
@@ -102,7 +102,7 @@ describe("formatRecentConversation", () => {
     );
     assert.equal(
       formatted,
-      ["Recent Telegram turns. The current user message follows separately.", "Assistant: ok two", "User: three"].join(
+      ["Recent Telegram turns for chat context only. Totals, remaining budget, and goals are not live here. The current user message follows separately.", "Assistant: ok two", "User: three"].join(
         "\n",
       ),
     );
@@ -115,7 +115,7 @@ describe("formatRecentConversation", () => {
         { role: "assistant", text: "bbbbbbbbbb" },
         { role: "user", text: "yes" },
       ],
-      { maxChars: 90 },
+      { maxChars: 180 },
     );
     assert.match(formatted ?? "", /User: yes$/u);
     assert.doesNotMatch(formatted ?? "", /aaaaaaaaaa/u);

@@ -7,8 +7,8 @@ export const RECENT_CONVERSATION_MAX_CHARS = 3500;
 export const TELEGRAM_CONVERSATION_CHANNEL = "telegram";
 
 const MEDIA_STUB = /\[(?:image|file): [^\]]*\]/gu;
-const RECENT_CONVERSATION_HEADER =
-  "Recent Telegram turns. The current user message follows separately.";
+export const RECENT_CONVERSATION_HEADER =
+  "Recent Telegram turns for chat context only. Totals, remaining budget, and goals are not live here. The current user message follows separately.";
 
 export function clampConversationSearchLimit(limit: number | undefined) {
   if (limit === undefined || !Number.isFinite(limit)) {
