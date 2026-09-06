@@ -17,7 +17,7 @@ describe("collectBackfillFileParts", () => {
     const parts = collectBackfillFileParts(transcript);
     assert.equal(parts.length, 1);
     assert.equal(parts[0]?.part.filename, "photo.jpg");
-    assert.equal(backfillPartSkipReason(parts[0]!.part), "unrecoverable");
+    assert.equal(backfillPartSkipReason(parts[0]!.part), null);
     const persisted = parts.length === 1 ? transcript.items[0] : undefined;
     const persistedPart = persisted?.type === "user" ? persisted.parts?.[1] : undefined;
     assert.equal(persistedPart ? backfillPartSkipReason(persistedPart) : null, "persisted");

@@ -1,3 +1,4 @@
+import { inferMealLabel, mealSlotContextText } from "./meal-label.ts";
 import { formatClock } from "./reminder-clock.ts";
 import { formatDateInTimeZone, getZonedParts } from "./timezone.ts";
 
@@ -18,5 +19,6 @@ export function clockContextText(input: {
   return [
     `Current local time: ${weekday} ${calendarDate} ${formatClock(local.hour, local.minute)} (${zone}).`,
     `Nutrition day: ${formatDateInTimeZone(input.now, input.timeZone)} (04:00 to 04:00 the next morning).`,
+    mealSlotContextText(inferMealLabel(input.now, input.timeZone)),
   ].join(" ");
 }

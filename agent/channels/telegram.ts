@@ -8,6 +8,12 @@ import {
   markTelegramTurnReplyPosted,
   startTelegramAckTurn,
 } from "../../lib/telegram-ack-turn";
+import {
+  appendAndClaimTelegramBurst,
+  applyTelegramBurstMerge,
+  mergeTelegramBurstItems,
+  telegramBurstItemFromMessage,
+} from "../../lib/telegram-burst";
 import { applyTelegramHiddenMedia, telegramMessageHasInboundContent } from "../../lib/telegram-media";
 import { claimTelegramMessage } from "../../lib/telegram-message-claim";
 import { markdownToTelegramHtml, telegramHtmlMessage } from "../../lib/telegram-html";
@@ -89,6 +95,14 @@ export default wrapTelegramLastMessageChannel(
         }
         void ctx.telegram.startTyping();
         applyTelegramHiddenMedia(message);
+        const burst = await appendAndClaimTelegramBurst({
+          chatId: message.chat.id,
+          item: telegramBurstItemFromMessage(message),
+        });
+        if (!burst) {
+          return null;
+        }
+        applyTelegramBurstMerge(message, mergeTelegramBurstItems(burst));
         const files = telegramAckFiles(message.attachments);
         const ackGenerated = generateTelegramAckOrFalse({
           caption: message.caption,

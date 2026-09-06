@@ -2,11 +2,12 @@ import { Prisma } from "../generated/prisma/client.ts";
 import { parseTranscript, type AgentTurnTranscript } from "./agent-turn-model.ts";
 import {
   collectBackfillFileParts,
+  isFilenameOnlyImagePart,
   patchTranscriptPartUrl,
   type BackfillFilePart,
 } from "./backfill-user-attachments-query.ts";
 import { prisma } from "./prisma.ts";
-import { persistUserAttachment } from "./user-attachments.ts";
+import { listTurnAttachments as loadTurnAttachments, persistUserAttachment, type PersistedUserAttachment } from "./user-attachments.ts";
 import { decodeDataUrl, isHttpOrHttpsUrl, recoverableAttachmentKind } from "./user-attachments-query.ts";
 import { fetchTelegramFileBytes } from "./telegram-file.ts";
 
@@ -29,6 +30,7 @@ type BackfillTurn = {
 
 export type BackfillUserAttachmentsStore = {
   listTurns(): AsyncIterable<BackfillTurn>;
+  listTurnAttachments?(sessionId: string, turnId: string): Promise<PersistedUserAttachment[]>;
   saveMessages(id: string, messages: AgentTurnTranscript): Promise<void>;
 };
 
@@ -57,6 +59,7 @@ export async function backfillUserAttachments(input: {
     if (parts.length === 0) {
       continue;
     }
+    const unused = [...(await listStoredTurnAttachments(store, turn.sessionId, turn.turnId))];
     result.fileParts += parts.length;
     let next = transcript;
     let changed = false;
@@ -65,6 +68,8 @@ export async function backfillUserAttachments(input: {
         const kind = recoverableAttachmentKind(candidate.part.url);
         if (kind === "data" || kind === "http" || kind === "telegram") {
           result.persisted += 1;
+        } else if (isFilenameOnlyImagePart(candidate.part) && takeMatchingAttachment(unused, candidate.part)) {
+          result.persisted += 1;
         } else {
           result.skipped += 1;
         }
@@ -72,6 +77,15 @@ export async function backfillUserAttachments(input: {
       }
       const loaded = await loadBytes(candidate.part);
       if (loaded === null) {
+        const existing = isFilenameOnlyImagePart(candidate.part)
+          ? takeMatchingAttachment(unused, candidate.part)
+          : undefined;
+        if (existing) {
+          result.persisted += 1;
+          next = patchTranscriptPartUrl(next, candidate.itemIndex, candidate.partIndex, existing.id);
+          changed = true;
+          continue;
+        }
         result.skipped += 1;
         continue;
       }
@@ -171,6 +185,9 @@ function prismaTurnStore(): BackfillUserAttachmentsStore {
         }
       }
     },
+    listTurnAttachments(sessionId, turnId) {
+      return loadTurnAttachments(sessionId, turnId);
+    },
     async saveMessages(id, messages) {
       await prisma.agentTurn.update({
         data: { messages: messages as Prisma.InputJsonValue },
@@ -178,4 +195,29 @@ function prismaTurnStore(): BackfillUserAttachmentsStore {
       });
     },
   };
+}
+
+async function listStoredTurnAttachments(
+  store: BackfillUserAttachmentsStore,
+  sessionId: string,
+  turnId: string,
+): Promise<PersistedUserAttachment[]> {
+  if (store.listTurnAttachments) {
+    return store.listTurnAttachments(sessionId, turnId);
+  }
+  return [];
+}
+
+function takeMatchingAttachment(
+  unused: PersistedUserAttachment[],
+  part: { filename?: string },
+): PersistedUserAttachment | undefined {
+  if (unused.length === 0) {
+    return undefined;
+  }
+  const byName = unused.findIndex(
+    (row) => part.filename !== undefined && row.filename === part.filename,
+  );
+  const index = byName >= 0 ? byName : 0;
+  return unused.splice(index, 1)[0];
 }

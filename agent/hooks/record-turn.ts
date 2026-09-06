@@ -17,14 +17,12 @@ import {
   findAgentTurnModel,
   normalizeChannelKind,
   patchAgentTurnTranscript,
-  parseTranscript,
-  replaceUserMessageParts,
   startAgentTurn,
   toolCallsFromActions,
   toolResultFromAction,
   type AgentTurnUserPart,
 } from "../../lib/agent-turns";
-import { persistTurnUserFiles } from "../../lib/persist-turn-files";
+import { persistTurnMediaFilesFromParts, schedulePersistTurnMedia } from "../../lib/persist-turn-media";
 
 export default defineHook({
   events: {
@@ -51,17 +49,7 @@ export default defineHook({
     },
     async "message.received"(event, ctx) {
       await persistTurnEvent("message.received", ctx, event.data.turnId, event.meta.at, async (scope) => {
-        let parts: AgentTurnUserPart[] | undefined;
-        try {
-          parts = await persistTurnUserFiles({
-            ctx,
-            parts: event.data.parts,
-            scope,
-          });
-        } catch (error) {
-          console.error("user attachment persist failed", error);
-          parts = receivedParts(event.data.parts);
-        }
+        const parts = receivedParts(event.data.parts);
         await patchAgentTurnTranscript(scope, (transcript) =>
           applyUserMessage(transcript, {
             at: event.meta.at,
@@ -69,11 +57,17 @@ export default defineHook({
             text: event.data.message,
           }),
         );
+        schedulePersistTurnMedia({
+          channel: scope.channel,
+          files: persistTurnMediaFilesFromParts(event.data.parts),
+          sessionId: scope.sessionId,
+          turnId: scope.turnId,
+          userId: scope.userId,
+        });
       });
     },
     "step.started"(event, ctx) {
       persistTurnEvent("step.started", ctx, event.data.turnId, event.meta.at, async (scope) => {
-        await persistRecordedUserFiles(ctx, scope);
         await patchAgentTurnTranscript(
           { ...scope, model: event.data.modelId },
           (transcript) => applyStepStarted(transcript, {
@@ -197,39 +191,6 @@ type TurnScope = {
   turnSequence: number;
   userId: string | null;
 };
-
-async function persistRecordedUserFiles(ctx: HookContext, scope: TurnScope): Promise<void> {
-  const row = await prisma["agentTurn"].findUnique({
-    select: { messages: true },
-    where: { sessionId_turnId: { sessionId: scope.sessionId, turnId: scope.turnId } },
-  });
-  const transcript = parseTranscript(row?.messages);
-  const user = transcript.items.find((item) => item.type === "user");
-  if (user?.type !== "user") {
-    return;
-  }
-  let parts: AgentTurnUserPart[] | undefined;
-  try {
-    parts = await persistTurnUserFiles({
-      ctx,
-      parts: user.parts,
-      scope,
-    });
-  } catch (error) {
-    console.error("user attachment persist failed", error);
-    return;
-  }
-  if (parts === undefined) {
-    return;
-  }
-  const previous = user.parts ?? [];
-  const unchanged =
-    previous.length === parts.length && previous.every((part, index) => part.url === parts?.[index]?.url);
-  if (unchanged) {
-    return;
-  }
-  await patchAgentTurnTranscript(scope, (current) => replaceUserMessageParts(current, parts));
-}
 
 function persistTurnEvent(
   event: string,

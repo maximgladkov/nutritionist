@@ -24,6 +24,9 @@ export {
   safeAttachmentFilename,
   telegramFileIdFromUrl,
   USER_ATTACHMENT_MAX_BYTES,
+  USER_ATTACHMENT_PREFIX,
+  userAttachmentUrl,
+  userFacingAttachmentUrl,
 } from "./user-attachments-query.ts";
 
 export type PersistUserAttachmentInput = {

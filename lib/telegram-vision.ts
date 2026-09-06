@@ -1,7 +1,7 @@
 import type { FilePart, UserContent } from "ai";
 import { normalizeChannelKind } from "./agent-turn-model.ts";
 import { isImageMediaType, looksLikeImageFilename, sniffImageMediaType } from "./image-bytes.ts";
-import type { TurnFilePersistScope } from "./persist-turn-files.ts";
+import { persistTurnMediaFilesFromMessage, schedulePersistTurnMedia } from "./persist-turn-media.ts";
 import { PENDING_ATTACHMENT_TURN_ID } from "./user-attachments-query.ts";
 
 export function isAudioMediaType(mediaType: string | undefined): boolean {
@@ -37,19 +37,13 @@ type ChannelAdapterLike = {
 export async function inlineTelegramImages(
   content: string | UserContent,
   fetchFile: TelegramFileFetch,
-  persist?: TurnFilePersistScope,
 ): Promise<string | UserContent> {
   if (typeof content === "string" || !Array.isArray(content)) {
     return content;
   }
-  let fileIndex = 0;
   const parts = [];
   for (const part of content) {
-    const next = await inlineTelegramImagePart(part, fetchFile, persist, fileIndex);
-    if (isFilePart(part)) {
-      fileIndex += 1;
-    }
-    parts.push(next);
+    parts.push(await inlineTelegramImagePart(part, fetchFile));
   }
   return parts as UserContent;
 }
@@ -74,12 +68,18 @@ export function attachTelegramVision<T extends object>(channel: T, fetchFile: Te
       return delivered ?? payload;
     }
     const persist = persistScopeFromDeliver(ctx);
+    const originalMessage = step.message as string | UserContent;
+    if (persist) {
+      schedulePersistTurnMedia({
+        ...persist,
+        files: persistTurnMediaFilesFromMessage(originalMessage),
+      });
+    }
     return {
       ...step,
       message: await inlineTelegramImages(
-        step.message as string | UserContent,
+        originalMessage,
         (url) => (adapter.fetchFile === undefined ? fetchFile(url) : adapter.fetchFile(url)),
-        persist ?? undefined,
       ),
     };
   };
@@ -110,16 +110,13 @@ export function withSniffedImageType(
 async function inlineTelegramImagePart(
   part: unknown,
   fetchFile: TelegramFileFetch,
-  persist: TurnFilePersistScope | undefined,
-  index: number,
 ) {
   if (!isFilePart(part)) {
     return part;
   }
   const url = filePartUrl(part.data);
   if (url === null) {
-    const inlined = inlineLocalFilePart(part);
-    return persistIfNeeded(inlined, persist, index, localFileBytes(part.data) ?? undefined);
+    return inlineLocalFilePart(part);
   }
   if (!shouldInlineTelegramFile(part.mediaType, part.filename)) {
     return part;
@@ -135,7 +132,7 @@ async function inlineTelegramImagePart(
     if (mediaType === undefined) {
       return part;
     }
-    return persistIfNeeded(visionFilePart(bytes, mediaType, part.filename), persist, index, bytes);
+    return visionFilePart(bytes, mediaType, part.filename);
   } catch {
     return part;
   }
@@ -234,7 +231,12 @@ function localFileBytes(data: unknown): Uint8Array | null {
   return null;
 }
 
-export function persistScopeFromDeliver(ctx: unknown): TurnFilePersistScope | null {
+export function persistScopeFromDeliver(ctx: unknown): {
+  channel: string;
+  sessionId: string;
+  turnId: string;
+  userId: string | null;
+} | null {
   if (!isRecord(ctx)) {
     return null;
   }
@@ -260,30 +262,6 @@ export function persistScopeFromDeliver(ctx: unknown): TurnFilePersistScope | nu
     turnId,
     userId: principalId,
   };
-}
-
-async function persistIfNeeded(
-  part: FilePart,
-  persist: TurnFilePersistScope | undefined,
-  index: number,
-  bytes?: Uint8Array,
-) {
-  if (persist === undefined) {
-    return part;
-  }
-  const payload = bytes ?? localFileBytes(part.data);
-  if (payload === null) {
-    return part;
-  }
-  const { persistInlineUserFile } = await import("./persist-turn-files.ts");
-  await persistInlineUserFile({
-    ...persist,
-    bytes: payload,
-    filename: part.filename,
-    index,
-    mediaType: part.mediaType,
-  });
-  return part;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

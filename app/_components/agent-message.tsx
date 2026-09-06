@@ -29,6 +29,7 @@ import { useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { FoodThumb } from "@/app/_components/food-thumb";
 import { productImagePreviews } from "@/lib/product-image-preview";
+import { userFacingAttachmentUrl } from "@/lib/user-attachments-query";
 
 export type AgentInputResponse = {
   readonly optionId?: string;
@@ -555,7 +556,7 @@ function messageAttachments(
         id: `file:${index}:${part.filename ?? part.mediaType}`,
         mediaType: part.mediaType,
         type: "file" as const,
-        url: part.url ?? "",
+        url: userFacingAttachmentUrl(part.url),
       },
     ];
   });

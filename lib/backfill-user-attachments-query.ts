@@ -1,4 +1,5 @@
 import type { AgentTurnTranscript, AgentTurnUserPart } from "./agent-turn-model.ts";
+import { isImageMediaType, looksLikeImageFilename } from "./image-bytes.ts";
 import { adminAttachmentUrl, isAdminAttachmentUrl, recoverableAttachmentKind } from "./user-attachments-query.ts";
 
 export type BackfillFilePart = {
@@ -42,13 +43,21 @@ export function patchTranscriptPartUrl(
   return { ...transcript, items };
 }
 
+export function isFilenameOnlyImagePart(part: AgentTurnUserPart): boolean {
+  return (
+    (part.type === "file" || part.type === "image") &&
+    recoverableAttachmentKind(part.url) === "none" &&
+    (isImageMediaType(part.mediaType) || looksLikeImageFilename(part.filename))
+  );
+}
+
 export function backfillPartSkipReason(part: AgentTurnUserPart): "persisted" | "unrecoverable" | null {
   const kind = recoverableAttachmentKind(part.url);
   if (kind === "persisted") {
     return "persisted";
   }
   if (kind === "none") {
-    return "unrecoverable";
+    return isFilenameOnlyImagePart(part) ? null : "unrecoverable";
   }
   return null;
 }

@@ -398,3 +398,17 @@ model ChatSdkEntry {
   expiresAt DateTime?
   updatedAt DateTime  @updatedAt
 }
+
+model TelegramInboundBurstItem {
+  id           String    @id @default(cuid())
+  chatId       String
+  messageId    String
+  text         String    @default("")
+  caption      String    @default("")
+  attachments  Json
+  createdAt    DateTime  @default(now())
+  consumedAt   DateTime?
+
+  @@unique([chatId, messageId])
+  @@index([chatId, consumedAt, createdAt])
+}

@@ -61,6 +61,50 @@ describe("backfillUserAttachments", () => {
     assert.equal(patched?.type === "user" ? patched.parts?.[0]?.url : undefined, undefined);
   });
 
+  it("patches filename-only image parts when a turn attachment already exists", async () => {
+    const turns: AgentTurnTranscript[] = [
+      userTranscript([{ type: "file", filename: "plate.jpg", mediaType: "image/jpeg" }]),
+    ];
+    const persisted: PersistUserAttachmentInput[] = [];
+    const result = await backfillUserAttachments({
+      loadBytes: async () => null,
+      persist: async (input) => {
+        persisted.push(input);
+        return stored("att-should-not");
+      },
+      store: {
+        async *listTurns() {
+          yield {
+            channel: "telegram",
+            id: "turn-row",
+            messages: turns[0],
+            sessionId: "sess",
+            turnId: "turn",
+            userId: "user-1",
+          };
+        },
+        async listTurnAttachments() {
+          return [stored("att-existing")];
+        },
+        async saveMessages(id, messages) {
+          assert.equal(id, "turn-row");
+          turns[0] = messages;
+        },
+      },
+    });
+
+    assert.deepEqual(result, {
+      fileParts: 1,
+      patchedTurns: 1,
+      persisted: 1,
+      scannedTurns: 1,
+      skipped: 0,
+    });
+    assert.equal(persisted.length, 0);
+    const patched = turns[0]?.items[0];
+    assert.equal(patched?.type === "user" ? patched.parts?.[0]?.url : undefined, "/admin/attachments/att-existing");
+  });
+
   it("counts recoverable parts in dry-run without writing", async () => {
     const jpeg = Buffer.from([0xff, 0xd8, 0xff]);
     const saved: unknown[] = [];
@@ -86,6 +130,9 @@ describe("backfillUserAttachments", () => {
             turnId: "turn",
             userId: null,
           };
+        },
+        async listTurnAttachments() {
+          return [];
         },
         async saveMessages() {
           saved.push("saved");

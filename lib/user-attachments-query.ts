@@ -1,5 +1,6 @@
 export const USER_ATTACHMENT_MAX_BYTES = 25 * 1024 * 1024;
 export const ADMIN_ATTACHMENT_PREFIX = "/admin/attachments/";
+export const USER_ATTACHMENT_PREFIX = "/api/attachments/";
 export const CATALOG_IMAGE_PREFIX = "/api/catalog-images/";
 export const TELEGRAM_FILE_PREFIX = "telegram-file:";
 export const EVE_URL_PREFIX = "eve-url:";
@@ -7,6 +8,20 @@ export const PENDING_ATTACHMENT_TURN_ID = "pending";
 
 export function adminAttachmentUrl(id: string) {
   return `${ADMIN_ATTACHMENT_PREFIX}${encodeURIComponent(id)}`;
+}
+
+export function userAttachmentUrl(id: string) {
+  return `${USER_ATTACHMENT_PREFIX}${encodeURIComponent(id)}`;
+}
+
+export function userFacingAttachmentUrl(url: string | undefined) {
+  if (typeof url !== "string" || url.length === 0) {
+    return "";
+  }
+  if (!isAdminAttachmentUrl(url)) {
+    return url;
+  }
+  return `${USER_ATTACHMENT_PREFIX}${url.slice(ADMIN_ATTACHMENT_PREFIX.length)}`;
 }
 
 export function catalogImageUrl(id: string) {

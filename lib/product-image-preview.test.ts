@@ -31,5 +31,6 @@ describe("looksLikeImageUrl", () => {
     assert.equal(looksLikeImageUrl("https://example.com/page"), false);
     assert.equal(looksLikeImageUrl("/api/catalog-images/abc"), true);
     assert.equal(looksLikeImageUrl("/admin/attachments/xyz"), true);
+    assert.equal(looksLikeImageUrl("/api/attachments/xyz"), true);
   });
 });

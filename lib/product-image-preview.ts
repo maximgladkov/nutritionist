@@ -11,7 +11,7 @@ export function productImagePreviews(value: unknown): ProductImagePreview[] {
 }
 
 export function looksLikeImageUrl(value: string, keyName?: number | string): boolean {
-  if (value.startsWith("/api/catalog-images/") || value.startsWith("/admin/attachments/")) {
+  if (value.startsWith("/api/catalog-images/") || value.startsWith("/admin/attachments/") || value.startsWith("/api/attachments/")) {
     return true;
   }
   if (!/^https?:\/\//i.test(value)) {
