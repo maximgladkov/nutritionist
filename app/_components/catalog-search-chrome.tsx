@@ -23,7 +23,7 @@ export function CatalogSearchField({ className }: { readonly className?: string 
       variant="secondary"
       onChange={search.setQuery}
     >
-      <SearchField.Group className={cn(SEARCH_SURFACE, "h-14 w-full")}>
+      <SearchField.Group className={cn(SEARCH_SURFACE, "h-14 w-full pe-3")}>
         <SearchField.SearchIcon />
         <SearchField.Input
           autoFocus
@@ -36,6 +36,20 @@ export function CatalogSearchField({ className }: { readonly className?: string 
             }
           }}
         />
+        <Tooltip delay={0}>
+          <Button
+            aria-label={t`Close search`}
+            isIconOnly
+            size="sm"
+            variant="ghost"
+            onPress={search.closeSearch}
+          >
+            <Xmark className="size-5" />
+          </Button>
+          <Tooltip.Content>
+            <Trans>Close search</Trans>
+          </Tooltip.Content>
+        </Tooltip>
       </SearchField.Group>
     </SearchField>
   );
@@ -44,27 +58,20 @@ export function CatalogSearchField({ className }: { readonly className?: string 
 export function CatalogSearchToggle() {
   const { t } = useLingui();
   const search = useCatalogSearch();
-  const open = search.open;
 
   return (
     <Tooltip delay={0}>
       <Button
-        aria-label={open ? t`Close search` : t`Search`}
+        aria-label={t`Search`}
         className={cn(SEARCH_SURFACE, "size-14")}
         isIconOnly
         variant="secondary"
-        onPress={() => {
-          if (open) {
-            search.closeSearch();
-          } else {
-            search.openSearch();
-          }
-        }}
+        onPress={search.openSearch}
       >
-        {open ? <Xmark className="size-5" /> : <Magnifier className="size-5" />}
+        <Magnifier className="size-5" />
       </Button>
       <Tooltip.Content>
-        {open ? <Trans>Close search</Trans> : <Trans>Search</Trans>}
+        <Trans>Search</Trans>
       </Tooltip.Content>
     </Tooltip>
   );
@@ -73,10 +80,17 @@ export function CatalogSearchToggle() {
 export function CatalogSearchDock() {
   const search = useCatalogSearch();
 
+  if (search.open) {
+    return (
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-3 pb-3">
+        <CatalogSearchField className="pointer-events-auto" />
+      </div>
+    );
+  }
+
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end px-3 pb-3 pe-[4.5rem]">
-      {search.open ? <CatalogSearchField className="pointer-events-auto" /> : null}
-      <div className="pointer-events-auto absolute right-3 bottom-3">
+    <div className="pointer-events-none absolute right-3 bottom-3 z-20">
+      <div className="pointer-events-auto">
         <CatalogSearchToggle />
       </div>
     </div>

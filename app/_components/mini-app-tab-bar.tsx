@@ -66,7 +66,7 @@ export function AppTabBar<T extends string>({
     <nav
       className={cn(
         "pointer-events-none fixed inset-x-0 bottom-0 z-50 flex items-end px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]",
-        searchEnabled ? FAB_SLOT : null,
+        searchEnabled && !searchOpen ? FAB_SLOT : null,
         searchOpen ? null : "justify-center",
       )}
     >
@@ -103,7 +103,7 @@ export function AppTabBar<T extends string>({
           })}
         </Segment>
       )}
-      {searchEnabled ? (
+      {searchEnabled && !searchOpen ? (
         <div className={cn("pointer-events-auto absolute right-4", SAFE_BOTTOM)}>
           <CatalogSearchToggle />
         </div>
