@@ -1,8 +1,8 @@
 import { defineDynamic, defineInstructions, type DynamicResolveContext } from "eve/instructions";
 import { clockContextText } from "../../lib/clock-context";
-import { callerTimezone } from "../../lib/meals";
 import { liveNutritionContextText } from "../../lib/live-nutrition-context";
 import { loadTodayNutritionProgress } from "../../lib/nutrition-progress";
+import { prisma } from "../../lib/prisma";
 import { getLiveUserId } from "../lib/require-user";
 
 export default defineDynamic({
@@ -19,13 +19,20 @@ async function resolveClockContext(ctx: DynamicResolveContext): Promise<string> 
   const now = new Date();
   let timeZone = "UTC";
   let timezoneIsFallback = true;
+  let catalogCountry: string | undefined;
   let userId: string | undefined;
   try {
     userId = await getLiveUserId(ctx);
-    const saved = userId === undefined ? undefined : await callerTimezone(userId);
-    if (saved) {
-      timeZone = saved;
-      timezoneIsFallback = false;
+    if (userId) {
+      const profile = await prisma.userProfile.findUnique({
+        select: { country: true, timezone: true },
+        where: { userId },
+      });
+      if (profile?.timezone) {
+        timeZone = profile.timezone;
+        timezoneIsFallback = false;
+      }
+      catalogCountry = profile?.country ?? undefined;
     }
   } catch {
     return clockContextText({ now, timeZone: "UTC", timezoneIsFallback: true });
@@ -38,5 +45,5 @@ async function resolveClockContext(ctx: DynamicResolveContext): Promise<string> 
       liveNutrition = undefined;
     }
   }
-  return clockContextText({ liveNutrition, now, timeZone, timezoneIsFallback });
+  return clockContextText({ catalogCountry, liveNutrition, now, timeZone, timezoneIsFallback });
 }

@@ -63,12 +63,12 @@ export function CatalogSearchToggle() {
     <Tooltip delay={0}>
       <Button
         aria-label={t`Search`}
-        className={cn(SEARCH_SURFACE, "size-14")}
+        className={cn(SEARCH_SURFACE, "size-10 m-2")}
         isIconOnly
-        variant="secondary"
+        variant="tertiary"
         onPress={search.openSearch}
       >
-        <Magnifier className="size-5" />
+        <Magnifier className="size-4" />
       </Button>
       <Tooltip.Content>
         <Trans>Search</Trans>

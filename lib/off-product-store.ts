@@ -8,6 +8,7 @@ import type { Product } from "./open-food-facts-map.ts";
 import { prisma, usingAccelerate } from "./prisma.ts";
 import {
   fuzzyTokenFilters,
+  productSearchOrderSql,
   searchTokens,
   setWordSimilarityThresholdSql,
 } from "./product-search.ts";
@@ -73,7 +74,7 @@ export async function searchOffProductsByName(
       WHERE 1=1
       ${countryFilter(options.country)}
       ${Prisma.join(fuzzyTokenFilters(tokens), " ")}
-      ORDER BY word_similarity(immutable_unaccent(lower(${query.trim()})), "searchText") DESC
+      ORDER BY ${productSearchOrderSql(query)}
       LIMIT ${options.pageSize}
     `;
   });
@@ -95,7 +96,7 @@ export async function searchCatalogProductsFuzzy(
       FROM "CatalogProduct"
       WHERE 1=1
       ${Prisma.join(fuzzyTokenFilters(tokens), " ")}
-      ORDER BY word_similarity(immutable_unaccent(lower(${query.trim()})), "searchText") DESC
+      ORDER BY ${productSearchOrderSql(query)}
       LIMIT ${pageSize}
     `;
   });

@@ -10,6 +10,7 @@ import {
   resolveCatalogBarcode,
 } from "./catalog-product-query.ts";
 import type { Product } from "./open-food-facts.ts";
+import { rankSearchProducts } from "./product-search.ts";
 
 function product(barcode: string | null, name: string, nutriments: Product["nutriments"] = {}): Product {
   return {
@@ -185,5 +186,42 @@ describe("mergeCatalogSearchResults", () => {
     assert.equal(merged.count, 1);
     assert.equal(merged.products[0]?.name, "My Yogurt");
     assert.equal(merged.products[0]?.source, "custom-catalog");
+  });
+
+  it("ranks exact banana with nutrition above packaged hits after merge", () => {
+    const merged = mergeCatalogSearchResults([
+      {
+        count: 1,
+        page: 1,
+        products: [
+          {
+            ...product("3800051700020", "Agua mineral natural", { energyKcal100ml: 0 }),
+            hasNutrition: true,
+            source: "open-food-facts",
+          },
+        ],
+      },
+      {
+        count: 2,
+        page: 1,
+        products: [
+          {
+            ...product("4680019020655", "Banana parfait", { energyKcal100g: 121 }),
+            hasNutrition: true,
+            source: "open-food-facts",
+          },
+          {
+            ...product("2902266001334", "Banana", { energyKcal100g: 90.5 }),
+            hasNutrition: true,
+            source: "open-food-facts",
+          },
+        ],
+      },
+    ]);
+    const ranked = rankSearchProducts(merged.products, ["банан", "banana", "plátano"]);
+    assert.equal(ranked[0]?.name, "Banana");
+    assert.equal(ranked[0]?.barcode, "2902266001334");
+    assert.equal(ranked[1]?.name, "Banana parfait");
+    assert.equal(ranked[2]?.name, "Agua mineral natural");
   });
 });

@@ -13,6 +13,7 @@ describe("clockContextText", () => {
     assert.match(text, /Nutrition day: 2026-09-03/);
     assert.match(text, /Current meal slot: snack \(before 05:00 or from 21:00\)/);
     assert.match(text, /Breakfast 05:00–11:00, lunch 11:00–16:00, dinner 16:00–21:00, otherwise snack/);
+    assert.match(text, /Catalog country is unknown/);
     assert.doesNotMatch(text, /timezone is unknown/);
   });
 
@@ -56,5 +57,26 @@ describe("clockContextText", () => {
     });
     assert.match(text, /Current meal slot: lunch \(11:00–16:00\)/);
     assert.match(text, /calories current 400 \/ goal 2244 kcal remaining 1844/);
+  });
+
+  it("tells the agent to search in the catalog language and English", () => {
+    const text = clockContextText({
+      catalogCountry: "es",
+      now: new Date("2026-09-03T11:00:00.000Z"),
+      timeZone: "Europe/Madrid",
+      timezoneIsFallback: false,
+    });
+    assert.match(text, /Catalog country: ES \(search names in Spanish and English\)/);
+  });
+
+  it("uses English only when the catalog language is English", () => {
+    const text = clockContextText({
+      catalogCountry: "gb",
+      now: new Date("2026-09-03T11:00:00.000Z"),
+      timeZone: "Europe/London",
+      timezoneIsFallback: false,
+    });
+    assert.match(text, /Catalog country: GB \(search names in English\)/);
+    assert.doesNotMatch(text, /and English/);
   });
 });

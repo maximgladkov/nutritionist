@@ -10,6 +10,7 @@ import {
   type CatalogSearchResult,
   type ProductSource,
 } from "./catalog-product-query.ts";
+import { rankSearchProducts } from "./product-search.ts";
 import { searchCatalogProductsFuzzy } from "./off-product-store.ts";
 import {
   attachCatalogProductPhotos,
@@ -102,7 +103,11 @@ export async function searchCatalogAndOpenFoodFacts(
     searchProductsByName(query, options),
     searchCatalogProducts(query),
   ]);
-  return mergeProductSearch(local, remote);
+  const merged = mergeProductSearch(local, remote);
+  return {
+    ...merged,
+    products: rankSearchProducts(merged.products, [query]),
+  };
 }
 
 export async function searchCatalogAndOpenFoodFactsMany(
@@ -114,7 +119,11 @@ export async function searchCatalogAndOpenFoodFactsMany(
     return { count: 0, page: 1, products: [] };
   }
   const results = await Promise.all(unique.map((query) => searchCatalogAndOpenFoodFacts(query, options)));
-  return mergeCatalogSearchResults(results);
+  const merged = mergeCatalogSearchResults(results);
+  return {
+    ...merged,
+    products: rankSearchProducts(merged.products, unique),
+  };
 }
 
 export async function saveCatalogProduct(input: SaveCatalogProductInput): Promise<SaveCatalogProductResult> {
