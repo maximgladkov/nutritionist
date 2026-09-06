@@ -2,6 +2,7 @@ import type { FilePart, UserContent } from "ai";
 import { normalizeChannelKind } from "./agent-turn-model.ts";
 import { isImageMediaType, looksLikeImageFilename, sniffImageMediaType } from "./image-bytes.ts";
 import type { TurnFilePersistScope } from "./persist-turn-files.ts";
+import { PENDING_ATTACHMENT_TURN_ID } from "./user-attachments-query.ts";
 
 export function isAudioMediaType(mediaType: string | undefined): boolean {
   return mediaType?.toLowerCase().startsWith("audio/") === true && mediaType.toLowerCase() !== "audio/*";
@@ -233,19 +234,21 @@ function localFileBytes(data: unknown): Uint8Array | null {
   return null;
 }
 
-function persistScopeFromDeliver(ctx: unknown): TurnFilePersistScope | null {
+export function persistScopeFromDeliver(ctx: unknown): TurnFilePersistScope | null {
   if (!isRecord(ctx)) {
     return null;
   }
   const session = isRecord(ctx.session) ? ctx.session : null;
-  if (session === null || typeof session.id !== "string") {
+  if (session === null || typeof session.id !== "string" || session.id.length === 0) {
     return null;
   }
   const turn = isRecord(session.turn) ? session.turn : isRecord(ctx.turn) ? ctx.turn : null;
-  const turnId = typeof turn?.id === "string" ? turn.id : typeof ctx.turnId === "string" ? ctx.turnId : null;
-  if (turnId === null) {
-    return null;
-  }
+  const turnId =
+    typeof turn?.id === "string" && turn.id.length > 0
+      ? turn.id
+      : typeof ctx.turnId === "string" && ctx.turnId.length > 0
+        ? ctx.turnId
+        : PENDING_ATTACHMENT_TURN_ID;
   const channel = isRecord(ctx.channel) ? ctx.channel : null;
   const kind = typeof channel?.kind === "string" ? channel.kind : "telegram";
   const auth = isRecord(session.auth) ? session.auth : null;

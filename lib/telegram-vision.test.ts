@@ -8,6 +8,7 @@ import {
   isVideoMediaType,
   looksLikeAudioFilename,
   looksLikeVideoFilename,
+  persistScopeFromDeliver,
   withSniffedImageType,
 } from "./telegram-vision.ts";
 
@@ -142,6 +143,26 @@ describe("inlineTelegramImages", () => {
     const message = (result as { message: Array<{ type: string; data?: { type: string } }> }).message[0];
     assert.equal(message?.type, "file");
     assert.equal(message?.data?.type, "data");
+  });
+
+  it("builds a persist scope from telegram deliver context without a turn id", () => {
+    const pending = persistScopeFromDeliver({
+      session: {
+        id: "sess_1",
+        auth: { current: { principalId: "user_1", principalType: "user" } },
+      },
+    });
+    assert.deepEqual(pending, {
+      channel: "telegram",
+      sessionId: "sess_1",
+      turnId: "pending",
+      userId: "user_1",
+    });
+    const withTurn = persistScopeFromDeliver({
+      session: { id: "sess_1", turn: { id: "turn_9" } },
+    });
+    assert.equal(withTurn?.turnId, "turn_9");
+    assert.equal(persistScopeFromDeliver({}), null);
   });
 
   it("emits JSON-serializable file parts so eve can snapshot the turn", async () => {

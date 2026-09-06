@@ -4,6 +4,7 @@ import { prisma } from "./prisma.ts";
 import {
   attachmentBlobPath,
   isOversizeBytes,
+  PENDING_ATTACHMENT_TURN_ID,
   safeAttachmentFilename,
 } from "./user-attachments-query.ts";
 
@@ -18,6 +19,7 @@ export {
   isCatalogImageUrl,
   isHttpOrHttpsUrl,
   isOversizeBytes,
+  PENDING_ATTACHMENT_TURN_ID,
   recoverableAttachmentKind,
   safeAttachmentFilename,
   telegramFileIdFromUrl,
@@ -51,8 +53,9 @@ export async function persistUserAttachment(
   if (size === 0 || isOversizeBytes(size)) {
     return null;
   }
-  const filename = safeAttachmentFilename(input.filename, input.index ?? 0, input.mediaType);
-  const blobPath = attachmentBlobPath(input.sessionId, input.turnId, filename);
+  const index = input.index ?? 0;
+  const filename = safeAttachmentFilename(input.filename, index, input.mediaType);
+  const blobPath = attachmentBlobPath(input.sessionId, input.turnId, filename, index);
   const existing = await prisma.userAttachment.findUnique({ where: { blobPath } });
   if (existing) {
     return toPersisted(existing);
@@ -93,12 +96,26 @@ export async function persistUserAttachment(
       const raced = await prisma.userAttachment.findUnique({ where: { blobPath } });
       return raced ? toPersisted(raced) : null;
     }
+    if (isForeignKeyError(error) && input.userId) {
+      return persistUserAttachment({ ...input, userId: null });
+    }
     console.error("user attachment persist failed", error);
     return null;
   }
 }
 
+export async function claimPendingTurnAttachments(sessionId: string, turnId: string): Promise<void> {
+  if (turnId === PENDING_ATTACHMENT_TURN_ID) {
+    return;
+  }
+  await prisma.userAttachment.updateMany({
+    data: { turnId },
+    where: { sessionId, turnId: PENDING_ATTACHMENT_TURN_ID },
+  });
+}
+
 export async function listTurnAttachments(sessionId: string, turnId: string): Promise<PersistedUserAttachment[]> {
+  await claimPendingTurnAttachments(sessionId, turnId);
   const rows = await prisma.userAttachment.findMany({
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     where: { sessionId, turnId },
@@ -157,4 +174,8 @@ function toPersisted(row: {
 
 function isUniqueConstraintError(error: unknown) {
   return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
+}
+
+function isForeignKeyError(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "P2003";
 }

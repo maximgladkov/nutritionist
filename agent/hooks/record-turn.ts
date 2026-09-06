@@ -17,6 +17,8 @@ import {
   findAgentTurnModel,
   normalizeChannelKind,
   patchAgentTurnTranscript,
+  parseTranscript,
+  replaceUserMessageParts,
   startAgentTurn,
   toolCallsFromActions,
   toolResultFromAction,
@@ -71,6 +73,7 @@ export default defineHook({
     },
     "step.started"(event, ctx) {
       persistTurnEvent("step.started", ctx, event.data.turnId, event.meta.at, async (scope) => {
+        await persistRecordedUserFiles(ctx, scope);
         await patchAgentTurnTranscript(
           { ...scope, model: event.data.modelId },
           (transcript) => applyStepStarted(transcript, {
@@ -194,6 +197,39 @@ type TurnScope = {
   turnSequence: number;
   userId: string | null;
 };
+
+async function persistRecordedUserFiles(ctx: HookContext, scope: TurnScope): Promise<void> {
+  const row = await prisma["agentTurn"].findUnique({
+    select: { messages: true },
+    where: { sessionId_turnId: { sessionId: scope.sessionId, turnId: scope.turnId } },
+  });
+  const transcript = parseTranscript(row?.messages);
+  const user = transcript.items.find((item) => item.type === "user");
+  if (user?.type !== "user") {
+    return;
+  }
+  let parts: AgentTurnUserPart[] | undefined;
+  try {
+    parts = await persistTurnUserFiles({
+      ctx,
+      parts: user.parts,
+      scope,
+    });
+  } catch (error) {
+    console.error("user attachment persist failed", error);
+    return;
+  }
+  if (parts === undefined) {
+    return;
+  }
+  const previous = user.parts ?? [];
+  const unchanged =
+    previous.length === parts.length && previous.every((part, index) => part.url === parts?.[index]?.url);
+  if (unchanged) {
+    return;
+  }
+  await patchAgentTurnTranscript(scope, (current) => replaceUserMessageParts(current, parts));
+}
 
 function persistTurnEvent(
   event: string,

@@ -12,6 +12,7 @@ import {
   emptyTranscript,
   normalizeChannelKind,
   parseTranscript,
+  replaceUserMessageParts,
   summarizeTranscript,
   TOOL_JSON_MAX_CHARS,
   toolCallsFromActions,
@@ -59,6 +60,11 @@ describe("transcript reducers", () => {
     if (user?.type === "user") {
       assert.equal(user.parts?.[0]?.url, "/admin/attachments/att1");
     }
+    const patched = replaceUserMessageParts(transcript, [
+      { filename: "meal.jpg", mediaType: "image/jpeg", type: "file", url: "/admin/attachments/att2" },
+    ]);
+    const patchedUser = patched.items[0];
+    assert.equal(patchedUser?.type === "user" ? patchedUser.parts?.[0]?.url : undefined, "/admin/attachments/att2");
   });
 
   it("records tool input then output", () => {

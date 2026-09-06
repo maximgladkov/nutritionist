@@ -3,6 +3,7 @@ export const ADMIN_ATTACHMENT_PREFIX = "/admin/attachments/";
 export const CATALOG_IMAGE_PREFIX = "/api/catalog-images/";
 export const TELEGRAM_FILE_PREFIX = "telegram-file:";
 export const EVE_URL_PREFIX = "eve-url:";
+export const PENDING_ATTACHMENT_TURN_ID = "pending";
 
 export function adminAttachmentUrl(id: string) {
   return `${ADMIN_ATTACHMENT_PREFIX}${encodeURIComponent(id)}`;
@@ -72,8 +73,8 @@ export function safeAttachmentFilename(
   return cleaned.length > 0 ? cleaned.slice(0, 180) : fallbackFilename(index, mediaType);
 }
 
-export function attachmentBlobPath(sessionId: string, turnId: string, filename: string) {
-  return `attachments/${sessionId}/${turnId}/${filename}`;
+export function attachmentBlobPath(sessionId: string, turnId: string, filename: string, index = 0) {
+  return `attachments/${sessionId}/${turnId}/${index}-${filename}`;
 }
 
 export function decodeDataUrl(url: string): { bytes: Buffer; mediaType: string } | null {

@@ -34,7 +34,11 @@ describe("attachment naming", () => {
     assert.equal(safeAttachmentFilename(undefined, 2, "image/png"), "file-2.png");
     assert.equal(
       attachmentBlobPath("sess", "turn", "meal.jpg"),
-      "attachments/sess/turn/meal.jpg",
+      "attachments/sess/turn/0-meal.jpg",
+    );
+    assert.equal(
+      attachmentBlobPath("sess", "pending", "meal.jpg", 1),
+      "attachments/sess/pending/1-meal.jpg",
     );
   });
 });

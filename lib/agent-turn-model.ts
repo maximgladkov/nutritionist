@@ -154,6 +154,21 @@ export function applyUserMessage(
   return { ...transcript, items };
 }
 
+export function replaceUserMessageParts(
+  transcript: AgentTurnTranscript,
+  parts: readonly AgentTurnUserPart[] | undefined,
+): AgentTurnTranscript {
+  let replaced = false;
+  const items = transcript.items.map((item) => {
+    if (replaced || item.type !== "user") {
+      return item;
+    }
+    replaced = true;
+    return { ...item, parts };
+  });
+  return { ...transcript, items };
+}
+
 export function applyAckMessage(
   transcript: AgentTurnTranscript,
   input: {
