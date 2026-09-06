@@ -1,12 +1,11 @@
 import type { UserContent } from "ai";
-import { Prisma } from "../generated/prisma/client.ts";
 import { enqueueAgentTurnPersist } from "./agent-turn-persist.ts";
 import {
-  parseTranscript,
   replaceUserMessageParts,
   type AgentTurnTranscript,
   type AgentTurnUserPart,
 } from "./agent-turn-model.ts";
+import { patchAgentTurnTranscript } from "./agent-turns.ts";
 import { prisma } from "./prisma.ts";
 import { fetchTelegramFileBytes } from "./telegram-file.ts";
 import {
@@ -214,27 +213,30 @@ export async function persistTurnMedia(input: PersistTurnMediaInput): Promise<{ 
 }
 
 export async function patchTurnTranscriptWithAttachments(input: {
+  channel?: string;
   sessionId: string;
   turnId: string;
 }): Promise<{ patched: boolean }> {
-  const row = await prisma.agentTurn.findUnique({
-    select: { id: true, messages: true },
-    where: { sessionId_turnId: { sessionId: input.sessionId, turnId: input.turnId } },
-  });
-  if (!row) {
-    return { patched: false };
-  }
-  const transcript = parseTranscript(row.messages);
-  if (!transcriptHasUserMessage(transcript)) {
-    return { patched: false };
-  }
   const stored = await listTurnAttachments(input.sessionId, input.turnId);
-  const next = applyStoredAttachmentsToTranscript(transcript, stored);
-  await prisma.agentTurn.update({
-    data: { messages: next as unknown as Prisma.InputJsonValue },
-    where: { id: row.id },
-  });
-  return { patched: true };
+  if (stored.length === 0) {
+    return { patched: false };
+  }
+  const channel = input.channel ?? (await loadTurnChannel(input.sessionId, input.turnId));
+  if (channel === null) {
+    return { patched: false };
+  }
+  let patched = false;
+  await patchAgentTurnTranscript(
+    { channel, sessionId: input.sessionId, turnId: input.turnId },
+    (transcript) => {
+      if (!transcriptHasUserMessage(transcript)) {
+        return transcript;
+      }
+      patched = true;
+      return applyStoredAttachmentsToTranscript(transcript, stored);
+    },
+  );
+  return { patched };
 }
 
 export function schedulePersistTurnMedia(input: PersistTurnMediaInput): void {
@@ -272,20 +274,18 @@ async function enqueueTranscriptAttachmentPatch(input: PersistTurnMediaInput): P
 
 async function startPersistTurnMediaRun(input: PersistTurnMediaInput): Promise<void> {
   try {
-    const [{ start }, { persistTurnMediaWorkflow }] = await Promise.all([
-      import("workflow/api"),
-      import("../workflows/persist-turn-media.ts"),
-    ]);
-    const run = await start(persistTurnMediaWorkflow, [input]);
-    void run.returnValue.catch((error: unknown) => {
-      console.error("persist turn media workflow failed", error);
-    });
+    await persistTurnMedia(input);
   } catch (error) {
-    console.error("persist turn media workflow start failed", error);
-    void persistTurnMedia(input).catch((persistError) => {
-      console.error("persist turn media failed", persistError);
-    });
+    console.error("persist turn media failed", error);
   }
+}
+
+async function loadTurnChannel(sessionId: string, turnId: string): Promise<string | null> {
+  const row = await prisma.agentTurn.findUnique({
+    select: { channel: true },
+    where: { sessionId_turnId: { sessionId, turnId } },
+  });
+  return row?.channel ?? null;
 }
 
 function filePartUrl(data: unknown): string | null {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { emptyTranscript } from "./agent-turn-model.ts";
+import { applyAssistantMessage, emptyTranscript } from "./agent-turn-model.ts";
 import {
   applyStoredAttachmentsToTranscript,
   filesForTurnMediaPersist,
@@ -165,6 +165,31 @@ describe("applyStoredAttachmentsToTranscript", () => {
     }
     assert.equal(user.parts?.[0]?.url, "/admin/attachments/att-a");
     assert.equal(user.parts?.[0]?.filename, "photo.jpg");
+  });
+
+  it("keeps attachment urls after later assistant messages", () => {
+    const withPhoto = applyStoredAttachmentsToTranscript(
+      {
+        ...emptyTranscript(),
+        items: [
+          {
+            at: "2026-09-06T13:09:29.000Z",
+            parts: [{ type: "file", mediaType: "image/jpeg" }],
+            text: "[image: image/jpeg]",
+            type: "user",
+          },
+        ],
+      },
+      [storedAttachment("att-live", "photo.jpg")],
+    );
+    const next = applyAssistantMessage(withPhoto, {
+      at: "2026-09-06T13:09:50.000Z",
+      finishReason: "stop",
+      stepIndex: 0,
+      text: "Saved.",
+    });
+    const user = next.items[0];
+    assert.equal(user?.type === "user" ? user.parts?.[0]?.url : undefined, "/admin/attachments/att-live");
   });
 });
 
