@@ -33,7 +33,7 @@ export function MealGroupsAccordion({
     return null;
   }
   return (
-    <Card className="p-0">
+    <Card className="p-0 overflow-hidden">
       <Accordion allowsMultipleExpanded className="w-full" key={locale}>
         {groups.map((group) => {
           const Icon = MEAL_ICONS[group.label];
@@ -57,13 +57,13 @@ export function MealGroupsAccordion({
                 </Accordion.Trigger>
               </Accordion.Heading>
               <Accordion.Panel>
-                <Accordion.Body className="pt-0">
+                <Accordion.Body className="pt-0 pb-2">
                   {hasItems ? (
                     <ul className="m-0 flex list-none flex-col gap-1 p-0 -mx-4">
                       {group.items.map((item) => (
                         <li key={item.id}>
                           <button
-                            className="hover:bg-surface-secondary flex w-full min-w-0 cursor-[var(--cursor-interactive)] items-center gap-3 px-4 py-2 text-left"
+                            className="hover:bg-surface-secondary/50 flex w-full min-w-0 cursor-[var(--cursor-interactive)] items-center gap-3 px-4 py-2 text-left"
                             type="button"
                             onClick={() => {
                               onSelectItem(item, group.label);
