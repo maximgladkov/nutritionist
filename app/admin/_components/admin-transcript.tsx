@@ -80,7 +80,7 @@ function AdminUserAttachments({ parts }: { readonly parts: readonly AgentTurnUse
   const [preview, setPreview] = useState<AgentTurnUserPart | undefined>();
   return (
     <>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-end gap-2">
         {parts.map((part, index) => (
           <AdminAttachmentPreview
             key={`${part.url ?? part.filename ?? part.mediaType}:${String(index)}`}
@@ -102,20 +102,18 @@ function AdminUserAttachments({ parts }: { readonly parts: readonly AgentTurnUse
         }}
       >
         <Modal.Container>
-          <Modal.Dialog className="max-w-[min(96vw,72rem)]">
-            <Modal.CloseTrigger />
-            <Modal.Header>
-              <Modal.Heading>{preview?.filename ?? "Attachment"}</Modal.Heading>
-            </Modal.Header>
-            <Modal.Body>
-              {preview?.url ? (
-                <img
-                  alt={preview.filename ?? "Attachment"}
-                  className="max-h-[75vh] w-auto max-w-full rounded-2xl object-contain"
-                  src={preview.url}
-                />
-              ) : null}
-            </Modal.Body>
+          <Modal.Dialog
+            aria-label={preview?.filename ?? "Attachment"}
+            className="w-fit! overflow-hidden p-0!"
+          >
+            <Modal.CloseTrigger className="bg-overlay/80 z-10 text-foreground backdrop-blur-md" />
+            {preview?.url ? (
+              <img
+                alt={preview.filename ?? "Attachment"}
+                className="block h-auto max-h-[min(85dvh,calc(100dvh-5rem))] w-auto max-w-[min(calc(100vw-2rem),72rem)]"
+                src={preview.url}
+              />
+            ) : null}
           </Modal.Dialog>
         </Modal.Container>
       </Modal.Backdrop>
@@ -133,8 +131,12 @@ function AdminAttachmentPreview({
   const label = part.filename ?? part.mediaType ?? "file";
   if (part.url && isImageMediaType(part.mediaType)) {
     return (
-      <button className="cursor-[var(--cursor-interactive)] text-left" type="button" onClick={onOpen}>
-        <img alt={label} className="h-24 w-24 rounded-lg object-cover" src={part.url} />
+      <button
+        className="cursor-[var(--cursor-interactive)] h-24 overflow-hidden rounded-lg text-left"
+        type="button"
+        onClick={onOpen}
+      >
+        <img alt={label} className="h-full w-auto" src={part.url} />
       </button>
     );
   }
