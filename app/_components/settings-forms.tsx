@@ -2,6 +2,7 @@
 
 import { GOAL_LABELS, GOAL_UNIT_LABELS, REMINDER_TITLES } from "@/app/_components/i18n-labels";
 import { useAppLocale } from "@/app/_components/lingui-client-provider";
+import { MealThumb } from "@/app/_components/meal-thumb";
 import { signOutAction } from "@/app/actions/auth";
 import {
   consumeLinkCodeAction,
@@ -32,14 +33,11 @@ import {
   Arrows3RotateLeftLetterA,
   ChartColumn,
   ClockFill,
-  Cup,
   Droplet,
   Flame,
   Globe,
   HeartFill,
   Link,
-  Moon,
-  Sun,
   ThunderboltFill,
 } from "@gravity-ui/icons";
 import { ItemCard, ItemCardGroup } from "@heroui-pro/react";
@@ -72,13 +70,6 @@ import {
 } from "react";
 
 const NONE_KEY = "__none__";
-
-const REMINDER_ICONS: Record<ReminderLabel, typeof Cup> = {
-  breakfast: Cup,
-  lunch: Sun,
-  dinner: Moon,
-  summary: ChartColumn,
-};
 
 function Grains(props: SVGProps<SVGSVGElement>) {
   return (
@@ -600,15 +591,18 @@ export function ReminderSettings({
       {timezone
         ? REMINDER_LABELS.map((label, index) => {
           const row = rows[label];
-          const Icon = REMINDER_ICONS[label];
           const title = t(REMINDER_TITLES[label]);
           return (
             <Fragment key={label}>
               {index > 0 ? <Separator /> : null}
               <ItemCard>
-                <ItemCard.Icon>
-                  <Icon />
-                </ItemCard.Icon>
+                {label === "summary" ? (
+                  <ItemCard.Icon>
+                    <ChartColumn />
+                  </ItemCard.Icon>
+                ) : (
+                  <MealThumb alt={title} className="size-9" label={label} />
+                )}
                 <ItemCard.Content>
                   <ItemCard.Title>{title}</ItemCard.Title>
                 </ItemCard.Content>

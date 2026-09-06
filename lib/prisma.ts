@@ -5,10 +5,11 @@ config();
 
 import { PrismaPg } from "@prisma/adapter-pg";
 import { withAccelerate } from "@prisma/extension-accelerate";
-import { PrismaClient } from "../generated/prisma/client.ts";
+import { Prisma, PrismaClient } from "../generated/prisma/client.ts";
 import { isAccelerateUrl, resolveRuntimeDatabaseUrl } from "./prisma-url.ts";
 
 const runtimeDatabaseUrl = resolveRuntimeDatabaseUrl();
+const prismaSchemaId = Object.values(Prisma.CatalogProductScalarFieldEnum).join(",");
 
 export const usingAccelerate = isAccelerateUrl(runtimeDatabaseUrl);
 
@@ -21,12 +22,16 @@ function createPrisma(): PrismaClient {
   return new PrismaClient({ adapter: new PrismaPg({ connectionString: runtimeDatabaseUrl }) });
 }
 
-const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+const globalForPrisma = globalThis as unknown as {
+  prisma?: PrismaClient;
+  prismaSchemaId?: string;
+};
 
 function hasRequiredModels(client: PrismaClient | undefined): client is PrismaClient {
   return (
     typeof client?.agentTurn?.findUnique === "function" &&
     typeof client?.agentTurnPendingAck?.findFirst === "function" &&
+    typeof client?.catalogProduct?.findMany === "function" &&
     typeof client?.offProduct?.findUnique === "function" &&
     typeof client?.productFavorite?.findMany === "function" &&
     typeof client?.userAttachment?.findUnique === "function" &&
@@ -36,8 +41,11 @@ function hasRequiredModels(client: PrismaClient | undefined): client is PrismaCl
 
 function getPrisma(): PrismaClient {
   const cached = globalForPrisma.prisma;
-  if (hasRequiredModels(cached)) {
+  if (hasRequiredModels(cached) && globalForPrisma.prismaSchemaId === prismaSchemaId) {
     return cached;
+  }
+  if (cached) {
+    void cached.$disconnect();
   }
   const created = createPrisma();
   if (!hasRequiredModels(created)) {
@@ -45,6 +53,7 @@ function getPrisma(): PrismaClient {
   }
   if (process.env.NODE_ENV !== "production") {
     globalForPrisma.prisma = created;
+    globalForPrisma.prismaSchemaId = prismaSchemaId;
   }
   return created;
 }

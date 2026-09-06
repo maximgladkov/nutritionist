@@ -5,6 +5,7 @@ import { FoodThumb } from "@/app/_components/food-thumb";
 import { MEAL_LABELS } from "@/app/_components/i18n-labels";
 import { useAppLocale } from "@/app/_components/lingui-client-provider";
 import { MealKcal } from "@/app/_components/meal-kcal";
+import { MealThumb } from "@/app/_components/meal-thumb";
 import { formatAmount, formatKcal } from "@/app/_components/nutrition-format";
 import { bootTelegramWebApp } from "@/app/_components/telegram-webapp-client";
 import {
@@ -21,7 +22,7 @@ import {
   type ProductSegment,
   type UserProductView,
 } from "@/lib/user-products";
-import { CircleDashed, Cup, Magnifier, Moon, ShoppingBag, Star, StarFill, Sun } from "@gravity-ui/icons";
+import { Magnifier, ShoppingBag, Star, StarFill } from "@gravity-ui/icons";
 import { EmptyState, RadioButtonGroup, Segment, Sheet } from "@heroui-pro/react";
 import {
   Button,
@@ -37,13 +38,6 @@ import { useCallback, useEffect, useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 
 type ProductsSWRKey = readonly ["user-products", ProductSegment, string];
-
-const MEAL_ICONS = {
-  breakfast: Cup,
-  dinner: Moon,
-  lunch: Sun,
-  snack: CircleDashed,
-} as const;
 
 async function fetchProducts([, segment, initData]: ProductsSWRKey): Promise<readonly UserProductView[]> {
   const result = await getUserProductsAction({
@@ -368,14 +362,14 @@ function AddProductSheet({
                   <Trans>Add to</Trans>
                 </Label>
                 {PRODUCT_MEAL_LABELS.map((mealLabel) => {
-                  const Icon = MEAL_ICONS[mealLabel];
+                  const mealName = t(MEAL_LABELS[mealLabel]);
                   return (
                     <RadioButtonGroup.Item key={mealLabel} value={mealLabel}>
                       <RadioButtonGroup.ItemContent className="flex-row items-center gap-3">
                         <RadioButtonGroup.ItemIcon>
-                          <Icon className="size-4" />
+                          <MealThumb alt="" className="size-8" label={mealLabel} />
                         </RadioButtonGroup.ItemIcon>
-                        <Label>{t(MEAL_LABELS[mealLabel])}</Label>
+                        <Label>{mealName}</Label>
                       </RadioButtonGroup.ItemContent>
                     </RadioButtonGroup.Item>
                   );

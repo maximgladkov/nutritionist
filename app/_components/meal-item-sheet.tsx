@@ -3,22 +3,14 @@
 import { FoodThumb } from "@/app/_components/food-thumb";
 import { MEAL_LABELS } from "@/app/_components/i18n-labels";
 import { MealKcal } from "@/app/_components/meal-kcal";
+import { MealThumb } from "@/app/_components/meal-thumb";
 import { deleteMealItemAction, updateMealItemAction } from "@/app/actions/meals";
 import type { MealItemView, MealView } from "@/lib/meals";
 import { PRODUCT_MEAL_LABELS } from "@/lib/user-products";
-import { CircleDashed, Cup, Moon, Sun } from "@gravity-ui/icons";
 import { RadioButtonGroup, Sheet } from "@heroui-pro/react";
 import { Button, Label, NumberField, toast } from "@heroui/react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useEffect, useState } from "react";
-
-const MEAL_ICONS: Record<MealView["label"], typeof CircleDashed> = {
-  breakfast: Cup,
-  dinner: Moon,
-  lunch: Sun,
-  other: CircleDashed,
-  snack: CircleDashed,
-};
 
 function amountStep(unit: MealItemView["unit"]): number {
   return unit === "serving" ? 0.5 : 10;
@@ -112,14 +104,14 @@ export function MealItemSheet({
                   <Trans>Move to</Trans>
                 </Label>
                 {choices.map((mealLabel) => {
-                  const Icon = MEAL_ICONS[mealLabel];
+                  const mealName = t(MEAL_LABELS[mealLabel]);
                   return (
                     <RadioButtonGroup.Item key={mealLabel} value={mealLabel}>
                       <RadioButtonGroup.ItemContent className="flex-row items-center gap-3">
                         <RadioButtonGroup.ItemIcon>
-                          <Icon className="size-4" />
+                          <MealThumb alt="" className="size-8" label={mealLabel} />
                         </RadioButtonGroup.ItemIcon>
-                        <Label>{t(MEAL_LABELS[mealLabel])}</Label>
+                        <Label>{mealName}</Label>
                       </RadioButtonGroup.ItemContent>
                     </RadioButtonGroup.Item>
                   );
