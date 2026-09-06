@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { eatenAtForCreate, MealError, mealQueryRange, mealWriteRange, todaysMealWrite } from "./meals.ts";
+import {
+  eatenAtForCreate,
+  MealError,
+  mealQueryRange,
+  mealWriteRange,
+  scaleMealItemNutrition,
+  todaysMealWrite,
+} from "./meals.ts";
+import { emptyNutrients } from "./nutrition.ts";
 import { localDayRange, localInclusiveDateRange } from "./timezone.ts";
 
 describe("todaysMealWrite", () => {
@@ -96,6 +104,113 @@ describe("mealQueryRange", () => {
     );
     assert.throws(
       () => mealQueryRange({ from: "2026-08-01T12:00:00Z", to: "2026-08-02", timeZone: "UTC" }),
+      (error: unknown) => error instanceof MealError,
+    );
+  });
+});
+
+describe("scaleMealItemNutrition", () => {
+  const yogurt = {
+    carbohydrates: 10,
+    energyKcal: 80,
+    fat: 2,
+    fiber: 0,
+    proteins: 4,
+    salt: 0.1,
+    saturatedFat: 1,
+    sugars: 8,
+  };
+
+  it("scales grams and nutrients by the amount ratio", () => {
+    const result = scaleMealItemNutrition({
+      amount: 100,
+      grams: 100,
+      metrics: yogurt,
+      newAmount: 150,
+    });
+    assert.equal(result.amount, 150);
+    assert.equal(result.grams, 150);
+    assert.deepEqual(result.metrics, {
+      carbohydrates: 15,
+      energyKcal: 120,
+      fat: 3,
+      fiber: 0,
+      proteins: 6,
+      salt: 0.15,
+      saturatedFat: 1.5,
+      sugars: 12,
+    });
+  });
+
+  it("scales milliliter amounts", () => {
+    const result = scaleMealItemNutrition({
+      amount: 200,
+      grams: 200,
+      metrics: { ...emptyNutrients(), energyKcal: 90, sugars: 20 },
+      newAmount: 100,
+    });
+    assert.equal(result.grams, 100);
+    assert.equal(result.metrics.energyKcal, 45);
+    assert.equal(result.metrics.sugars, 10);
+    assert.equal(result.metrics.proteins, null);
+  });
+
+  it("scales serving amounts using stored grams", () => {
+    const result = scaleMealItemNutrition({
+      amount: 1,
+      grams: 25,
+      metrics: { ...emptyNutrients(), energyKcal: 80, proteins: 3 },
+      newAmount: 2,
+    });
+    assert.equal(result.amount, 2);
+    assert.equal(result.grams, 50);
+    assert.equal(result.metrics.energyKcal, 160);
+    assert.equal(result.metrics.proteins, 6);
+  });
+
+  it("keeps null nutrients null", () => {
+    const result = scaleMealItemNutrition({
+      amount: 100,
+      grams: 100,
+      metrics: { ...emptyNutrients(), energyKcal: 200 },
+      newAmount: 50,
+    });
+    assert.equal(result.metrics.energyKcal, 100);
+    assert.equal(result.metrics.fat, null);
+    assert.equal(result.metrics.fiber, null);
+  });
+
+  it("returns the original values when the amount is unchanged", () => {
+    const result = scaleMealItemNutrition({
+      amount: 80,
+      grams: 80,
+      metrics: yogurt,
+      newAmount: 80,
+    });
+    assert.equal(result.amount, 80);
+    assert.equal(result.grams, 80);
+    assert.deepEqual(result.metrics, yogurt);
+  });
+
+  it("rejects non-positive and oversized amounts", () => {
+    assert.throws(
+      () =>
+        scaleMealItemNutrition({
+          amount: 100,
+          grams: 100,
+          metrics: emptyNutrients(),
+          newAmount: 0,
+        }),
+      (error: unknown) => error instanceof MealError,
+    );
+    assert.throws(
+      () =>
+        scaleMealItemNutrition({
+          amount: 100,
+          grams: 100,
+          metrics: emptyNutrients(),
+          newAmount: 10001,
+        }),
       (error: unknown) => error instanceof MealError,
     );
   });

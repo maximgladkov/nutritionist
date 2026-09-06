@@ -5,6 +5,7 @@ import { DayRingStrip } from "@/app/_components/day-ring-strip";
 import { DayTotalsRow } from "@/app/_components/day-totals-row";
 import { useDesktopWorkspace } from "@/app/_components/desktop-workspace-context";
 import { MealGroupsAccordion } from "@/app/_components/meal-groups-accordion";
+import { MealItemSheet } from "@/app/_components/meal-item-sheet";
 import { useMiniAppFoodActive } from "@/app/_components/mini-app-shell";
 import { bootTelegramWebApp, telegramWebApp } from "@/app/_components/telegram-webapp-client";
 import {
@@ -14,6 +15,7 @@ import {
 } from "@/app/actions/summary";
 import { goalRingsForToday, hasAnyGoal, type GoalsView } from "@/lib/goal-values";
 import { groupMealsByLabel } from "@/lib/meal-groups";
+import type { MealItemView, MealView } from "@/lib/meals";
 import { resolveMealStreak } from "@/lib/meal-streak";
 import { dayIndexWindows, ymdToDayIndex } from "@/lib/summary-days";
 import type {
@@ -228,6 +230,11 @@ export function NutritionSummaryApp({
       })
     : null;
 
+  const onMutated = useCallback(() => {
+    void mutateDay();
+    void mutateDiary();
+  }, [mutateDay, mutateDiary]);
+
   return (
     <div
       className={
@@ -267,7 +274,15 @@ export function NutritionSummaryApp({
       ) : null}
       {calendarOpen ? null : errorMessage ? <p className="text-danger text-sm">{errorMessage}</p> : null}
       {calendarOpen ? null : day ? (
-        <SelectedDayView compact={tight} day={day} goals={goals} groups={groups} isPending={isPending} />
+        <SelectedDayView
+          compact={tight}
+          day={day}
+          goals={goals}
+          groups={groups}
+          initData={initData || undefined}
+          isPending={isPending}
+          onMutated={onMutated}
+        />
       ) : null}
       {!calendarOpen && !day && !errorMessage && ((embed && initData === null) || !today) ? (
         <div className="flex justify-center py-8">
@@ -283,20 +298,50 @@ function SelectedDayView({
   day,
   goals,
   groups,
+  initData,
   isPending,
+  onMutated,
 }: {
   readonly compact: boolean;
   readonly day: NutritionDayPayload;
   readonly goals: GoalsView | null;
   readonly groups: ReturnType<typeof groupMealsByLabel>;
+  readonly initData?: string;
   readonly isPending: boolean;
+  readonly onMutated: () => void;
 }) {
+  const [selected, setSelected] = useState<{
+    item: MealItemView;
+    label: MealView["label"];
+  } | null>(null);
   const rings = goals && hasAnyGoal(goals) ? goalRingsForToday(goals, day.totals) : [];
+
+  useEffect(() => {
+    setSelected(null);
+  }, [day.date]);
+
   return (
     <div className={cn("flex flex-col", compact ? "gap-3" : "gap-4", isPending && "opacity-60")}>
       {rings.length > 0 ? <DayGoalProgress rings={rings} /> : <DayTotalsRow totals={day.totals} />}
       {goals && !hasAnyGoal(goals) ? <SetCalorieGoalHint compact={compact} /> : null}
-      <MealGroupsAccordion groups={groups} />
+      <MealGroupsAccordion
+        groups={groups}
+        onSelectItem={(item, label) => {
+          setSelected({ item, label });
+        }}
+      />
+      <MealItemSheet
+        initData={initData}
+        item={selected?.item ?? null}
+        label={selected?.label ?? null}
+        onChanged={() => {
+          setSelected(null);
+          onMutated();
+        }}
+        onClose={() => {
+          setSelected(null);
+        }}
+      />
     </div>
   );
 }

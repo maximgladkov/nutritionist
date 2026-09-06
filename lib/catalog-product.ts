@@ -6,13 +6,14 @@ import {
   mergeProductSearch,
   pickNutriments,
   preferProduct,
+  resolveCatalogBarcode,
   type CatalogSearchResult,
   type ProductSource,
 } from "./catalog-product-query.ts";
 import { searchCatalogProductsFuzzy } from "./off-product-store.ts";
 import {
   attachCatalogProductPhotos,
-  loadCatalogImagesByBarcodes,
+  loadCatalogImagesByProductIds,
   withCatalogImages,
   type CatalogPhotoInput,
 } from "./catalog-product-images.ts";
@@ -27,12 +28,15 @@ import {
 } from "./open-food-facts.ts";
 import { prisma } from "./prisma.ts";
 
+const BARCODE_IGNORED_WARNING =
+  "Barcode was omitted because it was not a valid GTIN. Do not invent a barcode. If none is clearly readable, save and log by name.";
+
 export type ResolvedProductLookup =
   | { found: true; hasNutrition: boolean; product: Product; source: ProductSource }
   | { found: false; barcode: string };
 
 export type SaveCatalogProductInput = {
-  barcode: string;
+  barcode?: string;
   brands?: string;
   createdByUserId: string;
   name: string;
@@ -45,7 +49,14 @@ export type SaveCatalogProductInput = {
 };
 
 export type SaveCatalogProductResult =
-  | { hasNutrition: boolean; product: Product; source: ProductSource; status: "created" | "updated" | "exists" }
+  | {
+      barcodeIgnored?: boolean;
+      hasNutrition: boolean;
+      product: Product;
+      source: ProductSource;
+      status: "created" | "updated" | "exists";
+      warning?: string;
+    }
   | { error: string; status: "invalid" };
 
 export {
@@ -53,6 +64,7 @@ export {
   mergeCatalogSearchResults,
   mergeProductSearch,
   preferProduct,
+  resolveCatalogBarcode,
   type CatalogSearchResult,
   type ProductSource,
 } from "./catalog-product-query.ts";
@@ -68,7 +80,7 @@ export async function resolveProductByBarcode(
 
   const [off, local] = await Promise.all([
     getProductByBarcode(normalizedBarcode, options),
-    findCatalogProduct(normalizedBarcode),
+    findCatalogProductByBarcode(normalizedBarcode),
   ]);
   const preferred = preferProduct(local, off.found ? off.product : undefined);
   if (!preferred) {
@@ -106,10 +118,7 @@ export async function searchCatalogAndOpenFoodFactsMany(
 }
 
 export async function saveCatalogProduct(input: SaveCatalogProductInput): Promise<SaveCatalogProductResult> {
-  const barcode = normalizeBarcode(input.barcode);
-  if (!isValidBarcode(barcode)) {
-    return { error: "Invalid barcode.", status: "invalid" };
-  }
+  const resolvedBarcode = resolveCatalogBarcode(input.barcode);
   const name = input.name.trim();
   if (name.length === 0) {
     return { error: "Name is required.", status: "invalid" };
@@ -119,22 +128,23 @@ export async function saveCatalogProduct(input: SaveCatalogProductInput): Promis
     return { error: "Nutrition per 100g or 100ml is required.", status: "invalid" };
   }
 
+  const barcode = resolvedBarcode.barcode;
   const [off, existing] = await Promise.all([
-    getProductByBarcode(barcode),
-    findCatalogProduct(barcode),
+    barcode ? getProductByBarcode(barcode) : Promise.resolve(undefined),
+    findCatalogProductForSave(barcode, name),
   ]);
-  const decision = decideCatalogSave(existing, off.found ? off.product : undefined);
+  const decision = decideCatalogSave(existing, off?.found ? off.product : undefined);
   if (decision.action === "exists") {
-    if (decision.source === "custom-catalog") {
+    if (decision.source === "custom-catalog" && decision.product.id) {
       const images = await attachCatalogProductPhotos({
-        barcode,
         photos: input.photos,
+        productId: decision.product.id,
         sessionId: input.sessionId,
         turnId: input.turnId,
       });
-      return savedResult(withCatalogImages(decision.product, images), decision.source, "exists");
+      return savedResult(withCatalogImages(decision.product, images), decision.source, "exists", resolvedBarcode.ignored);
     }
-    return savedResult(decision.product, decision.source, "exists");
+    return savedResult(decision.product, decision.source, "exists", resolvedBarcode.ignored);
   }
 
   const data = {
@@ -147,10 +157,11 @@ export async function saveCatalogProduct(input: SaveCatalogProductInput): Promis
     servingSize: emptyToNull(input.servingSize),
   };
 
-  if (decision.action === "update") {
+  if (decision.action === "update" && existing?.id) {
     const updated = await prisma.catalogProduct.update({
-      where: { barcode },
+      where: { id: existing.id },
       data: {
+        barcode: data.barcode,
         brands: data.brands,
         name: data.name,
         nutriments: data.nutriments,
@@ -159,34 +170,34 @@ export async function saveCatalogProduct(input: SaveCatalogProductInput): Promis
       },
     });
     const images = await attachCatalogProductPhotos({
-      barcode,
       photos: input.photos,
+      productId: updated.id,
       sessionId: input.sessionId,
       turnId: input.turnId,
     });
-    return savedResult(withCatalogImages(catalogRowToProduct(updated), images), "custom-catalog", "updated");
+    return savedResult(withCatalogImages(catalogRowToProduct(updated), images), "custom-catalog", "updated", resolvedBarcode.ignored);
   }
 
   try {
     const created = await prisma.catalogProduct.create({ data });
     const images = await attachCatalogProductPhotos({
-      barcode,
       photos: input.photos,
+      productId: created.id,
       sessionId: input.sessionId,
       turnId: input.turnId,
     });
-    return savedResult(withCatalogImages(catalogRowToProduct(created), images), "custom-catalog", "created");
+    return savedResult(withCatalogImages(catalogRowToProduct(created), images), "custom-catalog", "created", resolvedBarcode.ignored);
   } catch (error) {
-    if (isUniqueConstraintError(error)) {
-      const raced = await findCatalogProduct(barcode);
-      if (raced) {
+    if (isUniqueConstraintError(error) && barcode) {
+      const raced = await findCatalogProductByBarcode(barcode);
+      if (raced?.id) {
         const images = await attachCatalogProductPhotos({
-          barcode,
           photos: input.photos,
+          productId: raced.id,
           sessionId: input.sessionId,
           turnId: input.turnId,
         });
-        return savedResult(withCatalogImages(raced, images), "custom-catalog", "exists");
+        return savedResult(withCatalogImages(raced, images), "custom-catalog", "exists", resolvedBarcode.ignored);
       }
     }
     throw error;
@@ -197,8 +208,10 @@ function savedResult(
   product: Product,
   source: ProductSource,
   status: "created" | "updated" | "exists",
+  barcodeIgnored: boolean,
 ): SaveCatalogProductResult {
   return {
+    ...(barcodeIgnored ? { barcodeIgnored: true, warning: BARCODE_IGNORED_WARNING } : {}),
     hasNutrition: catalogNutrimentsHaveValues(product.nutriments),
     product,
     source,
@@ -206,24 +219,54 @@ function savedResult(
   };
 }
 
-async function findCatalogProduct(barcode: string): Promise<Product | undefined> {
+async function findCatalogProductForSave(barcode: string | null, name: string): Promise<Product | undefined> {
+  if (barcode) {
+    const byBarcode = await findCatalogProductByBarcode(barcode);
+    if (byBarcode) {
+      return byBarcode;
+    }
+  }
+  return findCatalogProductByName(name);
+}
+
+async function findCatalogProductByBarcode(barcode: string): Promise<Product | undefined> {
   const row = await prisma.catalogProduct.findUnique({ where: { barcode } });
   if (!row) {
     return undefined;
   }
-  const images = await loadCatalogImagesByBarcodes([barcode]);
-  return withCatalogImages(catalogRowToProduct(row), images.get(barcode) ?? []);
+  return productWithImages(catalogRowToProduct(row));
+}
+
+async function findCatalogProductByName(name: string): Promise<Product | undefined> {
+  const row = await prisma.catalogProduct.findFirst({
+    orderBy: { updatedAt: "desc" },
+    where: { barcode: null, name: { equals: name, mode: "insensitive" } },
+  });
+  if (!row) {
+    return undefined;
+  }
+  return productWithImages(catalogRowToProduct(row));
 }
 
 async function searchCatalogProducts(query: string): Promise<Product[]> {
   const products = await searchCatalogProductsFuzzy(query, 10);
-  const images = await loadCatalogImagesByBarcodes(products.map((product) => product.barcode));
-  return products.map((product) => withCatalogImages(product, images.get(product.barcode) ?? []));
+  const ids = products.flatMap((product) => (product.id ? [product.id] : []));
+  const images = await loadCatalogImagesByProductIds(ids);
+  return products.map((product) => withCatalogImages(product, product.id ? images.get(product.id) ?? [] : []));
+}
+
+async function productWithImages(product: Product): Promise<Product> {
+  if (product.id) {
+    const images = await loadCatalogImagesByProductIds([product.id]);
+    return withCatalogImages(product, images.get(product.id) ?? []);
+  }
+  return product;
 }
 
 function catalogRowToProduct(row: {
-  barcode: string;
+  barcode: string | null;
   brands: string | null;
+  id: string;
   name: string;
   nutriments: Prisma.JsonValue;
   quantity: string | null;
@@ -234,6 +277,7 @@ function catalogRowToProduct(row: {
     barcode: row.barcode,
     brands: row.brands,
     countries: [],
+    id: row.id,
     imageUrl: null,
     ingredients: null,
     name: row.name,

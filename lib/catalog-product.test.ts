@@ -7,10 +7,11 @@ import {
   mergeProductSearch,
   pickNutriments,
   preferProduct,
+  resolveCatalogBarcode,
 } from "./catalog-product-query.ts";
 import type { Product } from "./open-food-facts.ts";
 
-function product(barcode: string, name: string, nutriments: Product["nutriments"] = {}): Product {
+function product(barcode: string | null, name: string, nutriments: Product["nutriments"] = {}): Product {
   return {
     allergens: null,
     barcode,
@@ -26,6 +27,25 @@ function product(barcode: string, name: string, nutriments: Product["nutriments"
     servingSize: null,
   };
 }
+
+describe("resolveCatalogBarcode", () => {
+  it("keeps a valid GTIN", () => {
+    assert.deepEqual(resolveCatalogBarcode("3017624010701"), {
+      barcode: "3017624010701",
+      ignored: false,
+    });
+  });
+
+  it("omits a missing barcode", () => {
+    assert.deepEqual(resolveCatalogBarcode(undefined), { barcode: null, ignored: false });
+    assert.deepEqual(resolveCatalogBarcode("  "), { barcode: null, ignored: false });
+  });
+
+  it("ignores invented or invalid barcodes instead of saving them", () => {
+    assert.deepEqual(resolveCatalogBarcode("MILSANI001"), { barcode: null, ignored: true });
+    assert.deepEqual(resolveCatalogBarcode("843670100001"), { barcode: null, ignored: true });
+  });
+});
 
 describe("catalogNutrimentsHaveValues", () => {
   it("requires at least one finite nutrient", () => {
@@ -133,6 +153,18 @@ describe("mergeProductSearch", () => {
     assert.equal(merged.products[0]?.name, "Off Dup");
     assert.equal(merged.products[0]?.source, "open-food-facts");
     assert.equal(merged.products[0]?.hasNutrition, true);
+  });
+
+  it("keeps custom catalog products that have no barcode", () => {
+    const merged = mergeProductSearch([product(null, "Milsani Yogur", { energyKcal100g: 51 })], {
+      count: 0,
+      page: 1,
+      products: [],
+    });
+    assert.equal(merged.count, 1);
+    assert.equal(merged.products[0]?.barcode, null);
+    assert.equal(merged.products[0]?.name, "Milsani Yogur");
+    assert.equal(merged.products[0]?.source, "custom-catalog");
   });
 });
 

@@ -1,4 +1,4 @@
-import type { Product, ProductNutriments, ProductSearchResult } from "./open-food-facts.ts";
+import { isValidBarcode, normalizeBarcode, type Product, type ProductNutriments, type ProductSearchResult } from "./open-food-facts.ts";
 
 const NUTRIMENT_KEYS = [
   "energyKcal100g",
@@ -100,6 +100,16 @@ export function mergeProductSearch(local: Product[], remote: ProductSearchResult
       source: preferred.source,
     });
   }
+  for (const product of local) {
+    if (product.barcode) {
+      continue;
+    }
+    products.push({
+      ...product,
+      hasNutrition: catalogNutrimentsHaveValues(product.nutriments),
+      source: "custom-catalog",
+    });
+  }
 
   return {
     count: products.length,
@@ -109,12 +119,13 @@ export function mergeProductSearch(local: Product[], remote: ProductSearchResult
 }
 
 export function mergeCatalogSearchResults(results: readonly CatalogSearchResult[]): CatalogSearchResult {
-  const byBarcode = new Map<string, CatalogSearchProduct>();
+  const byKey = new Map<string, CatalogSearchProduct>();
   for (const result of results) {
     for (const product of result.products) {
-      const existing = byBarcode.get(product.barcode);
+      const key = catalogProductKey(product);
+      const existing = byKey.get(key);
       if (!existing) {
-        byBarcode.set(product.barcode, product);
+        byKey.set(key, product);
         continue;
       }
       const catalog =
@@ -125,19 +136,48 @@ export function mergeCatalogSearchResults(results: readonly CatalogSearchResult[
       if (!preferred) {
         continue;
       }
-      byBarcode.set(product.barcode, {
+      byKey.set(key, {
         ...preferred.product,
         hasNutrition: catalogNutrimentsHaveValues(preferred.product.nutriments),
         source: preferred.source,
       });
     }
   }
-  const products = [...byBarcode.values()];
+  const products = [...byKey.values()];
   return {
     count: products.length,
     page: results[0]?.page ?? 1,
     products,
   };
+}
+
+export function catalogProductKey(product: {
+  barcode: string | null;
+  id?: string;
+  name?: string | null;
+}): string {
+  const barcode = product.barcode?.trim() ?? "";
+  if (barcode.length > 0) {
+    return `b:${barcode}`;
+  }
+  if (product.id) {
+    return `id:${product.id}`;
+  }
+  return `n:${(product.name ?? "").trim().toLowerCase()}`;
+}
+
+export function resolveCatalogBarcode(barcode: string | undefined | null): {
+  barcode: string | null;
+  ignored: boolean;
+} {
+  const raw = normalizeBarcode(barcode ?? "");
+  if (raw.length === 0) {
+    return { barcode: null, ignored: false };
+  }
+  if (!isValidBarcode(raw)) {
+    return { barcode: null, ignored: true };
+  }
+  return { barcode: raw, ignored: false };
 }
 
 export function pickNutriments(value: ProductNutriments | Record<string, unknown>): ProductNutriments {
@@ -154,8 +194,9 @@ export function pickNutriments(value: ProductNutriments | Record<string, unknown
 function indexByBarcode(products: Product[]) {
   const byBarcode = new Map<string, Product>();
   for (const product of products) {
-    if (product.barcode.length > 0 && !byBarcode.has(product.barcode)) {
-      byBarcode.set(product.barcode, product);
+    const barcode = product.barcode?.trim() ?? "";
+    if (barcode.length > 0 && !byBarcode.has(barcode)) {
+      byBarcode.set(barcode, product);
     }
   }
   return byBarcode;

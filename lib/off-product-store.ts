@@ -29,8 +29,9 @@ type OffProductRow = {
 };
 
 type CatalogProductRow = {
-  barcode: string;
+  barcode: string | null;
   brands: string | null;
+  id: string;
   name: string;
   nutriments: Prisma.JsonValue;
   quantity: string | null;
@@ -90,7 +91,7 @@ export async function searchCatalogProductsFuzzy(
   const rows = await prisma.$transaction(async (tx) => {
     await tx.$queryRaw(setWordSimilarityThresholdSql());
     return tx.$queryRaw<CatalogProductRow[]>`
-      SELECT "barcode", "name", "brands", "quantity", "servingSize", "nutriments"
+      SELECT "id", "barcode", "name", "brands", "quantity", "servingSize", "nutriments"
       FROM "CatalogProduct"
       WHERE 1=1
       ${Prisma.join(fuzzyTokenFilters(tokens), " ")}
@@ -139,6 +140,7 @@ function catalogRowToProduct(row: CatalogProductRow): Product {
     barcode: row.barcode,
     brands: row.brands,
     countries: [],
+    id: row.id,
     imageUrl: null,
     ingredients: null,
     name: row.name,

@@ -12,3 +12,4 @@ generated
 locales/**/messages.ts
 locales/**/messages.js
 locales/**/messages.d.ts
+/.swc

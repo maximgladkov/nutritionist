@@ -1,5 +1,5 @@
 import { prisma } from "./prisma.ts";
-import { loadCatalogImagesByBarcodes, primaryCatalogImageUrl } from "./catalog-product-images.ts";
+import { loadCatalogImagesByBarcodes, loadCatalogImagesByNames, primaryCatalogImageUrl } from "./catalog-product-images.ts";
 import {
   applyFavorites,
   groupLoggedProducts,
@@ -51,10 +51,23 @@ export async function listUserProducts(input: {
         .filter((barcode): barcode is string => Boolean(barcode && barcode.length > 0)),
     ),
   ];
-  const imagesByBarcode = await loadCatalogImagesByBarcodes(barcodes);
-  const withImages = grouped.map((product) => withCatalogProductImages(product, imagesByBarcode));
+  const namesWithoutBarcode = [
+    ...new Set(
+      [...grouped, ...favorites]
+        .filter((item) => !item.barcode)
+        .map((item) => item.name)
+        .filter((name) => name.trim().length > 0),
+    ),
+  ];
+  const [imagesByBarcode, imagesByName] = await Promise.all([
+    loadCatalogImagesByBarcodes(barcodes),
+    loadCatalogImagesByNames(namesWithoutBarcode),
+  ]);
+  const withImages = grouped.map((product) =>
+    withCatalogProductImages(product, imagesByBarcode, imagesByName),
+  );
   return applyFavorites(withImages, favorites, input.segment).map((product) =>
-    withCatalogProductImages(product, imagesByBarcode),
+    withCatalogProductImages(product, imagesByBarcode, imagesByName),
   );
 }
 
@@ -98,11 +111,14 @@ export async function setProductFavorite(input: {
 function withCatalogProductImages(
   product: UserProductView,
   imagesByBarcode: Map<string, UserProductView["images"]>,
+  imagesByName: Map<string, UserProductView["images"]>,
 ): UserProductView {
-  if (!product.barcode) {
+  const images = product.barcode
+    ? (imagesByBarcode.get(product.barcode) ?? product.images)
+    : (imagesByName.get(product.name.trim().toLowerCase()) ?? product.images);
+  if (images.length === 0) {
     return product;
   }
-  const images = imagesByBarcode.get(product.barcode) ?? product.images;
   return {
     ...product,
     imageUrl: product.imageUrl ?? primaryCatalogImageUrl(images),

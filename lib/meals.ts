@@ -2,13 +2,16 @@ import { resolveProductByBarcode } from "./catalog-product.ts";
 import { inferMealLabel } from "./meal-label.ts";
 import { choosePackagedFoodName } from "./open-food-facts-name.ts";
 import type { ProductNutriments } from "./open-food-facts.ts";
-import { InvalidBarcodeError } from "./open-food-facts.ts";
+import { InvalidBarcodeError, isValidBarcode } from "./open-food-facts.ts";
 import {
   type AmountUnit,
   type NutrientKey,
   type NutrientValues,
   computeItemNutrition,
+  emptyNutrients,
   incompleteNutrients,
+  NUTRIENT_KEYS,
+  roundNutrient,
   ServingSizeError,
   sumNutrients,
 } from "./nutrition.ts";
@@ -87,6 +90,36 @@ type ResolvedItem = {
 
 const MAX_AMOUNT = 10000;
 const MAX_ITEMS = 50;
+
+export function scaleMealItemNutrition(input: {
+  amount: number;
+  grams: number;
+  metrics: NutrientValues;
+  newAmount: number;
+}): { amount: number; grams: number; metrics: NutrientValues } {
+  assertPositiveAmount(input.newAmount);
+  if (!Number.isFinite(input.amount) || input.amount <= 0) {
+    throw new MealError("amount must be a positive number");
+  }
+  if (input.newAmount === input.amount) {
+    return {
+      amount: input.amount,
+      grams: input.grams,
+      metrics: { ...input.metrics },
+    };
+  }
+  const ratio = input.newAmount / input.amount;
+  const metrics = emptyNutrients();
+  for (const key of NUTRIENT_KEYS) {
+    const value = input.metrics[key];
+    metrics[key] = value === null ? null : roundNutrient(value * ratio);
+  }
+  return {
+    amount: input.newAmount,
+    grams: input.grams * ratio,
+    metrics,
+  };
+}
 
 export async function logMeal(input: {
   userId: string;
@@ -315,6 +348,109 @@ export async function addItemToTodaysMeal(input: {
   });
 }
 
+export async function updateMealItem(input: {
+  userId: string;
+  itemId: string;
+  amount?: number;
+  label?: MealLabel;
+}): Promise<MealView> {
+  if (input.amount === undefined && input.label === undefined) {
+    throw new MealError("Provide an amount or a meal");
+  }
+  if (input.amount !== undefined) {
+    assertPositiveAmount(input.amount);
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const item = await tx.mealItem.findFirst({
+      where: { id: input.itemId, meal: { userId: input.userId } },
+      include: { meal: true },
+    });
+    if (!item) {
+      throw new MealError("Meal item not found");
+    }
+
+    const data: Prisma.MealItemUpdateInput = {};
+    if (input.amount !== undefined && input.amount !== item.amount) {
+      const scaled = scaleMealItemNutrition({
+        amount: item.amount,
+        grams: item.grams,
+        metrics: {
+          carbohydrates: item.carbohydrates,
+          energyKcal: item.energyKcal,
+          fat: item.fat,
+          fiber: item.fiber,
+          proteins: item.proteins,
+          salt: item.salt,
+          saturatedFat: item.saturatedFat,
+          sugars: item.sugars,
+        },
+        newAmount: input.amount,
+      });
+      data.amount = scaled.amount;
+      data.grams = scaled.grams;
+      data.carbohydrates = scaled.metrics.carbohydrates;
+      data.energyKcal = scaled.metrics.energyKcal;
+      data.fat = scaled.metrics.fat;
+      data.fiber = scaled.metrics.fiber;
+      data.proteins = scaled.metrics.proteins;
+      data.salt = scaled.metrics.salt;
+      data.saturatedFat = scaled.metrics.saturatedFat;
+      data.sugars = scaled.metrics.sugars;
+    }
+
+    let destMealId = item.mealId;
+    if (input.label !== undefined && input.label !== item.meal.label) {
+      const timeZone = (await callerTimezone(input.userId)) ?? "UTC";
+      const date = formatDateInTimeZone(item.meal.eatenAt, timeZone);
+      const range = mealWriteRange({ date, timeZone });
+      const existing = await tx.meal.findFirst({
+        where: {
+          userId: input.userId,
+          label: input.label,
+          eatenAt: { gte: range.from, lt: range.to },
+        },
+        orderBy: { eatenAt: "desc" },
+        select: { id: true },
+      });
+      if (existing) {
+        destMealId = existing.id;
+      } else {
+        const created = await tx.meal.create({
+          data: {
+            eatenAt: eatenAtForCreate(item.meal.eatenAt, new Date(), range),
+            label: input.label,
+            userId: input.userId,
+          },
+          select: { id: true },
+        });
+        destMealId = created.id;
+      }
+      data.meal = { connect: { id: destMealId } };
+    }
+
+    if (Object.keys(data).length > 0) {
+      await tx.mealItem.update({
+        where: { id: item.id },
+        data,
+      });
+    }
+
+    if (destMealId !== item.mealId) {
+      const remaining = await tx.mealItem.count({ where: { mealId: item.mealId } });
+      if (remaining === 0) {
+        await tx.meal.delete({ where: { id: item.mealId } });
+      }
+    }
+
+    const meal = await tx.meal.findUniqueOrThrow({
+      where: { id: destMealId },
+      include: { items: true },
+    });
+    return toMealView(meal);
+  });
+}
+
 export async function deleteMeal(input: {
   userId: string;
   mealId: string;
@@ -426,12 +562,7 @@ async function resolveItem(
   country: string | undefined,
   signal: AbortSignal | undefined,
 ): Promise<ResolvedItem> {
-  if (!Number.isFinite(item.amount) || item.amount <= 0) {
-    throw new MealError("amount must be a positive number");
-  }
-  if (item.amount > MAX_AMOUNT) {
-    throw new MealError("amount is too large");
-  }
+  assertPositiveAmount(item.amount);
 
   let name: string | undefined = item.name?.trim() || undefined;
   let barcode: string | null = null;
@@ -440,25 +571,28 @@ async function resolveItem(
   let servingSize: string | null = null;
 
   if (item.barcode) {
-    try {
-      const result = await resolveProductByBarcode(item.barcode, { country, signal });
-      if (!result.found) {
-        throw new MealError(`Product not found for barcode ${result.barcode}`);
+    const normalizedBarcode = item.barcode.trim();
+    if (isValidBarcode(normalizedBarcode)) {
+      try {
+        const result = await resolveProductByBarcode(normalizedBarcode, { country, signal });
+        if (!result.found) {
+          throw new MealError(`Product not found for barcode ${result.barcode}`);
+        }
+        barcode = result.product.barcode;
+        imageUrl = result.product.imageUrl;
+        name = choosePackagedFoodName({
+          barcode: result.product.barcode,
+          productName: result.product.name,
+          providedName: name,
+        });
+        nutriments = result.product.nutriments;
+        servingSize = result.product.servingSize;
+      } catch (error) {
+        if (error instanceof InvalidBarcodeError) {
+          throw new MealError(error.message);
+        }
+        throw error;
       }
-      barcode = result.product.barcode;
-      imageUrl = result.product.imageUrl;
-      name = choosePackagedFoodName({
-        barcode: result.product.barcode,
-        productName: result.product.name,
-        providedName: name,
-      });
-      nutriments = result.product.nutriments;
-      servingSize = result.product.servingSize;
-    } catch (error) {
-      if (error instanceof InvalidBarcodeError) {
-        throw new MealError(error.message);
-      }
-      throw error;
     }
   }
   if (!name) {
@@ -592,6 +726,15 @@ function toItemView(item: {
     metrics,
     incomplete: incompleteNutrients([metrics]),
   };
+}
+
+function assertPositiveAmount(amount: number): void {
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new MealError("amount must be a positive number");
+  }
+  if (amount > MAX_AMOUNT) {
+    throw new MealError("amount is too large");
+  }
 }
 
 function parseQueryDate(value: string, field: string): string {

@@ -7,7 +7,7 @@ import { requireUser } from "../lib/require-user";
 
 export default defineTool({
   description:
-    "Add foods to the caller's meal for a nutrition day and meal type. Same item fields as log_meal. Pass label when the user named breakfast, lunch, dinner, or snack; omit it to use the current slot. Pass date as YYYY-MM-DD only to add to another nutrition day. Never pass a meal id. Do not call list_meals just to append.",
+    "Add foods to the caller's meal for a nutrition day and meal type. Same item fields as log_meal. If the product has no barcode, pass name and nutrimentsPer100g; never invent a barcode. Pass label when the user named breakfast, lunch, dinner, or snack; omit it to use the current slot. Pass date as YYYY-MM-DD only to add to another nutrition day. Never pass a meal id. Do not call list_meals just to append.",
   inputSchema: z.object({
     items: z.array(mealItemInputSchema).min(1).max(50),
     label: mealLabelSchema.optional(),

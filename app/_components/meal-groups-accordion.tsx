@@ -3,12 +3,13 @@
 import { FoodThumb } from "@/app/_components/food-thumb";
 import { MEAL_LABELS } from "@/app/_components/i18n-labels";
 import { useAppLocale } from "@/app/_components/lingui-client-provider";
+import { MealKcal } from "@/app/_components/meal-kcal";
 import { NutrientMetricsRow } from "@/app/_components/nutrient-metrics-row";
-import { formatAmount, formatKcal } from "@/app/_components/nutrition-format";
+import { formatAmount } from "@/app/_components/nutrition-format";
 import type { MealGroupView } from "@/lib/meal-groups";
-import type { MealView } from "@/lib/meals";
+import type { MealItemView, MealView } from "@/lib/meals";
 import { CircleDashed, Cup, Moon, Sun } from "@gravity-ui/icons";
-import { Accordion, Card, Typography } from "@heroui/react";
+import { Accordion, Card } from "@heroui/react";
 import { useLingui } from "@lingui/react/macro";
 
 const MEAL_ICONS: Record<MealView["label"], typeof CircleDashed> = {
@@ -19,33 +20,13 @@ const MEAL_ICONS: Record<MealView["label"], typeof CircleDashed> = {
   snack: CircleDashed,
 };
 
-function MealKcal({
-  compact = false,
-  value,
+export function MealGroupsAccordion({
+  groups,
+  onSelectItem,
 }: {
-  readonly compact?: boolean;
-  readonly value: number | null;
+  readonly groups: readonly MealGroupView[];
+  readonly onSelectItem: (item: MealItemView, label: MealView["label"]) => void;
 }) {
-  const kcal = formatKcal(value);
-  return (
-    <span className="flex shrink-0 items-baseline gap-1">
-      <Typography
-        className="tabular-nums leading-none"
-        type={compact ? "body-sm" : "h6"}
-        weight="semibold"
-      >
-        {kcal}
-      </Typography>
-      {kcal !== "—" ? (
-        <Typography className="leading-none" color="muted" type={compact ? "body-xs" : "body-sm"}>
-          kcal
-        </Typography>
-      ) : null}
-    </span>
-  );
-}
-
-export function MealGroupsAccordion({ groups }: { readonly groups: readonly MealGroupView[] }) {
   const { t } = useLingui();
   const { locale } = useAppLocale();
   if (groups.length === 0) {
@@ -78,20 +59,28 @@ export function MealGroupsAccordion({ groups }: { readonly groups: readonly Meal
               <Accordion.Panel>
                 <Accordion.Body className="pt-0">
                   {hasItems ? (
-                    <ul className="m-0 flex list-none flex-col gap-3 p-0">
+                    <ul className="m-0 flex list-none flex-col gap-1 p-0 -mx-4">
                       {group.items.map((item) => (
-                        <li className="flex items-center gap-3 pt-1" key={item.id}>
-                          <FoodThumb alt={item.name} src={item.imageUrl} />
-                          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                            <span className="flex min-w-0 items-baseline gap-1.5">
-                              <span className="text-foreground min-w-0 truncate text-sm">{item.name}</span>
-                              <span className="text-muted shrink-0 text-xs tabular-nums">
-                                {formatAmount(item.amount, item.unit)}
+                        <li key={item.id}>
+                          <button
+                            className="hover:bg-surface-secondary flex w-full min-w-0 cursor-[var(--cursor-interactive)] items-center gap-3 px-4 py-2 text-left"
+                            type="button"
+                            onClick={() => {
+                              onSelectItem(item, group.label);
+                            }}
+                          >
+                            <FoodThumb alt={item.name} src={item.imageUrl} />
+                            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                              <span className="flex min-w-0 items-baseline gap-1.5">
+                                <span className="text-foreground min-w-0 truncate text-sm">{item.name}</span>
+                                <span className="text-muted shrink-0 text-xs tabular-nums">
+                                  {formatAmount(item.amount, item.unit)}
+                                </span>
                               </span>
-                            </span>
-                            <NutrientMetricsRow compact hideCalories totals={item.metrics} />
-                          </div>
-                          <MealKcal compact value={item.metrics.energyKcal} />
+                              <NutrientMetricsRow compact hideCalories totals={item.metrics} />
+                            </div>
+                            <MealKcal compact value={item.metrics.energyKcal} />
+                          </button>
                         </li>
                       ))}
                     </ul>

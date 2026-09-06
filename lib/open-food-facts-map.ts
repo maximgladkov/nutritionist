@@ -34,7 +34,8 @@ export type CatalogProductImageView = {
 };
 
 export type Product = {
-  barcode: string;
+  id?: string;
+  barcode: string | null;
   name: string | null;
   brands: string | null;
   quantity: string | null;
@@ -77,7 +78,19 @@ export function normalizeBarcode(barcode: string): string {
 }
 
 export function isValidBarcode(barcode: string): boolean {
-  return BARCODE_PATTERN.test(normalizeBarcode(barcode));
+  const normalized = normalizeBarcode(barcode);
+  return BARCODE_PATTERN.test(normalized) && gtinChecksumIsValid(normalized);
+}
+
+function gtinChecksumIsValid(digits: string): boolean {
+  const padded = digits.padStart(14, "0");
+  let sum = 0;
+  for (let i = 0; i < 13; i += 1) {
+    const digit = Number(padded[i]);
+    const multiplier = (13 - i) % 2 === 1 ? 3 : 1;
+    sum += digit * multiplier;
+  }
+  return (10 - (sum % 10)) % 10 === Number(padded[13]);
 }
 
 const KJ_PER_KCAL = 4.184;

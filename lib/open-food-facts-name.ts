@@ -72,16 +72,17 @@ export function pickProductName(
 }
 
 export function choosePackagedFoodName(input: {
-  barcode: string;
+  barcode: string | null;
   productName: string | null | undefined;
   providedName?: string;
 }): string {
   const provided = input.providedName?.trim() || undefined;
   const product = input.productName?.trim() || undefined;
-  if (provided && !isSameBarcode(provided, input.barcode)) {
+  const barcode = input.barcode?.trim() || undefined;
+  if (provided && barcode && !isSameBarcode(provided, barcode)) {
     return provided;
   }
-  return product ?? provided ?? input.barcode;
+  return product ?? provided ?? barcode ?? "Unknown";
 }
 
 function isSameBarcode(value: string, barcode: string) {

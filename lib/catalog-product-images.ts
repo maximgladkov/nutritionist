@@ -15,6 +15,31 @@ export {
   type CatalogPhotoLink,
 } from "./catalog-product-images-query.ts";
 
+export async function loadCatalogImagesByProductIds(
+  ids: readonly string[],
+): Promise<Map<string, CatalogProductImageView[]>> {
+  const unique = [...new Set(ids.filter((id) => id.length > 0))];
+  const byProductId = new Map<string, CatalogProductImageView[]>();
+  if (unique.length === 0) {
+    return byProductId;
+  }
+  const rows = await prisma.catalogProductImage.findMany({
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    select: { id: true, kind: true, productId: true },
+    where: { productId: { in: [...unique] } },
+  });
+  for (const row of rows) {
+    const list = byProductId.get(row.productId) ?? [];
+    list.push({
+      id: row.id,
+      kind: row.kind,
+      url: catalogImageUrl(row.id),
+    });
+    byProductId.set(row.productId, list);
+  }
+  return byProductId;
+}
+
 export async function loadCatalogImagesByBarcodes(
   barcodes: readonly string[],
 ): Promise<Map<string, CatalogProductImageView[]>> {
@@ -23,26 +48,42 @@ export async function loadCatalogImagesByBarcodes(
   if (unique.length === 0) {
     return byBarcode;
   }
-  const rows = await prisma.catalogProductImage.findMany({
-    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-    select: { barcode: true, id: true, kind: true },
+  const products = await prisma.catalogProduct.findMany({
+    select: { barcode: true, id: true },
     where: { barcode: { in: [...unique] } },
   });
-  for (const row of rows) {
-    const list = byBarcode.get(row.barcode) ?? [];
-    list.push({
-      id: row.id,
-      kind: row.kind,
-      url: catalogImageUrl(row.id),
-    });
-    byBarcode.set(row.barcode, list);
+  const images = await loadCatalogImagesByProductIds(products.map((product) => product.id));
+  for (const product of products) {
+    if (!product.barcode) {
+      continue;
+    }
+    byBarcode.set(product.barcode, images.get(product.id) ?? []);
   }
   return byBarcode;
 }
 
+export async function loadCatalogImagesByNames(
+  names: readonly string[],
+): Promise<Map<string, CatalogProductImageView[]>> {
+  const unique = [...new Set(names.map((name) => name.trim()).filter((name) => name.length > 0))];
+  const byName = new Map<string, CatalogProductImageView[]>();
+  if (unique.length === 0) {
+    return byName;
+  }
+  const products = await prisma.catalogProduct.findMany({
+    select: { id: true, name: true },
+    where: { barcode: null, name: { in: unique, mode: "insensitive" } },
+  });
+  const images = await loadCatalogImagesByProductIds(products.map((product) => product.id));
+  for (const product of products) {
+    byName.set(product.name.trim().toLowerCase(), images.get(product.id) ?? []);
+  }
+  return byName;
+}
+
 export async function attachCatalogProductPhotos(input: {
-  barcode: string;
   photos: readonly CatalogPhotoInput[] | undefined;
+  productId: string;
   sessionId: string | undefined;
   turnId: string | undefined;
 }): Promise<CatalogProductImageView[]> {
@@ -52,8 +93,8 @@ export async function attachCatalogProductPhotos(input: {
     input.sessionId === undefined ||
     input.turnId === undefined
   ) {
-    const existing = await loadCatalogImagesByBarcodes([input.barcode]);
-    return existing.get(input.barcode) ?? [];
+    const existing = await loadCatalogImagesByProductIds([input.productId]);
+    return existing.get(input.productId) ?? [];
   }
   const attachments = await listTurnImageAttachments(input.sessionId, input.turnId);
   const links = resolveTurnPhotoLinks(attachments, input.photos);
@@ -62,8 +103,8 @@ export async function attachCatalogProductPhotos(input: {
       await prisma.catalogProductImage.upsert({
         create: {
           attachmentId: link.attachmentId,
-          barcode: input.barcode,
           kind: link.kind,
+          productId: input.productId,
           sortOrder: link.sortOrder,
         },
         update: {
@@ -71,9 +112,9 @@ export async function attachCatalogProductPhotos(input: {
           sortOrder: link.sortOrder,
         },
         where: {
-          barcode_attachmentId: {
+          productId_attachmentId: {
             attachmentId: link.attachmentId,
-            barcode: input.barcode,
+            productId: input.productId,
           },
         },
       });
@@ -81,8 +122,8 @@ export async function attachCatalogProductPhotos(input: {
       console.error("catalog product image attach failed", error);
     }
   }
-  const images = await loadCatalogImagesByBarcodes([input.barcode]);
-  return images.get(input.barcode) ?? [];
+  const images = await loadCatalogImagesByProductIds([input.productId]);
+  return images.get(input.productId) ?? [];
 }
 
 export async function getCatalogProductImage(id: string) {

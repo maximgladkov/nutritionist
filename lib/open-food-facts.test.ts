@@ -4,6 +4,7 @@ import { listCountries, normalizeCountryCode, toOpenFoodFactsCountry } from "./c
 import {
   getProductByBarcode,
   InvalidBarcodeError,
+  isValidBarcode,
   offCatalog,
   searchProductsByName,
 } from "./open-food-facts.ts";
@@ -47,6 +48,20 @@ describe("toOpenFoodFactsCountry", () => {
 
   it("leaves other codes unchanged", () => {
     assert.equal(toOpenFoodFactsCountry("us"), "us");
+  });
+});
+
+describe("isValidBarcode", () => {
+  it("accepts real GTINs with a valid checksum", () => {
+    assert.equal(isValidBarcode("3017624010701"), true);
+    assert.equal(isValidBarcode("7300400481595"), true);
+    assert.equal(isValidBarcode("00000000"), true);
+  });
+
+  it("rejects invented codes and checksum failures", () => {
+    assert.equal(isValidBarcode("abc"), false);
+    assert.equal(isValidBarcode("MILSANI001"), false);
+    assert.equal(isValidBarcode("843670100001"), false);
   });
 });
 
@@ -98,6 +113,7 @@ describe("getProductByBarcode", () => {
       throw new Error("should not fetch");
     });
     await assert.rejects(() => getProductByBarcode("abc"), InvalidBarcodeError);
+    await assert.rejects(() => getProductByBarcode("843670100001"), InvalidBarcodeError);
     assert.equal(fetchMock.mock.callCount(), 0);
   });
 });
