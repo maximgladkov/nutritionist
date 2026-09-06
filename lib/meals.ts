@@ -218,21 +218,61 @@ export function todaysMealWrite(existingMealId: string | null | undefined): Toda
   return { action: "create" };
 }
 
-export async function addItemToTodaysMeal(input: {
+export function mealWriteRange(input: {
+  date?: string;
+  now?: Date;
+  timeZone: string;
+}): { from: Date; to: Date } {
+  const date = input.date?.trim() ?? "";
+  if (date === "") {
+    return localDayRange(input.now ?? new Date(), input.timeZone);
+  }
+  const ymd = parseQueryDate(date, "date");
+  try {
+    return localInclusiveDateRange(input.timeZone, ymd, ymd);
+  } catch (error) {
+    if (error instanceof RangeError) {
+      throw new MealError(error.message);
+    }
+    throw error;
+  }
+}
+
+export function eatenAtForCreate(
+  eatenAt: Date | undefined,
+  now: Date,
+  range: { from: Date; to: Date },
+): Date {
+  const candidate = eatenAt ?? now;
+  if (candidate >= range.from && candidate < range.to) {
+    return candidate;
+  }
+  return range.from;
+}
+
+export async function upsertMealItems(input: {
   userId: string;
-  label: MealLabel;
-  item: MealItemInput;
+  items: MealItemInput[];
+  label?: MealLabel;
+  date?: string;
+  eatenAt?: Date;
   now?: Date;
   country?: string;
   signal?: AbortSignal;
 }): Promise<MealView> {
+  const now = input.now ?? new Date();
   const timeZone = (await callerTimezone(input.userId)) ?? "UTC";
-  const { from, to } = localDayRange(input.now ?? new Date(), timeZone);
+  const range = mealWriteRange({
+    date: input.date,
+    now: input.eatenAt ?? now,
+    timeZone,
+  });
+  const label = input.label ?? inferMealLabel(now, timeZone);
   const existing = await prisma.meal.findFirst({
     where: {
       userId: input.userId,
-      label: input.label,
-      eatenAt: { gte: from, lt: to },
+      label,
+      eatenAt: { gte: range.from, lt: range.to },
     },
     orderBy: { eatenAt: "desc" },
     select: { id: true },
@@ -242,16 +282,34 @@ export async function addItemToTodaysMeal(input: {
     return addMealItems({
       userId: input.userId,
       mealId: write.mealId,
-      items: [input.item],
+      items: input.items,
       country: input.country,
       signal: input.signal,
     });
   }
   return logMeal({
     userId: input.userId,
-    eatenAt: input.now,
+    eatenAt: eatenAtForCreate(input.eatenAt, now, range),
+    label,
+    items: input.items,
+    country: input.country,
+    signal: input.signal,
+  });
+}
+
+export async function addItemToTodaysMeal(input: {
+  userId: string;
+  label: MealLabel;
+  item: MealItemInput;
+  now?: Date;
+  country?: string;
+  signal?: AbortSignal;
+}): Promise<MealView> {
+  return upsertMealItems({
+    userId: input.userId,
     label: input.label,
     items: [input.item],
+    now: input.now,
     country: input.country,
     signal: input.signal,
   });
