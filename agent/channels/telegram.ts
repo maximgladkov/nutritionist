@@ -7,6 +7,7 @@ import {
   generateTelegramAckOrFalse,
   markTelegramTurnReplyPosted,
   startTelegramAckTurn,
+  telegramAckPostedRecently,
 } from "../../lib/telegram-ack-turn";
 import {
   appendAndClaimTelegramBurst,
@@ -20,6 +21,7 @@ import { markdownToTelegramHtml, telegramHtmlMessage } from "../../lib/telegram-
 import { attachTelegramVision } from "../../lib/telegram-vision";
 import { wrapTelegramLastMessageChannel, settleTelegramTurn } from "../../lib/telegram-last-message";
 import { persistTelegramConversationMessage } from "../../lib/conversation";
+import { beginLatencyTrace, chatLatencyKey, markLatency } from "../../lib/latency-log";
 import { appPrincipal } from "../../lib/principal";
 import { getLiveUserId } from "../lib/require-user";
 
@@ -39,7 +41,19 @@ export default wrapTelegramLastMessageChannel(
       turnPolicy: "queue",
       events: {
         async "message.completed"(data, channel, ctx) {
-          if (data.finishReason === "tool-calls" || !data.message) {
+          if (!data.message) {
+            return;
+          }
+          if (data.finishReason === "tool-calls") {
+            if (telegramAckPostedRecently(ctx.session.id, ctx.session.turn.id)) {
+              return;
+            }
+            const html = markdownToTelegramHtml(data.message);
+            try {
+              await channel.telegram.post(telegramHtmlMessage(html));
+            } catch {
+              await channel.telegram.post(data.message);
+            }
             return;
           }
           const html = markdownToTelegramHtml(data.message);
@@ -93,26 +107,29 @@ export default wrapTelegramLastMessageChannel(
         if (!(await claimTelegramMessage(message.chat.id, message.messageId))) {
           return null;
         }
+        beginLatencyTrace({ chatId: message.chat.id });
         void ctx.telegram.startTyping();
         applyTelegramHiddenMedia(message);
-        const burst = await appendAndClaimTelegramBurst({
+        const burstPromise = appendAndClaimTelegramBurst({
           chatId: message.chat.id,
           item: telegramBurstItemFromMessage(message),
         });
+        const userPromise = resolveChannelUser({
+          provider: "telegram",
+          providerUserId: from.id,
+          name: [from.firstName, from.lastName].filter(Boolean).join(" ") || from.username,
+        });
+        const [burst, user] = await Promise.all([burstPromise, userPromise]);
         if (!burst) {
           return null;
         }
+        markLatency(chatLatencyKey(message.chat.id), "burst_claimed");
         applyTelegramBurstMerge(message, mergeTelegramBurstItems(burst));
         const files = telegramAckFiles(message.attachments);
         const ackGenerated = generateTelegramAckOrFalse({
           caption: message.caption,
           files,
           text: message.text,
-        });
-        const user = await resolveChannelUser({
-          provider: "telegram",
-          providerUserId: from.id,
-          name: [from.firstName, from.lastName].filter(Boolean).join(" ") || from.username,
         });
         if (message.chat.type === "private") {
           void saveChannelThreadId({

@@ -91,12 +91,14 @@ export function wrapTelegramLastMessageSend<TState>(
       const overlapping = address.length > 0 ? tracker.begin(address) : false;
       return tracker.enqueue(address, async () => {
         try {
-          const recentContext =
-            overlapping || input?.loadRecentContext === undefined
-              ? undefined
-              : await loadRecentContextForSender(options, input.loadRecentContext);
+          const recentPromise =
+            input?.loadRecentContext === undefined
+              ? Promise.resolve(undefined)
+              : loadRecentContextForSender(options, input.loadRecentContext);
+          const clearPromise = overlapping === true ? Promise.resolve() : source.clear();
+          const [recentContext] = await Promise.all([recentPromise, clearPromise]);
           return await sendTelegramLastMessageTurn(source, message, options, {
-            overlapping,
+            overlapping: true,
             recentContext,
           });
         } catch (error) {

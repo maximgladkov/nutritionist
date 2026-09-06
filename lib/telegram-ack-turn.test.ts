@@ -9,8 +9,11 @@ import {
 import {
   shouldDeliverTelegramAck,
   startTelegramAckTurn,
+  telegramAckPostedRecently,
+  resetTelegramTurnReplyPosted,
   type TelegramAckTurnStore,
 } from "./telegram-ack-turn.ts";
+import { bindTelegramAckPosted, rememberTelegramAckPosted } from "./telegram-ack-posted.ts";
 import type { PendingAgentTurnAck } from "./agent-turn-ack.ts";
 
 const ack: TelegramAckGeneration = {
@@ -132,6 +135,19 @@ describe("startTelegramAckTurn", () => {
     assert.equal(world.abandoned[0], world.reserved[0]);
     assert.equal(world.completed.length, 0);
     assert.deepEqual(world.sent, ["Quick reply failed: telegram ack timed out"]);
+  });
+});
+
+describe("telegramAckPostedRecently", () => {
+  it("is true only after an ack is remembered and bound to the turn", () => {
+    resetTelegramTurnReplyPosted();
+    assert.equal(telegramAckPostedRecently("sess", "turn"), false);
+    rememberTelegramAckPosted("pending_1");
+    assert.equal(telegramAckPostedRecently("sess", "turn"), false);
+    bindTelegramAckPosted("pending_1", "sess", "turn");
+    assert.equal(telegramAckPostedRecently("sess", "turn"), true);
+    assert.equal(telegramAckPostedRecently("sess", "turn", 0), false);
+    resetTelegramTurnReplyPosted();
   });
 });
 

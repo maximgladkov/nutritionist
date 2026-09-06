@@ -1,5 +1,6 @@
 import { Prisma } from "../generated/prisma/client.ts";
 import { prisma } from "./prisma.ts";
+import { bindTelegramAckPosted } from "./telegram-ack-posted.ts";
 
 export type PendingAgentTurnAck = {
   readonly at: string;
@@ -74,6 +75,7 @@ export async function claimPendingAgentTurnAck(input: {
       data: { sessionId: input.sessionId, turnId: input.turnId },
       where: { id: row.id },
     });
+    bindTelegramAckPosted(row.id, input.sessionId, input.turnId);
     const claimed = await tx.agentTurnPendingAck.findUnique({ where: { id: row.id } });
     if (!claimed) {
       return null;

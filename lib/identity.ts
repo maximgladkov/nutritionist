@@ -132,15 +132,36 @@ export async function consumeLinkCode(
   return { status: "merged", user: decision.survivor };
 }
 
+const AUTHENTICATED_USER_TTL_MS = 60_000;
+
+type AuthenticatedUserCacheEntry = {
+  expiresAt: number;
+  userId: string | undefined;
+};
+
+const authenticatedUserCache = new Map<string, AuthenticatedUserCacheEntry>();
+
+export function resetAuthenticatedUserIdCache(): void {
+  authenticatedUserCache.clear();
+}
+
 export async function resolveAuthenticatedUserId(input: {
   eveSessionId: string;
   principalId?: string;
 }): Promise<string | undefined> {
+  const cached = authenticatedUserCache.get(input.eveSessionId);
+  if (cached !== undefined && cached.expiresAt > Date.now()) {
+    return cached.userId;
+  }
   const session = await prisma.agentSession.findUnique({
     where: { eveSessionId: input.eveSessionId },
     select: { userId: true },
   });
   if (session) {
+    authenticatedUserCache.set(input.eveSessionId, {
+      expiresAt: Date.now() + AUTHENTICATED_USER_TTL_MS,
+      userId: session.userId,
+    });
     return session.userId;
   }
   const principal = input.principalId
@@ -149,11 +170,16 @@ export async function resolveAuthenticatedUserId(input: {
         select: { id: true },
       })
     : null;
-  return selectLiveUserId({
+  const userId = selectLiveUserId({
     sessionUserId: undefined,
     principalId: input.principalId,
     principalExists: Boolean(principal),
   });
+  authenticatedUserCache.set(input.eveSessionId, {
+    expiresAt: Date.now() + AUTHENTICATED_USER_TTL_MS,
+    userId,
+  });
+  return userId;
 }
 
 export async function mergeUsers(survivorId: string, absorbedId: string): Promise<void> {

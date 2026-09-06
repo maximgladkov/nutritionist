@@ -406,6 +406,7 @@ model TelegramInboundBurstItem {
   text         String    @default("")
   caption      String    @default("")
   attachments  Json
+  mediaGroupId String?
   createdAt    DateTime  @default(now())
   consumedAt   DateTime?
 

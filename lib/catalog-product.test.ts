@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   catalogNutrimentsHaveValues,
   decideCatalogSave,
+  mergeCatalogSearchResults,
   mergeProductSearch,
   pickNutriments,
   preferProduct,
@@ -132,5 +133,25 @@ describe("mergeProductSearch", () => {
     assert.equal(merged.products[0]?.name, "Off Dup");
     assert.equal(merged.products[0]?.source, "open-food-facts");
     assert.equal(merged.products[0]?.hasNutrition, true);
+  });
+});
+
+describe("mergeCatalogSearchResults", () => {
+  it("dedupes barcodes and prefers custom catalog nutrition", () => {
+    const merged = mergeCatalogSearchResults([
+      {
+        count: 1,
+        page: 1,
+        products: [{ ...product("111", "Off Yogurt", { energyKcal100g: 80 }), hasNutrition: true, source: "open-food-facts" }],
+      },
+      {
+        count: 1,
+        page: 1,
+        products: [{ ...product("111", "My Yogurt", { energyKcal100g: 90 }), hasNutrition: true, source: "custom-catalog" }],
+      },
+    ]);
+    assert.equal(merged.count, 1);
+    assert.equal(merged.products[0]?.name, "My Yogurt");
+    assert.equal(merged.products[0]?.source, "custom-catalog");
   });
 });

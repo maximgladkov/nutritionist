@@ -20,11 +20,31 @@ import {
 import { EVE_URL_PREFIX, TELEGRAM_FILE_PREFIX } from "./user-attachments-query.ts";
 
 export type PersistTurnMediaFile = {
+  bytesBase64?: string;
   fileId: string;
   filename?: string;
   index: number;
   mediaType?: string;
 };
+
+const MAX_WORKFLOW_FILE_BYTES = 1024 * 1024;
+const telegramFileBytes = new Map<string, Buffer>();
+
+export function rememberTelegramFileBytes(fileId: string, bytes: Buffer): void {
+  telegramFileBytes.set(fileId, bytes);
+}
+
+export function resetTelegramFileBytes(): void {
+  telegramFileBytes.clear();
+}
+
+function telegramFileBytesBase64(fileId: string): string | undefined {
+  const bytes = telegramFileBytes.get(fileId);
+  if (!bytes || bytes.byteLength > MAX_WORKFLOW_FILE_BYTES) {
+    return undefined;
+  }
+  return bytes.toString("base64");
+}
 
 export type PersistTurnMediaInput = {
   channel: string;
@@ -136,13 +156,14 @@ export function transcriptHasUserMessage(transcript: AgentTurnTranscript) {
 
 export async function persistTurnMedia(input: PersistTurnMediaInput): Promise<{ patched: boolean }> {
   for (const file of input.files) {
-    const fetched = await fetchTelegramFileBytes(file.fileId);
+    const fetched = await resolveTurnMediaBytes(file);
     if (fetched === null) {
       continue;
     }
     await persistUserAttachment({
       bytes: fetched.bytes,
       channel: input.channel,
+      fileId: file.fileId,
       filename: file.filename,
       index: file.index,
       mediaType: file.mediaType ?? "application/octet-stream",
@@ -182,7 +203,25 @@ export function schedulePersistTurnMedia(input: PersistTurnMediaInput): void {
   if (input.files.length === 0) {
     return;
   }
-  void startPersistTurnMediaRun(input);
+  const files = input.files.map((file) => {
+    if (file.bytesBase64 !== undefined) {
+      return file;
+    }
+    const bytesBase64 = telegramFileBytesBase64(file.fileId);
+    return bytesBase64 === undefined ? file : { ...file, bytesBase64 };
+  });
+  void startPersistTurnMediaRun({ ...input, files });
+}
+
+async function resolveTurnMediaBytes(file: PersistTurnMediaFile): Promise<{ bytes: Buffer } | null> {
+  if (file.bytesBase64 !== undefined) {
+    return { bytes: Buffer.from(file.bytesBase64, "base64") };
+  }
+  const cached = telegramFileBytes.get(file.fileId);
+  if (cached) {
+    return { bytes: cached };
+  }
+  return fetchTelegramFileBytes(file.fileId);
 }
 
 async function enqueueTranscriptAttachmentPatch(input: PersistTurnMediaInput): Promise<{ patched: boolean }> {

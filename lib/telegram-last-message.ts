@@ -11,6 +11,7 @@ import {
   persistTelegramConversationMessage,
   TELEGRAM_CONVERSATION_CHANNEL,
 } from "./conversation.ts";
+import { bindLatencySession, markLatency, sessionLatencyKey } from "./latency-log.ts";
 import { settleTelegramTurn, wrapTelegramLastMessageSend } from "./telegram-last-message-turn.ts";
 
 export function wrapTelegramLastMessageChannel<TState, TReceiveTarget, TMetadata extends Record<string, unknown>>(
@@ -39,6 +40,17 @@ export function wrapTelegramLastMessageSource<TState>(
     ...lastMessage,
     async send(message, options) {
       const session = await lastMessage.send(message, options);
+      const state = "state" in options ? options.state : undefined;
+      const chatId =
+        state !== undefined && typeof state === "object" && state !== null && "chatId" in state
+          ? typeof state.chatId === "string" || typeof state.chatId === "number"
+            ? String(state.chatId)
+            : address
+          : address;
+      if (chatId.length > 0) {
+        bindLatencySession(chatId, session.id);
+      }
+      markLatency(sessionLatencyKey(session.id), "send_returned");
       const userId = options.auth?.principalType === "user" ? options.auth.principalId : undefined;
       await persistTelegramConversationMessage({
         role: "user",

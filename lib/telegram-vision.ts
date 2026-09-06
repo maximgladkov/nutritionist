@@ -1,8 +1,8 @@
-import type { FilePart, UserContent } from "ai";
+import type { FilePart, ImagePart, UserContent } from "ai";
 import { normalizeChannelKind } from "./agent-turn-model.ts";
 import { isImageMediaType, looksLikeImageFilename, sniffImageMediaType } from "./image-bytes.ts";
-import { persistTurnMediaFilesFromMessage, schedulePersistTurnMedia } from "./persist-turn-media.ts";
-import { PENDING_ATTACHMENT_TURN_ID } from "./user-attachments-query.ts";
+import { rememberTelegramFileBytes } from "./persist-turn-media.ts";
+import { PENDING_ATTACHMENT_TURN_ID, telegramFileIdFromUrl } from "./user-attachments-query.ts";
 
 export function isAudioMediaType(mediaType: string | undefined): boolean {
   return mediaType?.toLowerCase().startsWith("audio/") === true && mediaType.toLowerCase() !== "audio/*";
@@ -34,6 +34,8 @@ type ChannelAdapterLike = {
   ) => Promise<Buffer | { bytes: Buffer; mediaType?: string } | null>;
 };
 
+const INLINE_FETCH_CONCURRENCY = 4;
+
 export async function inlineTelegramImages(
   content: string | UserContent,
   fetchFile: TelegramFileFetch,
@@ -41,11 +43,7 @@ export async function inlineTelegramImages(
   if (typeof content === "string" || !Array.isArray(content)) {
     return content;
   }
-  const parts = [];
-  for (const part of content) {
-    parts.push(await inlineTelegramImagePart(part, fetchFile));
-  }
-  return parts as UserContent;
+  return mapPool(content, INLINE_FETCH_CONCURRENCY, (part) => inlineTelegramImagePart(part, fetchFile)) as Promise<UserContent>;
 }
 
 export function attachTelegramVision<T extends object>(channel: T, fetchFile: TelegramFileFetch): T {
@@ -67,14 +65,7 @@ export function attachTelegramVision<T extends object>(channel: T, fetchFile: Te
     if (!isRecord(step) || step.message === undefined) {
       return delivered ?? payload;
     }
-    const persist = persistScopeFromDeliver(ctx);
     const originalMessage = step.message as string | UserContent;
-    if (persist) {
-      schedulePersistTurnMedia({
-        ...persist,
-        files: persistTurnMediaFilesFromMessage(originalMessage),
-      });
-    }
     return {
       ...step,
       message: await inlineTelegramImages(
@@ -132,13 +123,17 @@ async function inlineTelegramImagePart(
     if (mediaType === undefined) {
       return part;
     }
-    return visionFilePart(bytes, mediaType, part.filename);
+    const fileId = telegramFileIdFromUrl(url);
+    if (fileId) {
+      rememberTelegramFileBytes(fileId, Buffer.from(bytes));
+    }
+    return visionMediaPart(bytes, mediaType, part.filename);
   } catch {
     return part;
   }
 }
 
-function inlineLocalFilePart(part: FilePart): FilePart {
+function inlineLocalFilePart(part: FilePart): FilePart | ImagePart {
   const bytes = localFileBytes(part.data);
   if (bytes === null || !shouldInlineTelegramFile(part.mediaType, part.filename)) {
     return part;
@@ -147,16 +142,41 @@ function inlineLocalFilePart(part: FilePart): FilePart {
   if (mediaType === undefined) {
     return part;
   }
-  return visionFilePart(bytes, mediaType, part.filename);
+  return visionMediaPart(bytes, mediaType, part.filename);
 }
 
-function visionFilePart(bytes: Uint8Array, mediaType: string, filename?: string): FilePart {
+function visionMediaPart(bytes: Uint8Array, mediaType: string, filename?: string): FilePart | ImagePart {
+  if (isImageMediaType(mediaType)) {
+    return {
+      type: "image",
+      mediaType,
+      image: Buffer.from(bytes).toString("base64"),
+    };
+  }
   return {
     type: "file",
     mediaType,
     ...(filename === undefined ? {} : { filename }),
     data: { type: "data", data: Buffer.from(bytes).toString("base64") },
   };
+}
+
+async function mapPool<T, R>(items: readonly T[], concurrency: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (true) {
+      const index = next;
+      next += 1;
+      if (index >= items.length) {
+        return;
+      }
+      results[index] = await fn(items[index] as T);
+    }
+  }
+  const workers = Math.min(Math.max(concurrency, 1), items.length);
+  await Promise.all(Array.from({ length: workers }, () => worker()));
+  return results;
 }
 
 function shouldInlineTelegramFile(mediaType: string | undefined, filename: string | undefined) {

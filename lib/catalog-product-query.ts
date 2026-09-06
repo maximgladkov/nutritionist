@@ -108,6 +108,38 @@ export function mergeProductSearch(local: Product[], remote: ProductSearchResult
   };
 }
 
+export function mergeCatalogSearchResults(results: readonly CatalogSearchResult[]): CatalogSearchResult {
+  const byBarcode = new Map<string, CatalogSearchProduct>();
+  for (const result of results) {
+    for (const product of result.products) {
+      const existing = byBarcode.get(product.barcode);
+      if (!existing) {
+        byBarcode.set(product.barcode, product);
+        continue;
+      }
+      const catalog =
+        existing.source === "custom-catalog" ? existing : product.source === "custom-catalog" ? product : undefined;
+      const off =
+        existing.source === "open-food-facts" ? existing : product.source === "open-food-facts" ? product : undefined;
+      const preferred = preferProduct(catalog, off);
+      if (!preferred) {
+        continue;
+      }
+      byBarcode.set(product.barcode, {
+        ...preferred.product,
+        hasNutrition: catalogNutrimentsHaveValues(preferred.product.nutriments),
+        source: preferred.source,
+      });
+    }
+  }
+  const products = [...byBarcode.values()];
+  return {
+    count: products.length,
+    page: results[0]?.page ?? 1,
+    products,
+  };
+}
+
 export function pickNutriments(value: ProductNutriments | Record<string, unknown>): ProductNutriments {
   const nutriments: ProductNutriments = {};
   for (const key of NUTRIMENT_KEYS) {

@@ -1,6 +1,7 @@
 import { defineHook } from "eve/hooks";
 import type { HookContext } from "eve/hooks";
 import { resolveAuthenticatedUserId } from "../../lib/identity";
+import { markLatency, sessionLatencyKey } from "../../lib/latency-log";
 import { prisma } from "../../lib/prisma";
 import { claimPendingAgentTurnAck } from "../../lib/agent-turn-ack";
 import {
@@ -14,9 +15,10 @@ import {
   drainAgentTurnPersist,
   enqueueAgentTurnPersist,
   finalizeAgentTurn,
-  findAgentTurnModel,
   normalizeChannelKind,
   patchAgentTurnTranscript,
+  peekAgentTurnModel,
+  rememberAgentTurnModel,
   startAgentTurn,
   toolCallsFromActions,
   toolResultFromAction,
@@ -27,6 +29,7 @@ import { persistTurnMediaFilesFromParts, schedulePersistTurnMedia } from "../../
 export default defineHook({
   events: {
     "turn.started"(event, ctx) {
+      markLatency(sessionLatencyKey(ctx.session.id), "turn.started", { turnId: event.data.turnId });
       persistTurnEvent("turn.started", ctx, event.data.turnId, event.meta.at, async (scope) => {
         await startAgentTurn({
           channel: scope.channel,
@@ -47,8 +50,8 @@ export default defineHook({
         }
       });
     },
-    async "message.received"(event, ctx) {
-      await persistTurnEvent("message.received", ctx, event.data.turnId, event.meta.at, async (scope) => {
+    "message.received"(event, ctx) {
+      persistTurnEvent("message.received", ctx, event.data.turnId, event.meta.at, async (scope) => {
         const parts = receivedParts(event.data.parts);
         await patchAgentTurnTranscript(scope, (transcript) =>
           applyUserMessage(transcript, {
@@ -67,6 +70,13 @@ export default defineHook({
       });
     },
     "step.started"(event, ctx) {
+      if (event.data.stepIndex === 0) {
+        markLatency(sessionLatencyKey(ctx.session.id), "step.started", {
+          model: event.data.modelId,
+          stepIndex: event.data.stepIndex,
+        });
+      }
+      rememberAgentTurnModel(ctx.session.id, event.data.turnId, event.data.modelId);
       persistTurnEvent("step.started", ctx, event.data.turnId, event.meta.at, async (scope) => {
         await patchAgentTurnTranscript(
           { ...scope, model: event.data.modelId },
@@ -113,6 +123,10 @@ export default defineHook({
       });
     },
     "message.completed"(event, ctx) {
+      markLatency(sessionLatencyKey(ctx.session.id), "message.completed", {
+        finishReason: event.data.finishReason,
+        stepIndex: event.data.stepIndex,
+      });
       persistTurnEvent("message.completed", ctx, event.data.turnId, event.meta.at, async (scope) => {
         const text = event.data.message?.trim() ?? "";
         if (text.length === 0) {
@@ -130,8 +144,7 @@ export default defineHook({
     },
     "step.completed"(event, ctx) {
       persistTurnEvent("step.completed", ctx, event.data.turnId, event.meta.at, async (scope) => {
-        const existing = await findAgentTurnModel(ctx.session.id, event.data.turnId);
-        const model = existing?.model ?? "unknown";
+        const model = peekAgentTurnModel(ctx.session.id, event.data.turnId) ?? "unknown";
         await patchAgentTurnTranscript({ ...scope, model }, (transcript) =>
           applyStepCompleted(transcript, {
             cacheReadTokens: event.data.usage?.cacheReadTokens,

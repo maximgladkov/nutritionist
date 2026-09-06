@@ -84,12 +84,24 @@ export function safeAttachmentFilename(
 ) {
   const raw = filename?.trim() || fallbackFilename(index, mediaType);
   const base = raw.split(/[/\\]/u).at(-1)?.trim() || fallbackFilename(index, mediaType);
-  const cleaned = base.replaceAll(/[^\w.+-]+/gu, "_").replaceAll(/^_+|_+$/gu, "");
+  const cleaned = sanitizeAttachmentToken(base);
   return cleaned.length > 0 ? cleaned.slice(0, 180) : fallbackFilename(index, mediaType);
 }
 
-export function attachmentBlobPath(sessionId: string, turnId: string, filename: string, index = 0) {
-  return `attachments/${sessionId}/${turnId}/${index}-${filename}`;
+export function attachmentBlobPath(
+  sessionId: string,
+  turnId: string,
+  filename: string,
+  index = 0,
+  uniqueKey?: string,
+) {
+  const key = uniqueKey === undefined ? "" : sanitizeAttachmentToken(uniqueKey).slice(0, 80);
+  const prefix = key.length > 0 ? `${index}-${key}` : `${index}`;
+  return `attachments/${sessionId}/${turnId}/${prefix}-${filename}`;
+}
+
+export function shouldReuseAttachmentRow(existingTurnId: string, incomingTurnId: string) {
+  return existingTurnId === incomingTurnId || existingTurnId === PENDING_ATTACHMENT_TURN_ID;
 }
 
 export function decodeDataUrl(url: string): { bytes: Buffer; mediaType: string } | null {
@@ -111,6 +123,10 @@ export function decodeDataUrl(url: string): { bytes: Buffer; mediaType: string }
   } catch {
     return null;
   }
+}
+
+function sanitizeAttachmentToken(value: string) {
+  return value.replaceAll(/[^\w.+-]+/gu, "_").replaceAll(/^_+|_+$/gu, "");
 }
 
 function fallbackFilename(index: number, mediaType: string) {

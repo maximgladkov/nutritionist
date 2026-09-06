@@ -79,10 +79,9 @@ describe("inlineTelegramImages", () => {
     assert.deepEqual(content, [
       { type: "text", text: "Add 100 ml" },
       {
-        type: "file",
+        type: "image",
         mediaType: "image/jpeg",
-        filename: "photo.jpg",
-        data: { type: "data", data: jpeg.toString("base64") },
+        image: jpeg.toString("base64"),
       },
     ]);
   });
@@ -140,9 +139,10 @@ describe("inlineTelegramImages", () => {
       {},
     );
 
-    const message = (result as { message: Array<{ type: string; data?: { type: string } }> }).message[0];
-    assert.equal(message?.type, "file");
-    assert.equal(message?.data?.type, "data");
+    const message = (result as { message: Array<{ type: string; image?: string; mediaType?: string }> }).message[0];
+    assert.equal(message?.type, "image");
+    assert.equal(message?.mediaType, "image/jpeg");
+    assert.equal(message?.image, jpeg.toString("base64"));
   });
 
   it("builds a persist scope from telegram deliver context without a turn id", () => {
@@ -180,6 +180,30 @@ describe("inlineTelegramImages", () => {
 
     assert.deepEqual(JSON.parse(JSON.stringify(content)), content);
     assert.equal(isJsonValue(content), true);
+  });
+
+  it("fetches image parts concurrently", async () => {
+    const started: string[] = [];
+    let release: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const pending = inlineTelegramImages(
+      [
+        { type: "file", mediaType: "image/jpeg", filename: "a.jpg", data: "telegram-file:a" },
+        { type: "file", mediaType: "image/jpeg", filename: "b.jpg", data: "telegram-file:b" },
+      ],
+      async (url) => {
+        started.push(url);
+        await gate;
+        return { bytes: jpeg, mediaType: "image/jpeg" };
+      },
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.equal(started.length, 2);
+    release?.();
+    await pending;
   });
 
   it("inlines telegram audio and video file parts", async () => {

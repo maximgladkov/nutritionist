@@ -9,8 +9,10 @@ import {
   isCatalogImageUrl,
   isHttpOrHttpsUrl,
   isOversizeBytes,
+  PENDING_ATTACHMENT_TURN_ID,
   recoverableAttachmentKind,
   safeAttachmentFilename,
+  shouldReuseAttachmentRow,
   telegramFileIdFromUrl,
   USER_ATTACHMENT_MAX_BYTES,
 } from "./user-attachments-query.ts";
@@ -40,6 +42,27 @@ describe("attachment naming", () => {
       attachmentBlobPath("sess", "pending", "meal.jpg", 1),
       "attachments/sess/pending/1-meal.jpg",
     );
+    assert.equal(
+      attachmentBlobPath("sess", "pending", "photo.jpg", 0, "AgAC1"),
+      "attachments/sess/pending/0-AgAC1-photo.jpg",
+    );
+    assert.notEqual(
+      attachmentBlobPath("sess", "pending", "photo.jpg", 0, "AgAC1"),
+      attachmentBlobPath("sess", "pending", "photo.jpg", 0, "AgAC2"),
+    );
+  });
+});
+
+describe("shouldReuseAttachmentRow", () => {
+  it("reuses a still-pending row or the same turn", () => {
+    assert.equal(shouldReuseAttachmentRow(PENDING_ATTACHMENT_TURN_ID, PENDING_ATTACHMENT_TURN_ID), true);
+    assert.equal(shouldReuseAttachmentRow(PENDING_ATTACHMENT_TURN_ID, "turn_60"), true);
+    assert.equal(shouldReuseAttachmentRow("turn_60", "turn_60"), true);
+  });
+
+  it("does not reuse a row already claimed to another turn", () => {
+    assert.equal(shouldReuseAttachmentRow("turn_52", PENDING_ATTACHMENT_TURN_ID), false);
+    assert.equal(shouldReuseAttachmentRow("turn_52", "turn_60"), false);
   });
 });
 

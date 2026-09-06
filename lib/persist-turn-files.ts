@@ -228,6 +228,7 @@ async function persistFromPartUrl(
     return persistUserAttachment({
       bytes: fetched.bytes,
       channel: scope.channel,
+      fileId: telegramFileId,
       filename: part.filename,
       index,
       mediaType: part.mediaType ?? "application/octet-stream",

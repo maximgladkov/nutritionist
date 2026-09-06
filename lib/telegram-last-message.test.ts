@@ -130,7 +130,7 @@ describe("wrapTelegramLastMessageSend", () => {
     assert.deepEqual(order, ["clear", "send:yogurt", "send:and an apple", "clear", "send:later"]);
   });
 
-  it("injects recent context only on idle sends", async () => {
+  it("injects recent context on idle and overlapping sends", async () => {
     const contexts: Array<readonly string[] | undefined> = [];
     const tracker = createTelegramTurnTracker();
     const source = testSource({
@@ -147,7 +147,7 @@ describe("wrapTelegramLastMessageSend", () => {
     await wrapped.send("yes", { auth, context: ["ack hint"], state: { chatId: "1" } });
     await wrapped.send("the first", { auth, context: ["ack hint"], state: { chatId: "1" } });
     assert.deepEqual(contexts[0], ["ack hint", "User: yogurt\nAssistant: which one?"]);
-    assert.deepEqual(contexts[1], ["ack hint"]);
+    assert.deepEqual(contexts[1], ["ack hint", "User: yogurt\nAssistant: which one?"]);
   });
 
   it("keeps overlapping sends behind the in-flight dispatch", async () => {
@@ -179,9 +179,15 @@ describe("wrapTelegramLastMessageSend", () => {
     const first = wrapped.send("yogurt", { auth, state: { chatId: "1" } });
     const second = wrapped.send("apple", { auth, state: { chatId: "1" } });
     await Promise.resolve();
-    assert.deepEqual(order, ["load"]);
+    await Promise.resolve();
+    assert.equal(order.includes("send:yogurt"), false);
+    assert.equal(order.includes("load"), true);
+    assert.equal(order.includes("clear"), true);
     release?.();
     await Promise.all([first, second]);
-    assert.deepEqual(order, ["load", "clear", "send:yogurt", "send:apple"]);
+    assert.deepEqual(
+      order.filter((entry) => entry.startsWith("send:")),
+      ["send:yogurt", "send:apple"],
+    );
   });
 });

@@ -19,6 +19,12 @@ import {
   type TelegramAckGeneration,
   type TelegramAckInput,
 } from "./telegram-ack.ts";
+import {
+  bindTelegramAckPosted,
+  rememberTelegramAckPosted,
+  telegramAckTurnKey,
+  resetTelegramAckPosted,
+} from "./telegram-ack-posted.ts";
 
 type TelegramAckSender = {
   sendMessage: (message: string) => Promise<unknown>;
@@ -37,9 +43,7 @@ export type TelegramAckTurnStore = {
   reserve(userId: string): Promise<string>;
 };
 
-export function telegramAckTurnKey(sessionId: string, turnId: string) {
-  return `${sessionId}:${turnId}`;
-}
+export { telegramAckPostedRecently, telegramAckTurnKey } from "./telegram-ack-posted.ts";
 
 export function markTelegramTurnReplyPosted(sessionId: string, turnId: string): void {
   replyPostedTurns.add(telegramAckTurnKey(sessionId, turnId));
@@ -51,6 +55,7 @@ export function telegramTurnReplyPosted(sessionId: string, turnId: string): bool
 
 export function resetTelegramTurnReplyPosted(): void {
   replyPostedTurns.clear();
+  resetTelegramAckPosted();
 }
 
 export function shouldDeliverTelegramAck(input: {
@@ -94,6 +99,9 @@ export function prismaTelegramAckTurnStore(): TelegramAckTurnStore {
       });
       if (!filled) {
         return null;
+      }
+      if (filled.sessionId && filled.turnId) {
+        bindTelegramAckPosted(id, filled.sessionId, filled.turnId);
       }
       return { sessionId: filled.sessionId, turnId: filled.turnId };
     },
@@ -175,12 +183,14 @@ export async function settleTelegramAckTurn(input: {
   if (deliver) {
     try {
       await input.telegram.sendMessage(ack.text);
+      rememberTelegramAckPosted(input.pendingId);
     } catch (deliveryError) {
       console.error("telegram ack error delivery failed", deliveryError);
     }
   }
   const claimed = await input.store.complete(input.pendingId, ack);
   if (claimed?.sessionId && claimed.turnId) {
+    bindTelegramAckPosted(input.pendingId, claimed.sessionId, claimed.turnId);
     const pending: PendingAgentTurnAck = {
       at: new Date().toISOString(),
       cacheReadTokens: ack.cacheReadTokens,

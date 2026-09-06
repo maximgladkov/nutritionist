@@ -2,6 +2,7 @@ import type { Prisma } from "../generated/prisma/client";
 import {
   catalogNutrimentsHaveValues,
   decideCatalogSave,
+  mergeCatalogSearchResults,
   mergeProductSearch,
   pickNutriments,
   preferProduct,
@@ -49,6 +50,7 @@ export type SaveCatalogProductResult =
 
 export {
   catalogNutrimentsHaveValues,
+  mergeCatalogSearchResults,
   mergeProductSearch,
   preferProduct,
   type CatalogSearchResult,
@@ -89,6 +91,18 @@ export async function searchCatalogAndOpenFoodFacts(
     searchCatalogProducts(query),
   ]);
   return mergeProductSearch(local, remote);
+}
+
+export async function searchCatalogAndOpenFoodFactsMany(
+  queries: readonly string[],
+  options: { country?: string; pageSize?: number; signal?: AbortSignal } = {},
+): Promise<CatalogSearchResult> {
+  const unique = [...new Set(queries.map((query) => query.trim()).filter((query) => query.length > 0))].slice(0, 6);
+  if (unique.length === 0) {
+    return { count: 0, page: 1, products: [] };
+  }
+  const results = await Promise.all(unique.map((query) => searchCatalogAndOpenFoodFacts(query, options)));
+  return mergeCatalogSearchResults(results);
 }
 
 export async function saveCatalogProduct(input: SaveCatalogProductInput): Promise<SaveCatalogProductResult> {

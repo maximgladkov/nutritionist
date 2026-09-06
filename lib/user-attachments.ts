@@ -6,6 +6,7 @@ import {
   isOversizeBytes,
   PENDING_ATTACHMENT_TURN_ID,
   safeAttachmentFilename,
+  shouldReuseAttachmentRow,
 } from "./user-attachments-query.ts";
 
 export {
@@ -22,6 +23,7 @@ export {
   PENDING_ATTACHMENT_TURN_ID,
   recoverableAttachmentKind,
   safeAttachmentFilename,
+  shouldReuseAttachmentRow,
   telegramFileIdFromUrl,
   USER_ATTACHMENT_MAX_BYTES,
   USER_ATTACHMENT_PREFIX,
@@ -32,6 +34,7 @@ export {
 export type PersistUserAttachmentInput = {
   bytes: Uint8Array;
   channel: string;
+  fileId?: string;
   filename?: string;
   index?: number;
   mediaType: string;
@@ -58,10 +61,27 @@ export async function persistUserAttachment(
   }
   const index = input.index ?? 0;
   const filename = safeAttachmentFilename(input.filename, index, input.mediaType);
-  const blobPath = attachmentBlobPath(input.sessionId, input.turnId, filename, index);
+  return writeUserAttachment(input, filename, index, size, persistUniqueKey(input));
+}
+
+async function writeUserAttachment(
+  input: PersistUserAttachmentInput,
+  filename: string,
+  index: number,
+  size: number,
+  uniqueKey: string | undefined,
+  attempt = 0,
+): Promise<PersistedUserAttachment | null> {
+  const blobPath = attachmentBlobPath(input.sessionId, input.turnId, filename, index, uniqueKey);
   const existing = await prisma.userAttachment.findUnique({ where: { blobPath } });
   if (existing) {
-    return toPersisted(existing);
+    if (shouldReuseAttachmentRow(existing.turnId, input.turnId)) {
+      return toPersisted(existing);
+    }
+    if (attempt >= 2) {
+      return null;
+    }
+    return writeUserAttachment(input, filename, index, size, nextUniqueKey(uniqueKey), attempt + 1);
   }
 
   let blobUrl: string;
@@ -97,7 +117,13 @@ export async function persistUserAttachment(
   } catch (error) {
     if (isUniqueConstraintError(error)) {
       const raced = await prisma.userAttachment.findUnique({ where: { blobPath } });
-      return raced ? toPersisted(raced) : null;
+      if (raced && shouldReuseAttachmentRow(raced.turnId, input.turnId)) {
+        return toPersisted(raced);
+      }
+      if (attempt < 2) {
+        return writeUserAttachment(input, filename, index, size, nextUniqueKey(uniqueKey), attempt + 1);
+      }
+      return null;
     }
     if (isForeignKeyError(error) && input.userId) {
       return persistUserAttachment({ ...input, userId: null });
@@ -105,6 +131,22 @@ export async function persistUserAttachment(
     console.error("user attachment persist failed", error);
     return null;
   }
+}
+
+function persistUniqueKey(input: PersistUserAttachmentInput): string | undefined {
+  const fileId = input.fileId?.trim();
+  if (fileId && fileId.length > 0) {
+    return fileId;
+  }
+  if (input.turnId === PENDING_ATTACHMENT_TURN_ID) {
+    return crypto.randomUUID();
+  }
+  return undefined;
+}
+
+function nextUniqueKey(uniqueKey: string | undefined) {
+  const extra = crypto.randomUUID();
+  return uniqueKey === undefined || uniqueKey.length === 0 ? extra : `${uniqueKey}-${extra}`;
 }
 
 export async function claimPendingTurnAttachments(sessionId: string, turnId: string): Promise<void> {

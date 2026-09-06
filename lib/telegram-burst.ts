@@ -3,13 +3,13 @@ import { Prisma } from "../generated/prisma/client.ts";
 import { prisma } from "./prisma.ts";
 
 export const TELEGRAM_BURST_MEDIA_DELAY_MS = 2000;
-export const TELEGRAM_BURST_TEXT_DELAY_MS = 400;
 
 export type TelegramBurstAttachment = TelegramAttachment;
 
 export type TelegramBurstItem = {
   attachments: TelegramBurstAttachment[];
   caption: string;
+  mediaGroupId?: string;
   messageId: string;
   text: string;
 };
@@ -22,10 +22,22 @@ export type TelegramBurstMerge = {
 
 type BurstSleep = (ms: number) => Promise<void>;
 
-export function telegramBurstDelayMs(items: readonly { attachments: readonly unknown[] }[]): number {
-  return items.some((item) => item.attachments.length > 0)
+export function telegramBurstDelayMs(items: readonly { mediaGroupId?: string }[]): number {
+  const latest = items.at(-1);
+  return latest?.mediaGroupId !== undefined && latest.mediaGroupId.length > 0
     ? TELEGRAM_BURST_MEDIA_DELAY_MS
-    : TELEGRAM_BURST_TEXT_DELAY_MS;
+    : 0;
+}
+
+export function telegramMediaGroupId(raw: Record<string, unknown> | undefined): string | undefined {
+  const value = raw?.media_group_id;
+  if (typeof value === "string" && value.length > 0) {
+    return value;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  return undefined;
 }
 
 export function mergeTelegramBurstItems(items: readonly TelegramBurstItem[]): TelegramBurstMerge {
@@ -66,11 +78,13 @@ export function applyTelegramBurstMerge(message: TelegramMessage, merge: Telegra
 }
 
 export function telegramBurstItemFromMessage(message: TelegramMessage): TelegramBurstItem {
+  const mediaGroupId = telegramMediaGroupId(message.raw);
   return {
     attachments: [...message.attachments],
     caption: message.caption,
     messageId: message.messageId,
     text: message.text,
+    ...(mediaGroupId === undefined ? {} : { mediaGroupId }),
   };
 }
 
@@ -92,6 +106,7 @@ async function appendTelegramBurstItem(chatId: string, item: TelegramBurstItem):
         attachments: item.attachments as unknown as Prisma.InputJsonValue,
         caption: item.caption,
         chatId,
+        mediaGroupId: item.mediaGroupId,
         messageId: item.messageId,
         text: item.text,
       },
@@ -150,6 +165,7 @@ export async function claimTelegramBurst(chatId: string, messageId: string): Pro
 function fromRow(row: {
   attachments: unknown;
   caption: string;
+  mediaGroupId: string | null;
   messageId: string;
   text: string;
 }): TelegramBurstItem {
@@ -158,6 +174,7 @@ function fromRow(row: {
     caption: row.caption,
     messageId: row.messageId,
     text: row.text,
+    ...(row.mediaGroupId === null || row.mediaGroupId.length === 0 ? {} : { mediaGroupId: row.mediaGroupId }),
   };
 }
 
