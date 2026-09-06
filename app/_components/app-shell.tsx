@@ -32,6 +32,10 @@ export function AppShell({
     return children;
   }
 
+  if (pathname.startsWith("/g/")) {
+    return children;
+  }
+
   if (embed) {
     return <MiniAppShell>{children}</MiniAppShell>;
   }
@@ -98,6 +102,9 @@ function tabFromPath(pathname: string): WebAppTab {
   if (pathname.startsWith("/products")) {
     return "products";
   }
+  if (pathname.startsWith("/groups")) {
+    return "groups";
+  }
   return "chat";
 }
 
@@ -110,6 +117,9 @@ function hrefForTab(tab: WebAppTab, pathname: string): string {
   }
   if (tab === "products") {
     return "/products";
+  }
+  if (tab === "groups") {
+    return "/groups";
   }
   if (pathname === "/" || pathname === "/s" || pathname.startsWith("/s/")) {
     return pathname;

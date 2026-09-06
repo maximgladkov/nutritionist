@@ -15,15 +15,15 @@ import {
 } from "@/app/actions/summary";
 import { goalRingsForToday, hasAnyGoal, type GoalsView } from "@/lib/goal-values";
 import { groupMealsByLabel } from "@/lib/meal-groups";
-import type { MealItemView, MealView } from "@/lib/meals";
 import { resolveMealStreak } from "@/lib/meal-streak";
-import { dayIndexWindows, ymdToDayIndex } from "@/lib/summary-days";
+import type { MealItemView, MealView } from "@/lib/meals";
 import type {
   NutritionDayBucket,
   NutritionDayPayload,
   NutritionDaysPayload,
   NutritionDiaryPayload,
 } from "@/lib/summary";
+import { dayIndexWindows, ymdToDayIndex } from "@/lib/summary-days";
 import { shiftYmd } from "@/lib/timezone";
 import { cn } from "@/lib/utils";
 import { Link, Spinner } from "@heroui/react";
@@ -223,11 +223,11 @@ export function NutritionSummaryApp({
     day?.timezoneIsFallback ?? diary?.day.timezoneIsFallback ?? initial?.day.timezoneIsFallback ?? false;
   const streakDays = today
     ? resolveMealStreak({
-        buckets: daysByDate,
-        serverStreak: diary?.mealStreak ?? initial?.mealStreak,
-        serverTodayMealCount: diary?.day.mealCount ?? initial?.day.mealCount,
-        today,
-      })
+      buckets: daysByDate,
+      serverStreak: diary?.mealStreak ?? initial?.mealStreak,
+      serverTodayMealCount: diary?.day.mealCount ?? initial?.day.mealCount,
+      today,
+    })
     : null;
 
   const onMutated = useCallback(() => {
@@ -245,16 +245,6 @@ export function NutritionSummaryApp({
             : "mx-auto flex w-full max-w-lg flex-col gap-5 overflow-y-auto px-4 py-6 sm:px-6 sm:py-8"
       }
     >
-      {embed || compact ? null : (
-        <div className="flex flex-col gap-1">
-          <h1 className="text-foreground text-xl font-semibold">
-            <Trans>Summary</Trans>
-          </h1>
-          <p className="text-muted text-sm">
-            <Trans>Calories and macros for the meals you have logged.</Trans>
-          </p>
-        </div>
-      )}
       <DayRingStrip
         active={foodActive}
         calendarOpen={calendarOpen}
@@ -267,11 +257,6 @@ export function NutritionSummaryApp({
         onVisibleRange={onVisibleRange}
         streakDays={streakDays}
       />
-      {calendarOpen ? null : timezoneIsFallback ? (
-        <p className="text-muted text-sm">
-          <Trans>Times use UTC until you save a time zone in Settings.</Trans>
-        </p>
-      ) : null}
       {calendarOpen ? null : errorMessage ? <p className="text-danger text-sm">{errorMessage}</p> : null}
       {calendarOpen ? null : day ? (
         <SelectedDayView

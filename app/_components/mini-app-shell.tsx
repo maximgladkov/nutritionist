@@ -15,7 +15,7 @@ export function useMiniAppFoodActive() {
 }
 
 export function MiniAppShell({ children }: { readonly children: ReactNode }) {
-  const [tab, setTab] = useState<MiniAppTab>("food");
+  const [tab, setTab] = useState<MiniAppTab>(initialMiniAppTab);
   const foodRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
@@ -64,4 +64,11 @@ export function MiniAppShell({ children }: { readonly children: ReactNode }) {
       </MiniAppFoodActiveContext.Provider>
     </CatalogSearchProvider>
   );
+}
+
+function initialMiniAppTab(): MiniAppTab {
+  if (typeof window === "undefined") {
+    return "food";
+  }
+  return new URLSearchParams(window.location.search).get("tab") === "groups" ? "groups" : "food";
 }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { describe, it } from "node:test";
-import { verifyTelegramWebAppInitData } from "./telegram-webapp.ts";
+import { telegramInitDataStartParam, verifyTelegramWebAppInitData } from "./telegram-webapp.ts";
 
 const BOT_TOKEN = "123456:TEST-token";
 
@@ -63,5 +63,12 @@ describe("verifyTelegramWebAppInitData", () => {
         }),
       { code: "expired" },
     );
+  });
+});
+
+describe("telegramInitDataStartParam", () => {
+  it("reads start_param from init data", () => {
+    assert.equal(telegramInitDataStartParam("start_param=g_AbCdEfGh12345678"), "g_AbCdEfGh12345678");
+    assert.equal(telegramInitDataStartParam(""), null);
   });
 });

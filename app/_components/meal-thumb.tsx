@@ -20,16 +20,11 @@ export function MealThumb({
 }) {
   const src = MEAL_IMAGE_SRC[label];
   return (
-    <span
-      className={cn(
-        "bg-default flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-lg",
-        className,
-      )}
-    >
+    <span className={cn("flex size-14 shrink-0 items-center justify-center", className)}>
       {src ? (
-        <img alt={alt} className="size-full object-cover" height={44} src={src} width={44} />
+        <img alt={alt} className="size-full object-contain" src={src} />
       ) : (
-        <CircleDashed className="size-4" />
+        <CircleDashed className="size-5" />
       )}
     </span>
   );

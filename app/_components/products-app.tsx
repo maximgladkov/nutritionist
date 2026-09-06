@@ -147,16 +147,6 @@ export function ProductsApp({
             : "mx-auto flex w-full max-w-lg flex-col gap-5 overflow-y-auto px-4 py-6 sm:px-6 sm:py-8"
       }
     >
-      {embed ? null : (
-        <div className="flex flex-col gap-1">
-          <h1 className="text-foreground text-xl font-semibold">
-            <Trans>Products</Trans>
-          </h1>
-          <p className="text-muted text-sm">
-            <Trans>Foods you have logged, ready to add again.</Trans>
-          </p>
-        </div>
-      )}
       <Segment
         aria-label={t`Product lists`}
         className="w-full"
@@ -367,7 +357,7 @@ function AddProductSheet({
                     <RadioButtonGroup.Item key={mealLabel} value={mealLabel}>
                       <RadioButtonGroup.ItemContent className="flex-row items-center gap-3">
                         <RadioButtonGroup.ItemIcon>
-                          <MealThumb alt="" className="size-8" label={mealLabel} />
+                          <MealThumb alt="" className="size-10" label={mealLabel} />
                         </RadioButtonGroup.ItemIcon>
                         <Label>{mealName}</Label>
                       </RadioButtonGroup.ItemContent>

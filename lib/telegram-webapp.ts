@@ -91,3 +91,11 @@ function parseTelegramWebAppUser(raw: string | null): TelegramWebAppUser {
       : undefined;
   return { id, firstName, lastName, username };
 }
+
+export function telegramInitDataStartParam(initData: string): string | null {
+  const trimmed = initData.trim();
+  if (!trimmed) {
+    return null;
+  }
+  return new URLSearchParams(trimmed).get("start_param");
+}

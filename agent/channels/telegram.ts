@@ -1,7 +1,9 @@
 import { createTelegramFetchFile, telegramChannel } from "eve/channels/telegram";
 import type { TelegramContext, TelegramMessage } from "eve/channels/telegram";
 import { handleChannelLink, resolveChannelUser, saveChannelThreadId } from "../lib/channel-identity";
-import { telegramSummaryMiniAppUrl } from "../../lib/app-url";
+import { telegramGroupInviteUrl, telegramSummaryMiniAppUrl } from "../../lib/app-url";
+import { getGroupInvitePreview, GroupError } from "../../lib/groups";
+import { parseTelegramStartInvite } from "../../lib/groups-invite";
 import { telegramAckFiles } from "../../lib/telegram-ack";
 import {
   generateTelegramAckOrFalse,
@@ -101,6 +103,9 @@ export default wrapTelegramLastMessageChannel(
         if (await handleSummaryCommand(ctx, message)) {
           return null;
         }
+        if (await handleInviteStartCommand(ctx, message)) {
+          return null;
+        }
         if (!shouldDispatchTelegramMessage(message, ctx.telegram.botUsername)) {
           return null;
         }
@@ -183,6 +188,35 @@ function isBotCommand(text: string, botUsername: string | undefined) {
   }
   const target = match.groups?.target;
   return target === undefined || botUsername !== undefined && target.toLowerCase() === botUsername.toLowerCase();
+}
+
+async function handleInviteStartCommand(ctx: TelegramContext, message: TelegramMessage): Promise<boolean> {
+  const token = parseTelegramStartInvite(message.text);
+  if (!token) {
+    return false;
+  }
+  if (message.chat.type !== "private") {
+    await ctx.telegram.sendMessage("Open a private chat with me to join a group.");
+    return true;
+  }
+  try {
+    const preview = await getGroupInvitePreview(token);
+    const url = telegramGroupInviteUrl(token);
+    if (!url) {
+      await ctx.telegram.sendMessage("The invite page is not configured yet.");
+      return true;
+    }
+    await ctx.telegram.post({
+      reply_markup: {
+        inline_keyboard: [[{ text: "Open invite", web_app: { url } }]],
+      },
+      text: `Join ${preview.name}`,
+    });
+  } catch (error) {
+    const text = error instanceof GroupError ? error.message : "That invite link is not valid.";
+    await ctx.telegram.sendMessage(text);
+  }
+  return true;
 }
 
 async function handleSummaryCommand(ctx: TelegramContext, message: TelegramMessage): Promise<boolean> {

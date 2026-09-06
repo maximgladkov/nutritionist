@@ -17,7 +17,7 @@ export function MealGroupsAccordion({
   onSelectItem,
 }: {
   readonly groups: readonly MealGroupView[];
-  readonly onSelectItem: (item: MealItemView, label: MealView["label"]) => void;
+  readonly onSelectItem?: (item: MealItemView, label: MealView["label"]) => void;
 }) {
   const { t } = useLingui();
   const { locale } = useAppLocale();
@@ -50,15 +50,9 @@ export function MealGroupsAccordion({
                 <Accordion.Body className="pt-0 pb-2">
                   {hasItems ? (
                     <ul className="m-0 flex list-none flex-col gap-1 p-0 -mx-4">
-                      {group.items.map((item) => (
-                        <li key={item.id}>
-                          <button
-                            className="hover:bg-surface-secondary/50 flex w-full min-w-0 cursor-[var(--cursor-interactive)] items-center gap-3 px-4 py-2 text-left"
-                            type="button"
-                            onClick={() => {
-                              onSelectItem(item, group.label);
-                            }}
-                          >
+                      {group.items.map((item) => {
+                        const row = (
+                          <>
                             <FoodThumb alt={item.name} src={item.imageUrl} />
                             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                               <span className="flex min-w-0 items-baseline gap-1.5">
@@ -70,9 +64,28 @@ export function MealGroupsAccordion({
                               <NutrientMetricsRow compact hideCalories totals={item.metrics} />
                             </div>
                             <MealKcal compact value={item.metrics.energyKcal} />
-                          </button>
-                        </li>
-                      ))}
+                          </>
+                        );
+                        return (
+                          <li key={item.id}>
+                            {onSelectItem ? (
+                              <button
+                                className="hover:bg-surface-secondary/50 flex w-full min-w-0 cursor-[var(--cursor-interactive)] items-center gap-3 px-4 py-2 text-left"
+                                type="button"
+                                onClick={() => {
+                                  onSelectItem(item, group.label);
+                                }}
+                              >
+                                {row}
+                              </button>
+                            ) : (
+                              <div className="flex w-full min-w-0 items-center gap-3 px-4 py-2 text-left">
+                                {row}
+                              </div>
+                            )}
+                          </li>
+                        );
+                      })}
                     </ul>
                   ) : null}
                 </Accordion.Body>

@@ -8,11 +8,12 @@ import {
   DesktopWorkspaceContext,
   type DesktopWidgetId,
 } from "@/app/_components/desktop-workspace-context";
+import { GroupsApp } from "@/app/_components/groups-app";
 import { NutritionSummaryApp } from "@/app/_components/nutrition-summary";
 import { ProductsApp } from "@/app/_components/products-app";
 import { signOutAction } from "@/app/actions/auth";
 import { cn } from "@/lib/utils";
-import { ArrowRightFromSquare, ChartColumn, Comment, Gear, ShoppingBag } from "@gravity-ui/icons";
+import { ArrowRightFromSquare, ChartColumn, Comment, Gear, PersonFill, ShoppingBag } from "@gravity-ui/icons";
 import { Widget } from "@heroui-pro/react";
 import { Button, ScrollShadow, Tooltip } from "@heroui/react";
 import { Trans, useLingui } from "@lingui/react/macro";
@@ -125,6 +126,16 @@ export function DesktopWorkspace({ email }: { readonly email?: string }) {
               </DesktopScreen>
             </CatalogSearchProvider>
             <DesktopScreen
+              icon={PersonFill}
+              id="groups"
+              label={t`Groups`}
+              screenRef={(node) => {
+                screenRefs.current.groups = node;
+              }}
+            >
+              <GroupsApp compact />
+            </DesktopScreen>
+            <DesktopScreen
               icon={Gear}
               id="settings"
               label={t`Settings`}
@@ -163,7 +174,9 @@ function DesktopScreen({
       <Widget aria-label={label} className="shadow-overlay ring-foreground/8 min-h-0 flex-1 ring-1">
         <Widget.Content
           className={
-            id === "chat" || id === "products" ? "flex min-h-0 flex-1 flex-col p-0" : "min-h-0 flex-1 p-0"
+            id === "chat" || id === "products" || id === "groups"
+              ? "flex min-h-0 flex-1 flex-col p-0"
+              : "min-h-0 flex-1 p-0"
           }
         >
           {children}

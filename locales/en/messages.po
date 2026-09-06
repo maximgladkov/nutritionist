@@ -13,23 +13,28 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
+#. placeholder {0}: preview.name
+#: app/_components/group-invite.tsx:159
+msgid "{0} wants to connect to your diary"
+msgstr "{0} wants to connect to your diary"
+
 #: app/_components/day-ring-strip.tsx:374
 msgid "{days, plural, one {You've logged meals for # day in a row} other {You've logged meals for # days in a row}}"
 msgstr "{days, plural, one {You've logged meals for # day in a row} other {You've logged meals for # days in a row}}"
 
-#: app/_components/settings-forms.tsx:511
+#: app/_components/settings-forms.tsx:487
 msgid "{label} goal"
 msgstr "{label} goal"
 
-#: app/_components/settings-forms.tsx:636
+#: app/_components/settings-forms.tsx:615
 msgid "{title} time"
 msgstr "{title} time"
 
-#: app/_components/nutrition-summary.tsx:360
+#: app/_components/nutrition-summary.tsx:350
 msgid "<0>Set daily goals</0> to track them as you eat."
 msgstr "<0>Set daily goals</0> to track them as you eat."
 
-#: app/_components/settings-forms.tsx:226
+#: app/_components/settings-forms.tsx:202
 msgid "Account"
 msgstr "Account"
 
@@ -37,7 +42,7 @@ msgstr "Account"
 msgid "Accounts linked. Memory now follows you across channels."
 msgstr "Accounts linked. Memory now follows you across channels."
 
-#: app/_components/products-app.tsx:448
+#: app/_components/products-app.tsx:432
 msgid "Add"
 msgstr "Add"
 
@@ -46,20 +51,20 @@ msgstr "Add"
 msgid "Add photo"
 msgstr "Add photo"
 
-#: app/_components/products-app.tsx:368
+#: app/_components/products-app.tsx:352
 msgid "Add to"
 msgstr "Add to"
 
+#: app/_components/products-app.tsx:221
 #: app/_components/products-app.tsx:237
-#: app/_components/products-app.tsx:253
 msgid "Add to favorites"
 msgstr "Add to favorites"
 
-#: app/_components/products-app.tsx:443
+#: app/_components/products-app.tsx:427
 msgid "Added to {mealName}."
 msgstr "Added to {mealName}."
 
-#: app/_components/products-app.tsx:184
+#: app/_components/products-app.tsx:168
 msgid "All"
 msgstr "All"
 
@@ -72,7 +77,7 @@ msgstr "Already linked."
 msgid "Answer"
 msgstr "Answer"
 
-#: app/_components/settings-forms.tsx:276
+#: app/_components/settings-forms.tsx:252
 msgid "App language, product lookups, meal times, and reminders."
 msgstr "App language, product lookups, meal times, and reminders."
 
@@ -95,6 +100,7 @@ msgstr "Become a better version of yourself."
 msgid "Breakfast"
 msgstr "Breakfast"
 
+#: app/_components/group-invite.tsx:213
 #: app/layout.tsx:41
 #: app/login/page.tsx:35
 msgid "BTR.me"
@@ -108,11 +114,7 @@ msgstr "Calendar"
 msgid "Calories"
 msgstr "Calories"
 
-#: app/_components/nutrition-summary.tsx:254
-msgid "Calories and macros for the meals you have logged."
-msgstr "Calories and macros for the meals you have logged."
-
-#: app/_components/products-app.tsx:419
+#: app/_components/products-app.tsx:403
 msgid "Cancel"
 msgstr "Cancel"
 
@@ -120,8 +122,8 @@ msgstr "Cancel"
 msgid "Carbs"
 msgstr "Carbs"
 
-#: app/_components/desktop-workspace.tsx:88
-#: app/_components/mini-app-tab-bar.tsx:196
+#: app/_components/desktop-workspace.tsx:91
+#: app/_components/mini-app-tab-bar.tsx:153
 msgid "Chat"
 msgstr "Chat"
 
@@ -129,7 +131,7 @@ msgstr "Chat"
 msgid "Check the address and try again."
 msgstr "Check the address and try again."
 
-#: app/_components/settings-forms.tsx:598
+#: app/_components/settings-forms.tsx:574
 msgid "Check-ins"
 msgstr "Check-ins"
 
@@ -145,9 +147,41 @@ msgstr "Choose a food to remove."
 msgid "Choose a food to update."
 msgstr "Choose a food to update."
 
+#: app/actions/groups.ts:482
+msgid "Choose a group name."
+msgstr "Choose a group name."
+
+#: app/actions/groups.ts:160
+msgid "Choose a group to update."
+msgstr "Choose a group to update."
+
+#: app/actions/groups.ts:494
+msgid "Choose a JPEG, PNG, GIF, or WebP image."
+msgstr "Choose a JPEG, PNG, GIF, or WebP image."
+
+#: app/actions/groups.ts:510
+msgid "Choose a name, description, or image to update."
+msgstr "Choose a name, description, or image to update."
+
 #: app/actions/products.ts:99
 msgid "Choose a product."
 msgstr "Choose a product."
+
+#: app/actions/groups.ts:486
+msgid "Choose a shorter description."
+msgstr "Choose a shorter description."
+
+#: app/actions/groups.ts:484
+msgid "Choose a shorter group name."
+msgstr "Choose a shorter group name."
+
+#: app/actions/groups.ts:490
+msgid "Choose a shorter message."
+msgstr "Choose a shorter message."
+
+#: app/actions/groups.ts:492
+msgid "Choose a smaller image."
+msgstr "Choose a smaller image."
 
 #: app/actions/meals.ts:29
 #: app/actions/products.ts:91
@@ -159,10 +193,12 @@ msgstr "Choose a valid amount."
 msgid "Choose a valid country."
 msgstr "Choose a valid country."
 
+#: app/actions/groups.ts:414
 #: app/actions/summary.ts:73
 msgid "Choose a valid date range."
 msgstr "Choose a valid date range."
 
+#: app/actions/groups.ts:381
 #: app/actions/summary.ts:51
 msgid "Choose a valid date."
 msgstr "Choose a valid date."
@@ -187,25 +223,62 @@ msgstr "Choose a valid time zone."
 msgid "Choose an amount or a meal."
 msgstr "Choose an amount or a meal."
 
+#: app/_components/groups-app.tsx:696
+msgid "Choose an image"
+msgstr "Choose an image"
+
 #: app/actions/meals.ts:32
 #: app/actions/products.ts:88
 msgid "Choose breakfast, lunch, dinner, or a snack."
 msgstr "Choose breakfast, lunch, dinner, or a snack."
 
-#: app/_components/mini-app-tab-bar.tsx:134
-#: app/_components/mini-app-tab-bar.tsx:149
+#: app/_components/catalog-search-chrome.tsx:41
+#: app/_components/catalog-search-chrome.tsx:50
 msgid "Close search"
 msgstr "Close search"
 
-#: app/_components/settings-forms.tsx:685
+#: app/_components/groups-app.tsx:786
+msgid "Coach"
+msgstr "Coach"
+
+#: app/_components/settings-forms.tsx:664
 msgid "Connect Telegram or WhatsApp with a one-time code."
 msgstr "Connect Telegram or WhatsApp with a one-time code."
+
+#: app/_components/groups-app.tsx:365
+msgid "Copy web link"
+msgstr "Copy web link"
 
 #: app/actions/products.ts:124
 msgid "Could not add that food."
 msgstr "Could not add that food."
 
-#: app/_components/products-app.tsx:141
+#: app/_components/groups-app.tsx:362
+msgid "Could not copy the link."
+msgstr "Could not copy the link."
+
+#: app/actions/groups.ts:148
+#: app/actions/groups.ts:512
+msgid "Could not create that group."
+msgstr "Could not create that group."
+
+#: app/actions/groups.ts:189
+msgid "Could not delete that group."
+msgstr "Could not delete that group."
+
+#: app/actions/groups.ts:223
+msgid "Could not join that group."
+msgstr "Could not join that group."
+
+#: app/actions/groups.ts:240
+msgid "Could not leave that group."
+msgstr "Could not leave that group."
+
+#: app/_components/groups-app.tsx:87
+msgid "Could not load groups."
+msgstr "Could not load groups."
+
+#: app/_components/products-app.tsx:135
 #: app/actions/products.ts:48
 msgid "Could not load products."
 msgstr "Could not load products."
@@ -215,18 +288,31 @@ msgstr "Could not load products."
 msgid "Could not load settings."
 msgstr "Could not load settings."
 
+#: app/actions/groups.ts:400
 #: app/actions/summary.ts:61
 msgid "Could not load that day."
 msgstr "Could not load that day."
 
+#: app/actions/groups.ts:279
+#: app/actions/groups.ts:296
+msgid "Could not load that group."
+msgstr "Could not load that group."
+
+#: app/_components/member-diary.tsx:193
 #: app/_components/nutrition-summary.tsx:219
+#: app/actions/groups.ts:368
 #: app/actions/summary.ts:40
 msgid "Could not load that summary."
 msgstr "Could not load that summary."
 
+#: app/actions/groups.ts:437
 #: app/actions/summary.ts:83
 msgid "Could not load those days."
 msgstr "Could not load those days."
+
+#: app/actions/groups.ts:318
+msgid "Could not load those messages."
+msgstr "Could not load those messages."
 
 #: app/_components/agent-chat.tsx:27
 msgid "Could not read the photo."
@@ -235,6 +321,14 @@ msgstr "Could not read the photo."
 #: app/actions/meals.ts:71
 msgid "Could not remove that food."
 msgstr "Could not remove that food."
+
+#: app/actions/groups.ts:262
+msgid "Could not remove that person."
+msgstr "Could not remove that person."
+
+#: app/actions/groups.ts:206
+msgid "Could not reset that invite link."
+msgstr "Could not reset that invite link."
 
 #: app/actions/settings.ts:254
 msgid "Could not save reminders."
@@ -249,6 +343,10 @@ msgstr "Could not save those goals."
 msgid "Could not send a sign-in email"
 msgstr "Could not send a sign-in email"
 
+#: app/actions/groups.ts:342
+msgid "Could not send that message."
+msgstr "Could not send that message."
+
 #: app/login/page.tsx:48
 msgid "Could not sign in with Telegram"
 msgstr "Could not sign in with Telegram"
@@ -261,8 +359,12 @@ msgstr "Could not update favorites."
 msgid "Could not update that food."
 msgstr "Could not update that food."
 
-#: app/_components/settings-forms.tsx:340
-#: app/_components/settings-forms.tsx:361
+#: app/actions/groups.ts:172
+msgid "Could not update that group."
+msgstr "Could not update that group."
+
+#: app/_components/settings-forms.tsx:316
+#: app/_components/settings-forms.tsx:337
 msgid "Country"
 msgstr "Country"
 
@@ -273,6 +375,14 @@ msgstr "Country cleared. Lookups use the worldwide catalog."
 #: app/actions/settings.ts:178
 msgid "Country saved."
 msgstr "Country saved."
+
+#: app/_components/groups-app.tsx:742
+msgid "Create"
+msgstr "Create"
+
+#: app/_components/groups-app.tsx:208
+msgid "Create a group and send the invite to people you help."
+msgstr "Create a group and send the invite to people you help."
 
 #. placeholder {0}: spec.min
 #. placeholder {1}: spec.max
@@ -286,7 +396,7 @@ msgstr "Daily calories must be a whole number from {0} to {1} kcal."
 msgid "Daily carbs must be a whole number from {0} to {1} grams."
 msgstr "Daily carbs must be a whole number from {0} to {1} grams."
 
-#: app/_components/settings-forms.tsx:593
+#: app/_components/settings-forms.tsx:569
 msgid "Daily check-ins use your time zone."
 msgstr "Daily check-ins use your time zone."
 
@@ -302,7 +412,7 @@ msgstr "Daily fat must be a whole number from {0} to {1} grams."
 msgid "Daily fiber must be a whole number from {0} to {1} grams."
 msgstr "Daily fiber must be a whole number from {0} to {1} grams."
 
-#: app/_components/settings-forms.tsx:473
+#: app/_components/settings-forms.tsx:449
 msgid "Daily Goals"
 msgstr "Daily Goals"
 
@@ -320,6 +430,18 @@ msgstr "Daily protein must be a whole number from {0} to {1} grams."
 msgid "Daily summary"
 msgstr "Daily summary"
 
+#: app/_components/groups-app.tsx:341
+msgid "Delete"
+msgstr "Delete"
+
+#: app/_components/groups-app.tsx:321
+msgid "Delete group"
+msgstr "Delete group"
+
+#: app/_components/groups-app.tsx:684
+msgid "Description"
+msgstr "Description"
+
 #: app/_components/i18n-labels.ts:22
 #: app/_components/i18n-labels.ts:30
 msgid "Dinner"
@@ -329,6 +451,15 @@ msgstr "Dinner"
 msgid "Each photo must be 10 MB or smaller."
 msgstr "Each photo must be 10 MB or smaller."
 
+#: app/_components/groups-app.tsx:316
+msgid "Edit"
+msgstr "Edit"
+
+#: app/_components/groups-app.tsx:312
+#: app/_components/groups-app.tsx:672
+msgid "Edit group"
+msgstr "Edit group"
+
 #: app/login/page.tsx:76
 msgid "Email"
 msgstr "Email"
@@ -337,15 +468,15 @@ msgstr "Email"
 msgid "Email me a sign-in link"
 msgstr "Email me a sign-in link"
 
-#: app/_components/settings-forms.tsx:519
+#: app/_components/settings-forms.tsx:495
 msgid "Enable {label} goal"
 msgstr "Enable {label} goal"
 
-#: app/_components/settings-forms.tsx:644
+#: app/_components/settings-forms.tsx:623
 msgid "Enable {title} reminder"
 msgstr "Enable {title} reminder"
 
-#: app/_components/settings-forms.tsx:721
+#: app/_components/settings-forms.tsx:700
 msgid "Enter a code from chat"
 msgstr "Enter a code from chat"
 
@@ -353,7 +484,7 @@ msgstr "Enter a code from chat"
 msgid "Fat"
 msgstr "Fat"
 
-#: app/_components/products-app.tsx:181
+#: app/_components/products-app.tsx:165
 msgid "Favorites"
 msgstr "Favorites"
 
@@ -361,19 +492,15 @@ msgstr "Favorites"
 msgid "Fiber"
 msgstr "Fiber"
 
-#: app/_components/mini-app-tab-bar.tsx:167
+#: app/_components/mini-app-tab-bar.tsx:124
 msgid "Food"
 msgstr "Food"
 
-#: app/_components/products-app.tsx:162
-msgid "Foods you have logged, ready to add again."
-msgstr "Foods you have logged, ready to add again."
-
-#: app/_components/settings-forms.tsx:711
+#: app/_components/settings-forms.tsx:690
 msgid "Generate"
 msgstr "Generate"
 
-#: app/_components/settings-forms.tsx:694
+#: app/_components/settings-forms.tsx:673
 msgid "Generate a code"
 msgstr "Generate a code"
 
@@ -385,10 +512,35 @@ msgstr "Goal"
 msgid "grams per day"
 msgstr "grams per day"
 
-#: app/_components/mini-app-groups.tsx:16
-#: app/_components/mini-app-tab-bar.tsx:169
+#: app/_components/desktop-workspace.tsx:131
+#: app/_components/groups-app.tsx:205
+#: app/_components/groups-app.tsx:300
+#: app/_components/groups-app.tsx:309
+#: app/_components/groups-app.tsx:482
+#: app/_components/groups-app.tsx:490
+#: app/_components/mini-app-tab-bar.tsx:126
+#: app/_components/mini-app-tab-bar.tsx:156
+#: app/groups/page.tsx:14
 msgid "Groups"
 msgstr "Groups"
+
+#: app/_components/groups-app.tsx:690
+msgid "Image"
+msgstr "Image"
+
+#: app/_components/group-invite.tsx:121
+#: app/g/[token]/page.tsx:22
+#: app/g/[token]/page.tsx:28
+msgid "Invite"
+msgstr "Invite"
+
+#: app/_components/groups-app.tsx:384
+msgid "Invite link reset."
+msgstr "Invite link reset."
+
+#: app/_components/group-invite.tsx:203
+msgid "Join"
+msgstr "Join"
 
 #: app/_components/day-ring-strip.tsx:293
 msgid "Jump to date"
@@ -398,12 +550,13 @@ msgstr "Jump to date"
 msgid "kilocalories per day"
 msgstr "kilocalories per day"
 
-#: app/_components/settings-forms.tsx:285
-#: app/_components/settings-forms.tsx:310
+#: app/_components/group-invite.tsx:247
+#: app/_components/settings-forms.tsx:261
+#: app/_components/settings-forms.tsx:286
 msgid "Language"
 msgstr "Language"
 
-#: app/_components/settings-forms.tsx:277
+#: app/_components/settings-forms.tsx:253
 msgid "Language & location"
 msgstr "Language & location"
 
@@ -411,15 +564,19 @@ msgstr "Language & location"
 msgid "Language saved."
 msgstr "Language saved."
 
-#: app/_components/settings-forms.tsx:745
+#: app/_components/groups-app.tsx:524
+msgid "Leave group"
+msgstr "Leave group"
+
+#: app/_components/settings-forms.tsx:724
 msgid "Link"
 msgstr "Link"
 
-#: app/_components/settings-forms.tsx:728
+#: app/_components/settings-forms.tsx:707
 msgid "Link code"
 msgstr "Link code"
 
-#: app/_components/settings-forms.tsx:686
+#: app/_components/settings-forms.tsx:665
 msgid "Linked Accounts"
 msgstr "Linked Accounts"
 
@@ -427,7 +584,7 @@ msgstr "Linked Accounts"
 msgid "Loading day"
 msgstr "Loading day"
 
-#: app/_components/products-app.tsx:210
+#: app/_components/products-app.tsx:194
 msgid "Log a meal in chat and it will appear here for one-tap adding."
 msgstr "Log a meal in chat and it will appear here for one-tap adding."
 
@@ -440,47 +597,90 @@ msgstr "Log a meal today to start your streak"
 msgid "Lunch"
 msgstr "Lunch"
 
-#: app/_components/mini-app-tab-bar.tsx:175
+#: app/_components/groups-app.tsx:239
+#: app/_components/groups-app.tsx:410
+#: app/_components/groups-app.tsx:545
+msgid "Member"
+msgstr "Member"
+
+#: app/_components/groups-app.tsx:393
+#: app/_components/groups-app.tsx:557
+msgid "Members"
+msgstr "Members"
+
+#: app/_components/groups-app.tsx:566
+msgid "Message"
+msgstr "Message"
+
+#: app/_components/groups-app.tsx:499
+#: app/_components/groups-app.tsx:562
+msgid "Messages"
+msgstr "Messages"
+
+#: app/_components/mini-app-tab-bar.tsx:132
 msgid "Mini app"
 msgstr "Mini app"
 
-#: app/_components/meal-item-sheet.tsx:112
+#: app/_components/meal-item-sheet.tsx:104
 msgid "Move to"
 msgstr "Move to"
 
-#: app/_components/meal-item-sheet.tsx:206
+#: app/_components/meal-item-sheet.tsx:198
 msgid "Moved to {mealName}."
 msgstr "Moved to {mealName}."
 
-#: app/_components/mini-app-tab-bar.tsx:204
+#: app/_components/groups-app.tsx:678
+msgid "Name"
+msgstr "Name"
+
+#: app/_components/mini-app-tab-bar.tsx:162
 msgid "Navigation"
 msgstr "Navigation"
 
-#: app/_components/app-shell.tsx:70
+#: app/_components/app-shell.tsx:74
 msgid "New chat"
 msgstr "New chat"
 
-#: app/_components/products-app.tsx:204
+#: app/_components/groups-app.tsx:213
+#: app/_components/groups-app.tsx:251
+#: app/_components/groups-app.tsx:672
+msgid "New group"
+msgstr "New group"
+
+#: app/_components/products-app.tsx:188
 msgid "No favorites yet"
 msgstr "No favorites yet"
 
-#: app/_components/products-app.tsx:223
+#: app/_components/products-app.tsx:207
 msgid "No matching products"
 msgstr "No matching products"
 
-#: app/_components/products-app.tsx:204
+#: app/_components/groups-app.tsx:503
+msgid "No messages yet."
+msgstr "No messages yet."
+
+#: app/_components/groups-app.tsx:397
+msgid "No one has joined yet. Share the invite to get started."
+msgstr "No one has joined yet. Share the invite to get started."
+
+#: app/_components/products-app.tsx:188
 msgid "No products yet"
 msgstr "No products yet"
 
-#: app/_components/settings-forms.tsx:272
+#: app/_components/settings-forms.tsx:248
 msgid "Not set"
 msgstr "Not set"
 
-#: app/_components/settings-forms.tsx:271
+#: app/_components/settings-forms.tsx:247
 msgid "Not set (worldwide)"
 msgstr "Not set (worldwide)"
 
+#: app/_components/group-invite.tsx:193
+msgid "Open groups"
+msgstr "Open groups"
+
 #: app/_components/nutrition-summary.tsx:212
+#: app/actions/groups.ts:469
 #: app/actions/meals.ts:97
 #: app/actions/products.ts:150
 #: app/actions/settings.ts:75
@@ -496,6 +696,18 @@ msgstr "or"
 msgid "Other"
 msgstr "Other"
 
+#: app/_components/groups-app.tsx:239
+msgid "Owner"
+msgstr "Owner"
+
+#: app/actions/groups.ts:504
+msgid "Owners can delete the group instead of leaving."
+msgstr "Owners can delete the group instead of leaving."
+
+#: app/actions/groups.ts:506
+msgid "Owners cannot be removed."
+msgstr "Owners cannot be removed."
+
 #: app/_components/agent-message.tsx:151
 msgid "Photo"
 msgstr "Photo"
@@ -504,14 +716,13 @@ msgstr "Photo"
 msgid "Pick a day"
 msgstr "Pick a day"
 
-#: app/_components/products-app.tsx:167
+#: app/_components/products-app.tsx:151
 msgid "Product lists"
 msgstr "Product lists"
 
-#: app/_components/desktop-workspace.tsx:113
-#: app/_components/mini-app-tab-bar.tsx:168
-#: app/_components/mini-app-tab-bar.tsx:198
-#: app/_components/products-app.tsx:159
+#: app/_components/desktop-workspace.tsx:117
+#: app/_components/mini-app-tab-bar.tsx:125
+#: app/_components/mini-app-tab-bar.tsx:155
 #: app/products/page.tsx:14
 msgid "Products"
 msgstr "Products"
@@ -524,7 +735,7 @@ msgstr "Protein"
 msgid "Reasoning"
 msgstr "Reasoning"
 
-#: app/_components/products-app.tsx:178
+#: app/_components/products-app.tsx:162
 msgid "Recent"
 msgstr "Recent"
 
@@ -532,7 +743,8 @@ msgstr "Recent"
 msgid "Reminders saved."
 msgstr "Reminders saved."
 
-#: app/_components/meal-item-sheet.tsx:183
+#: app/_components/groups-app.tsx:434
+#: app/_components/meal-item-sheet.tsx:175
 msgid "Remove"
 msgstr "Remove"
 
@@ -541,12 +753,16 @@ msgstr "Remove"
 msgid "Remove {0}"
 msgstr "Remove {0}"
 
+#: app/_components/products-app.tsx:221
 #: app/_components/products-app.tsx:237
-#: app/_components/products-app.tsx:253
 msgid "Remove from favorites"
 msgstr "Remove from favorites"
 
-#: app/_components/meal-item-sheet.tsx:178
+#: app/_components/groups-app.tsx:414
+msgid "Remove member"
+msgstr "Remove member"
+
+#: app/_components/meal-item-sheet.tsx:170
 msgid "Removed."
 msgstr "Removed."
 
@@ -554,12 +770,17 @@ msgstr "Removed."
 msgid "Request failed"
 msgstr "Request failed"
 
+#: app/_components/groups-app.tsx:388
+msgid "Reset invite link"
+msgstr "Reset invite link"
+
 #. placeholder {0}: selectedOption?.label ?? inputResponse.text ?? inputResponse.optionId
 #: app/_components/agent-message.tsx:475
 msgid "Responded: {0}"
 msgstr "Responded: {0}"
 
-#: app/_components/meal-item-sheet.tsx:214
+#: app/_components/groups-app.tsx:742
+#: app/_components/meal-item-sheet.tsx:206
 msgid "Save"
 msgstr "Save"
 
@@ -567,11 +788,7 @@ msgstr "Save"
 msgid "Save a time zone before changing reminders."
 msgstr "Save a time zone before changing reminders."
 
-#: app/_components/mini-app-groups.tsx:19
-msgid "Saved food groups will show up here so you can log them in one tap."
-msgstr "Saved food groups will show up here so you can log them in one tap."
-
-#: app/_components/meal-item-sheet.tsx:208
+#: app/_components/meal-item-sheet.tsx:200
 msgid "Saved."
 msgstr "Saved."
 
@@ -580,42 +797,48 @@ msgstr "Saved."
 msgid "Scroll to bottom"
 msgstr "Scroll to bottom"
 
-#: app/_components/mini-app-tab-bar.tsx:76
-#: app/_components/mini-app-tab-bar.tsx:134
-#: app/_components/mini-app-tab-bar.tsx:149
+#: app/_components/catalog-search-chrome.tsx:18
+#: app/_components/catalog-search-chrome.tsx:65
+#: app/_components/catalog-search-chrome.tsx:74
 msgid "Search"
 msgstr "Search"
 
-#: app/_components/mini-app-tab-bar.tsx:89
-#: app/_components/settings-forms.tsx:364
-#: app/_components/settings-forms.tsx:420
+#: app/_components/catalog-search-chrome.tsx:31
+#: app/_components/settings-forms.tsx:340
+#: app/_components/settings-forms.tsx:396
 msgid "Search…"
 msgstr "Search…"
 
 #: app/_components/agent-chat.tsx:247
+#: app/_components/groups-app.tsx:599
 msgid "Send"
 msgstr "Send"
 
-#: app/_components/settings-forms.tsx:697
+#: app/_components/settings-forms.tsx:676
 msgid "Send /link CODE in a private chat with the bot."
 msgstr "Send /link CODE in a private chat with the bot."
 
-#: app/_components/settings-forms.tsx:595
+#: app/_components/settings-forms.tsx:571
 msgid "Set a time zone first to turn reminders on."
 msgstr "Set a time zone first to turn reminders on."
 
-#: app/_components/nutrition-summary.tsx:354
+#: app/_components/nutrition-summary.tsx:344
 msgid "Set daily goals in chat to track them here."
 msgstr "Set daily goals in chat to track them here."
 
-#: app/_components/desktop-workspace.tsx:123
+#: app/_components/desktop-workspace.tsx:141
 #: app/_components/mini-app-settings.tsx:72
-#: app/_components/mini-app-tab-bar.tsx:170
-#: app/_components/mini-app-tab-bar.tsx:199
-#: app/_components/settings-forms.tsx:209
+#: app/_components/mini-app-tab-bar.tsx:127
+#: app/_components/mini-app-tab-bar.tsx:157
 msgid "Settings"
 msgstr "Settings"
 
+#: app/_components/groups-app.tsx:357
+msgid "Share in Telegram"
+msgstr "Share in Telegram"
+
+#: app/actions/groups.ts:452
+#: app/actions/groups.ts:454
 #: app/actions/settings.ts:67
 msgid "Sign in to continue."
 msgstr "Sign in to continue."
@@ -623,6 +846,10 @@ msgstr "Sign in to continue."
 #: app/actions/meals.ts:84
 msgid "Sign in to edit your meals."
 msgstr "Sign in to edit your meals."
+
+#: app/_components/group-invite.tsx:208
+msgid "Sign in to join"
+msgstr "Sign in to join"
 
 #: app/actions/products.ts:137
 msgid "Sign in to view your products."
@@ -636,24 +863,23 @@ msgstr "Sign in to view your summary."
 msgid "Sign in with Telegram"
 msgstr "Sign in with Telegram"
 
-#: app/_components/desktop-workspace.tsx:74
-#: app/_components/desktop-workspace.tsx:78
-#: app/_components/settings-forms.tsx:234
-#: app/_components/settings-forms.tsx:240
+#: app/_components/desktop-workspace.tsx:77
+#: app/_components/desktop-workspace.tsx:81
+#: app/_components/settings-forms.tsx:210
+#: app/_components/settings-forms.tsx:216
 msgid "Sign out"
 msgstr "Sign out"
 
-#: app/_components/settings-forms.tsx:224
+#: app/_components/settings-forms.tsx:200
 msgid "Sign out of this browser."
 msgstr "Sign out of this browser."
 
-#: app/_components/settings-forms.tsx:213
-#: app/_components/settings-forms.tsx:224
+#: app/_components/settings-forms.tsx:200
 msgid "Signed in as {email}"
 msgstr "Signed in as {email}"
 
-#: app/_components/meal-item-sheet.tsx:146
-#: app/_components/products-app.tsx:402
+#: app/_components/meal-item-sheet.tsx:138
+#: app/_components/products-app.tsx:386
 msgid "Size"
 msgstr "Size"
 
@@ -661,11 +887,11 @@ msgstr "Size"
 msgid "Snack"
 msgstr "Snack"
 
-#: app/_components/products-app.tsx:208
+#: app/_components/products-app.tsx:192
 msgid "Star foods you eat often so they show up here."
 msgstr "Star foods you eat often so they show up here."
 
-#: app/_components/app-shell.tsx:61
+#: app/_components/app-shell.tsx:65
 msgid "Start a new chat"
 msgstr "Start a new chat"
 
@@ -673,13 +899,13 @@ msgstr "Start a new chat"
 msgid "Stop"
 msgstr "Stop"
 
-#: app/_components/desktop-workspace.tsx:103
-#: app/_components/mini-app-tab-bar.tsx:197
-#: app/_components/nutrition-summary.tsx:251
+#: app/_components/desktop-workspace.tsx:106
+#: app/_components/mini-app-tab-bar.tsx:154
 #: app/summary/page.tsx:15
 msgid "Summary"
 msgstr "Summary"
 
+#: app/actions/groups.ts:467
 #: app/actions/meals.ts:95
 #: app/actions/products.ts:148
 #: app/actions/settings.ts:73
@@ -687,12 +913,17 @@ msgstr "Summary"
 msgid "Telegram is not configured."
 msgstr "Telegram is not configured."
 
+#: app/actions/groups.ts:464
 #: app/actions/meals.ts:89
 #: app/actions/products.ts:142
 #: app/actions/settings.ts:70
 #: app/actions/summary.ts:101
 msgid "Telegram login expired. Close and open the summary again."
 msgstr "Telegram login expired. Close and open the summary again."
+
+#: app/_components/groups-app.tsx:349
+msgid "Telegram opens the Mini App. The web link works in a browser."
+msgstr "Telegram opens the Mini App. The web link works in a browser."
 
 #: app/actions/settings.ts:283
 msgid "That code expired."
@@ -701,6 +932,27 @@ msgstr "That code expired."
 #: app/actions/settings.ts:286
 msgid "That code is not valid."
 msgstr "That code is not valid."
+
+#: app/actions/groups.ts:105
+#: app/actions/groups.ts:496
+msgid "That invite link is not valid."
+msgstr "That invite link is not valid."
+
+#: app/actions/groups.ts:508
+msgid "That person is not in this group."
+msgstr "That person is not in this group."
+
+#: app/_components/group-invite.tsx:184
+msgid "The group owner can send you messages."
+msgstr "The group owner can send you messages."
+
+#: app/_components/group-invite.tsx:178
+msgid "The group owner will see your account name."
+msgstr "The group owner will see your account name."
+
+#: app/_components/group-invite.tsx:181
+msgid "The group owner will see your daily nutrient summaries."
+msgstr "The group owner will see your daily nutrient summaries."
 
 #: app/_components/agent-chat.tsx:28
 msgid "The model is temporarily unavailable. Please try again."
@@ -715,8 +967,8 @@ msgstr "Thinking"
 msgid "Those accounts both have email sign-in and cannot be merged."
 msgstr "Those accounts both have email sign-in and cannot be merged."
 
-#: app/_components/settings-forms.tsx:391
-#: app/_components/settings-forms.tsx:417
+#: app/_components/settings-forms.tsx:367
+#: app/_components/settings-forms.tsx:393
 msgid "Time zone"
 msgstr "Time zone"
 
@@ -728,7 +980,7 @@ msgstr "Time zone cleared."
 msgid "Time zone saved."
 msgstr "Time zone saved."
 
-#: app/_components/nutrition-summary.tsx:272
+#: app/_components/nutrition-summary.tsx:262
 msgid "Times use UTC until you save a time zone in Settings."
 msgstr "Times use UTC until you save a time zone in Settings."
 
@@ -740,7 +992,7 @@ msgstr "Today"
 msgid "Total"
 msgstr "Total"
 
-#: app/_components/products-app.tsx:226
+#: app/_components/products-app.tsx:210
 msgid "Try a different name."
 msgstr "Try a different name."
 
@@ -748,7 +1000,7 @@ msgstr "Try a different name."
 msgid "Try the Telegram button again, or use a magic link."
 msgstr "Try the Telegram button again, or use a magic link."
 
-#: app/_components/settings-forms.tsx:472
+#: app/_components/settings-forms.tsx:448
 msgid "Turn on a nutrient to track it in the summary."
 msgstr "Turn on a nutrient to track it in the summary."
 
@@ -764,13 +1016,37 @@ msgstr "Unable to cancel the response."
 msgid "Used tool: "
 msgstr "Used tool: "
 
+#: app/_components/groups-app.tsx:362
+msgid "Web invite copied."
+msgstr "Web invite copied."
+
+#: app/actions/groups.ts:488
+msgid "Write a message."
+msgstr "Write a message."
+
 #: app/_components/day-ring-strip.tsx:419
 msgid "Yesterday"
 msgstr "Yesterday"
 
+#: app/_components/group-invite.tsx:173
+msgid "You are already in this group."
+msgstr "You are already in this group."
+
+#: app/actions/groups.ts:502
+msgid "You are not a member of that group."
+msgstr "You are not a member of that group."
+
+#: app/actions/groups.ts:500
+msgid "You are not in that group."
+msgstr "You are not in that group."
+
 #: app/_components/agent-chat.tsx:116
 msgid "You can attach up to {MAX_ATTACHMENT_FILES} photos."
 msgstr "You can attach up to {MAX_ATTACHMENT_FILES} photos."
+
+#: app/actions/groups.ts:498
+msgid "You cannot edit that group."
+msgstr "You cannot edit that group."
 
 #: app/actions/settings.ts:266
 msgid "Your code is {code}. It expires in 10 minutes."

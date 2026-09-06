@@ -9,7 +9,10 @@ import { Prisma, PrismaClient } from "../generated/prisma/client.ts";
 import { isAccelerateUrl, resolveRuntimeDatabaseUrl } from "./prisma-url.ts";
 
 const runtimeDatabaseUrl = resolveRuntimeDatabaseUrl();
-const prismaSchemaId = Object.values(Prisma.CatalogProductScalarFieldEnum).join(",");
+const prismaSchemaId = [
+  Object.values(Prisma.CatalogProductScalarFieldEnum).join(","),
+  Object.values(Prisma.GroupScalarFieldEnum).join(","),
+].join("|");
 
 export const usingAccelerate = isAccelerateUrl(runtimeDatabaseUrl);
 
@@ -35,7 +38,10 @@ function hasRequiredModels(client: PrismaClient | undefined): client is PrismaCl
     typeof client?.offProduct?.findUnique === "function" &&
     typeof client?.productFavorite?.findMany === "function" &&
     typeof client?.userAttachment?.findUnique === "function" &&
-    typeof client?.telegramInboundBurstItem?.findMany === "function"
+    typeof client?.telegramInboundBurstItem?.findMany === "function" &&
+    typeof client?.group?.findMany === "function" &&
+    typeof client?.groupMember?.findMany === "function" &&
+    typeof client?.groupMessage?.findMany === "function"
   );
 }
 

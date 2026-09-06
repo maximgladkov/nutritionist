@@ -3,6 +3,8 @@ export type TelegramWebApp = {
   initData: string;
   offEvent?: (event: string, callback: () => void) => void;
   onEvent?: (event: string, callback: () => void) => void;
+  openLink?: (url: string) => void;
+  openTelegramLink?: (url: string) => void;
   ready: () => void;
 };
 

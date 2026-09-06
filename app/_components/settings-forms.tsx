@@ -193,21 +193,6 @@ function SettingsSection({
   );
 }
 
-export function SettingsHeading({ email }: { readonly email?: string }) {
-  return (
-    <div className="flex flex-col gap-1">
-      <h1 className="text-foreground text-xl font-semibold">
-        <Trans>Settings</Trans>
-      </h1>
-      {email ? (
-        <p className="text-muted text-sm">
-          <Trans>Signed in as {email}</Trans>
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
 export function AccountSettings({ email }: { readonly email?: string }) {
   return (
     <SettingsSection
@@ -601,7 +586,7 @@ export function ReminderSettings({
                     <ChartColumn />
                   </ItemCard.Icon>
                 ) : (
-                  <MealThumb alt={title} className="size-9" label={label} />
+                  <MealThumb alt={title} className="size-11" label={label} />
                 )}
                 <ItemCard.Content>
                   <ItemCard.Title>{title}</ItemCard.Title>

@@ -16,13 +16,13 @@ export default async function LoginPage({
   readonly searchParams: Promise<{ readonly callbackUrl?: string; readonly error?: string }>;
 }) {
   const token = await readAuthJwt({ headers: await headers() });
-  if (token?.sub) {
-    redirect("/s");
-  }
   const locale = await resolveRequestLocale();
   initLingui(locale);
   const params = await searchParams;
-  const callbackUrl = params.callbackUrl ?? "/s";
+  const callbackUrl = safeLoginCallback(params.callbackUrl);
+  if (token?.sub) {
+    redirect(callbackUrl);
+  }
   const telegramBotUsername = telegramLoginBotUsername();
   const telegramError = params.error === "CredentialsSignin";
 
@@ -101,4 +101,11 @@ export default async function LoginPage({
       </Card>
     </main>
   );
+}
+
+function safeLoginCallback(value: string | undefined): string {
+  if (value && value.startsWith("/") && !value.startsWith("//")) {
+    return value;
+  }
+  return "/s";
 }

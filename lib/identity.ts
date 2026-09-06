@@ -4,6 +4,7 @@ import { generateLinkCodeValue } from "./link-command";
 import { mergeMemoryFiles, parseMemoryFile, serializeMemoryFile } from "./memory-format";
 import type { ChannelProvider } from "./principal";
 import { prisma } from "./prisma";
+import { reassignGroupsOnUserMerge } from "./groups";
 
 const LINK_CODE_TTL_MS = 10 * 60 * 1000;
 
@@ -208,6 +209,7 @@ export async function mergeUsers(survivorId: string, absorbedId: string): Promis
       where: { createdByUserId: absorbedId },
       data: { createdByUserId: survivorId },
     });
+    await reassignGroupsOnUserMerge(tx, survivorId, absorbedId);
     await tx.meal.updateMany({
       where: { userId: absorbedId },
       data: { userId: survivorId },

@@ -130,7 +130,7 @@ export function MiniAppTabBar({
   return (
     <AppTabBar
       ariaLabel={t`Mini app`}
-      searchEnabled={selected === "products" || selected === "groups"}
+      searchEnabled={selected === "products"}
       selected={selected}
       tabs={tabs}
       onSelect={onSelect}
@@ -138,7 +138,7 @@ export function MiniAppTabBar({
   );
 }
 
-export const WEB_APP_TABS = ["chat", "summary", "products", "settings"] as const;
+export const WEB_APP_TABS = ["chat", "summary", "products", "groups", "settings"] as const;
 export type WebAppTab = (typeof WEB_APP_TABS)[number];
 
 export function WebAppTabBar({
@@ -153,6 +153,7 @@ export function WebAppTabBar({
     { id: "chat", label: t`Chat`, icon: Comment },
     { id: "summary", label: t`Summary`, icon: ChartColumn },
     { id: "products", label: t`Products`, icon: ShoppingBag },
+    { id: "groups", label: t`Groups`, icon: PersonFill },
     { id: "settings", label: t`Settings`, icon: Gear },
   ];
 

@@ -12,8 +12,7 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = await readAuthJwt(request);
   const staleCookie = hasAuthSessionCookie(request) && token === null;
-  const telegramEmbed =
-    pathname.startsWith("/summary") && request.nextUrl.searchParams.get("embed") === "tg";
+  const telegramEmbed = request.nextUrl.searchParams.get("embed") === "tg";
 
   if (pathname === "/admin" || pathname.startsWith("/admin/")) {
     if (!isValidAdminBasicAuth(request.headers.get("authorization"))) {
@@ -48,7 +47,8 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/s") ||
     pathname.startsWith("/settings") ||
     pathname.startsWith("/summary") ||
-    pathname.startsWith("/products")
+    pathname.startsWith("/products") ||
+    pathname.startsWith("/groups")
   ) {
     if (token) {
       return withLocaleCookie(request, NextResponse.next());
@@ -67,7 +67,18 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/s/:path*", "/settings", "/summary", "/products", "/login", "/admin", "/admin/:path*"],
+  matcher: [
+    "/",
+    "/s/:path*",
+    "/settings",
+    "/summary",
+    "/products",
+    "/groups",
+    "/g/:path*",
+    "/login",
+    "/admin",
+    "/admin/:path*",
+  ],
 };
 
 function withAdminUiHeader(request: NextRequest): Headers {

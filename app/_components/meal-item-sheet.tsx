@@ -109,7 +109,7 @@ export function MealItemSheet({
                     <RadioButtonGroup.Item key={mealLabel} value={mealLabel}>
                       <RadioButtonGroup.ItemContent className="flex-row items-center gap-3">
                         <RadioButtonGroup.ItemIcon>
-                          <MealThumb alt="" className="size-8" label={mealLabel} />
+                          <MealThumb alt="" className="size-10" label={mealLabel} />
                         </RadioButtonGroup.ItemIcon>
                         <Label>{mealName}</Label>
                       </RadioButtonGroup.ItemContent>

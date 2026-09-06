@@ -4,7 +4,6 @@ import {
   LinkAccountsSettings,
   LocationSettings,
   ReminderSettings,
-  SettingsHeading,
 } from "@/app/_components/settings-forms";
 import { FlashToast } from "@/app/_components/flash-toast";
 import { auth } from "@/auth";
@@ -45,7 +44,6 @@ export default async function SettingsPage({
 
   return (
     <div className="@container mx-auto flex w-full min-w-0 max-w-4xl flex-col gap-8 px-6 py-8 sm:px-8">
-      <SettingsHeading email={session.user.email ?? undefined} />
       {params.notice ? (
         <FlashToast
           message={params.notice}

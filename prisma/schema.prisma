@@ -28,6 +28,10 @@ model User {
   agentTurns    AgentTurn[]
   pendingAcks   AgentTurnPendingAck[]
   attachments   UserAttachment[]
+  ownedGroups   Group[]          @relation("OwnedGroups")
+  groupMemberships GroupMember[]
+  groupMessagesSent     GroupMessage[] @relation("GroupMessagesSent")
+  groupMessagesReceived GroupMessage[] @relation("GroupMessagesReceived")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -398,6 +402,58 @@ model ChatSdkEntry {
   value     Json
   expiresAt DateTime?
   updatedAt DateTime  @updatedAt
+}
+
+enum GroupMemberRole {
+  owner
+  member
+}
+
+model Group {
+  id            String   @id @default(cuid())
+  ownerId       String
+  owner         User     @relation("OwnedGroups", fields: [ownerId], references: [id], onDelete: Cascade)
+  name          String
+  description   String   @default("")
+  imageUrl      String
+  imageBlobPath String
+  inviteToken   String   @unique
+  locale        String   @default("en")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  members       GroupMember[]
+  messages      GroupMessage[]
+
+  @@index([ownerId])
+}
+
+model GroupMember {
+  id       String          @id @default(cuid())
+  groupId  String
+  group    Group           @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role     GroupMemberRole
+  joinedAt DateTime        @default(now())
+
+  @@unique([groupId, userId])
+  @@index([userId])
+}
+
+model GroupMessage {
+  id         String   @id @default(cuid())
+  groupId    String
+  group      Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  fromUserId String
+  fromUser   User     @relation("GroupMessagesSent", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUserId   String
+  toUser     User     @relation("GroupMessagesReceived", fields: [toUserId], references: [id], onDelete: Cascade)
+  body       String   @db.Text
+  createdAt  DateTime @default(now())
+
+  @@index([groupId, toUserId, createdAt])
+  @@index([toUserId, createdAt])
+  @@index([fromUserId])
 }
 
 model TelegramInboundBurstItem {
