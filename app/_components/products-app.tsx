@@ -3,6 +3,7 @@
 import { FoodThumb } from "@/app/_components/food-thumb";
 import { MEAL_LABELS } from "@/app/_components/i18n-labels";
 import { useAppLocale } from "@/app/_components/lingui-client-provider";
+import { MealKcal } from "@/app/_components/meal-kcal";
 import { formatAmount, formatKcal } from "@/app/_components/nutrition-format";
 import { bootTelegramWebApp } from "@/app/_components/telegram-webapp-client";
 import {
@@ -361,34 +362,36 @@ function AddProductSheet({
                 })}
               </RadioButtonGroup>
               {product ? (
-                <NumberField
-                  formatOptions={{ maximumFractionDigits: 1, useGrouping: false }}
-                  minValue={step}
-                  name="amount"
-                  step={step}
-                  value={amount}
-                  variant="secondary"
-                  onChange={(value) => {
-                    if (value !== undefined && !Number.isNaN(value)) {
-                      setAmount(value);
-                    }
-                  }}
-                >
-                  <Label>
-                    <Trans>Size</Trans>
-                    {` (${product.unit})`}
-                  </Label>
-                  <NumberField.Group className="w-full min-w-0">
-                    <NumberField.DecrementButton />
-                    <NumberField.Input className="min-w-0 text-center" />
-                    <NumberField.IncrementButton />
-                  </NumberField.Group>
-                </NumberField>
-              ) : null}
-              {kcal !== null ? (
-                <p className="text-muted text-sm tabular-nums">
-                  {formatKcal(kcal)} kcal
-                </p>
+                <div className="relative w-full">
+                  <NumberField
+                    className="w-full"
+                    formatOptions={{ maximumFractionDigits: 1, useGrouping: false }}
+                    fullWidth
+                    minValue={step}
+                    name="amount"
+                    step={step}
+                    value={amount}
+                    variant="secondary"
+                    onChange={(value) => {
+                      if (value !== undefined && !Number.isNaN(value)) {
+                        setAmount(value);
+                      }
+                    }}
+                  >
+                    <Label className="pe-24">
+                      <Trans>Size</Trans>
+                      {` (${product.unit})`}
+                    </Label>
+                    <NumberField.Group className="w-full min-w-0">
+                      <NumberField.DecrementButton />
+                      <NumberField.Input className="min-w-0 text-center" />
+                      <NumberField.IncrementButton />
+                    </NumberField.Group>
+                  </NumberField>
+                  <div className="pointer-events-none absolute top-0 right-0 flex h-5 items-center">
+                    <MealKcal compact value={kcal} />
+                  </div>
+                </div>
               ) : null}
             </Sheet.Body>
             <Sheet.Footer>

@@ -126,10 +126,11 @@ export function MealItemSheet({
                 })}
               </RadioButtonGroup>
               {item ? (
-                <div className="flex items-end gap-3">
+                <div className="relative w-full">
                   <NumberField
-                    className="min-w-0 flex-1"
+                    className="w-full"
                     formatOptions={{ maximumFractionDigits: 1, useGrouping: false }}
+                    fullWidth
                     minValue={Math.min(step, item.amount)}
                     name="amount"
                     step={step}
@@ -141,7 +142,7 @@ export function MealItemSheet({
                       }
                     }}
                   >
-                    <Label>
+                    <Label className="pe-24">
                       <Trans>Size</Trans>
                       {` (${item.unit})`}
                     </Label>
@@ -151,7 +152,9 @@ export function MealItemSheet({
                       <NumberField.IncrementButton />
                     </NumberField.Group>
                   </NumberField>
-                  <MealKcal compact value={kcal} />
+                  <div className="pointer-events-none absolute top-0 right-0 flex h-5 items-center">
+                    <MealKcal compact value={kcal} />
+                  </div>
                 </div>
               ) : null}
             </Sheet.Body>
