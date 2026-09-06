@@ -1,5 +1,6 @@
 "use client";
 
+import { useCatalogSearch } from "@/app/_components/catalog-search";
 import { FoodThumb } from "@/app/_components/food-thumb";
 import { MEAL_LABELS } from "@/app/_components/i18n-labels";
 import { useAppLocale } from "@/app/_components/lingui-client-provider";
@@ -15,11 +16,12 @@ import { mealLabelFromHour } from "@/lib/meal-label";
 import {
   PRODUCT_MEAL_LABELS,
   PRODUCT_SEGMENTS,
+  filterUserProducts,
   type ProductMealLabel,
   type ProductSegment,
   type UserProductView,
 } from "@/lib/user-products";
-import { CircleDashed, Cup, Moon, ShoppingBag, Star, StarFill, Sun } from "@gravity-ui/icons";
+import { CircleDashed, Cup, Magnifier, Moon, ShoppingBag, Star, StarFill, Sun } from "@gravity-ui/icons";
 import { EmptyState, RadioButtonGroup, Segment, Sheet } from "@heroui-pro/react";
 import {
   Button,
@@ -78,6 +80,7 @@ export function ProductsApp({
 }) {
   const { t } = useLingui();
   const { locale } = useAppLocale();
+  const { query } = useCatalogSearch();
   const { mutate: mutateCache } = useSWRConfig();
   const [initData, setInitData] = useState<string | null>(embed ? null : "");
   const [segment, setSegment] = useState<ProductSegment>("recent");
@@ -137,6 +140,8 @@ export function ProductsApp({
 
   const errorMessage = error instanceof Error ? error.message : error ? t`Could not load products.` : null;
   const products = data ?? [];
+  const visibleProducts = filterUserProducts(products, query);
+  const hasQuery = query.trim().length > 0;
 
   return (
     <div
@@ -144,7 +149,7 @@ export function ProductsApp({
         embed
           ? "mx-auto flex w-full max-w-lg flex-col gap-4 px-3 py-3"
           : compact
-            ? "flex h-full min-h-0 w-full flex-col gap-4 overflow-y-auto px-3 py-3"
+            ? "flex h-full min-h-0 w-full flex-col gap-4 overflow-y-auto px-3 py-3 pb-[4.75rem]"
             : "mx-auto flex w-full max-w-lg flex-col gap-5 overflow-y-auto px-4 py-6 sm:px-6 sm:py-8"
       }
     >
@@ -208,9 +213,24 @@ export function ProductsApp({
           </EmptyState.Header>
         </EmptyState>
       ) : null}
-      {products.length > 0 ? (
+      {!isLoading && hasQuery && products.length > 0 && visibleProducts.length === 0 ? (
+        <EmptyState className="bg-surface-secondary rounded-2xl">
+          <EmptyState.Header>
+            <EmptyState.Media variant="icon">
+              <Magnifier className="size-5" />
+            </EmptyState.Media>
+            <EmptyState.Title>
+              <Trans>No matching products</Trans>
+            </EmptyState.Title>
+            <EmptyState.Description>
+              <Trans>Try a different name.</Trans>
+            </EmptyState.Description>
+          </EmptyState.Header>
+        </EmptyState>
+      ) : null}
+      {visibleProducts.length > 0 ? (
         <ul className="m-0 flex list-none flex-col gap-1 p-0">
-          {products.map((product) => (
+          {visibleProducts.map((product) => (
             <li className="flex items-center gap-1" key={product.key}>
               <Tooltip delay={0}>
                 <Button

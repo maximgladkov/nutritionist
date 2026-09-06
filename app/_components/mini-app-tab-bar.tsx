@@ -1,11 +1,13 @@
 "use client";
 
+import { useCatalogSearch } from "@/app/_components/catalog-search";
+import { CatalogSearchField, CatalogSearchToggle } from "@/app/_components/catalog-search-chrome";
 import { useAppLocale } from "@/app/_components/lingui-client-provider";
 import { cn } from "@/lib/utils";
 import { ChartColumn, Comment, Gear, PersonFill, ShoppingBag } from "@gravity-ui/icons";
 import { Segment } from "@heroui-pro/react";
 import { useLingui } from "@lingui/react/macro";
-import type { ComponentType, SVGProps } from "react";
+import { useEffect, type ComponentType, type SVGProps } from "react";
 
 function Utensils(props: SVGProps<SVGSVGElement>) {
   return (
@@ -34,49 +36,78 @@ export type AppTab<T extends string> = {
   readonly icon: ComponentType<SVGProps<SVGSVGElement>>;
 };
 
+const FAB_SLOT = "pe-[4.75rem]";
+const SAFE_BOTTOM = "bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))]";
+
 export function AppTabBar<T extends string>({
   ariaLabel,
   onSelect,
+  searchEnabled = false,
   selected,
   tabs,
 }: {
   readonly ariaLabel: string;
   readonly onSelect: (tab: T) => void;
+  readonly searchEnabled?: boolean;
   readonly selected: T;
   readonly tabs: readonly AppTab<T>[];
 }) {
   const { locale } = useAppLocale();
+  const search = useCatalogSearch();
+  const searchOpen = searchEnabled && search.open;
+
+  useEffect(() => {
+    if (!searchEnabled) {
+      search.closeSearch();
+    }
+  }, [search.closeSearch, searchEnabled]);
+
   return (
-    <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
-      <Segment
-        aria-label={ariaLabel}
-        className={cn(
-          "border-border/70 bg-surface/95 shadow-overlay pointer-events-auto rounded-full border p-1.5 backdrop-blur-xl",
-          "**:data-[slot=segment-indicator]:bg-accent/12 **:data-[slot=segment-indicator]:shadow-none",
-        )}
-        key={locale}
-        selectedKey={selected}
-        onSelectionChange={(key) => {
-          const tab = tabs.find((item) => item.id === key);
-          if (tab) {
-            onSelect(tab.id);
-          }
-        }}
-      >
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          return (
-            <Segment.Item
-              className="text-foreground h-auto min-w-[3.75rem] flex-col gap-0.5 px-2.5 py-1.5 text-[11px] leading-none data-[selected=true]:text-accent [&_svg]:size-5"
-              id={tab.id}
-              key={tab.id}
-            >
-              <Icon />
-              {tab.label}
-            </Segment.Item>
-          );
-        })}
-      </Segment>
+    <nav
+      className={cn(
+        "pointer-events-none fixed inset-x-0 bottom-0 z-50 flex items-end px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]",
+        searchEnabled ? FAB_SLOT : null,
+        searchOpen ? null : "justify-center",
+      )}
+    >
+      {searchOpen ? (
+        <CatalogSearchField className="pointer-events-auto" />
+      ) : (
+        <Segment
+          aria-label={ariaLabel}
+          className={cn(
+            "border-border/70 bg-surface/95 shadow-overlay pointer-events-auto rounded-full border p-1.5 backdrop-blur-xl",
+            "**:data-[slot=segment-indicator]:bg-accent/12 **:data-[slot=segment-indicator]:shadow-none",
+          )}
+          key={locale}
+          selectedKey={selected}
+          onSelectionChange={(key) => {
+            const tab = tabs.find((item) => item.id === key);
+            if (tab) {
+              onSelect(tab.id);
+            }
+          }}
+        >
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <Segment.Item
+                className="text-foreground h-auto min-w-[3.75rem] flex-col gap-0.5 px-2.5 py-1.5 text-[11px] leading-none data-[selected=true]:text-accent [&_svg]:size-5"
+                id={tab.id}
+                key={tab.id}
+              >
+                <Icon />
+                {tab.label}
+              </Segment.Item>
+            );
+          })}
+        </Segment>
+      )}
+      {searchEnabled ? (
+        <div className={cn("pointer-events-auto absolute right-4", SAFE_BOTTOM)}>
+          <CatalogSearchToggle />
+        </div>
+      ) : null}
     </nav>
   );
 }
@@ -97,7 +128,13 @@ export function MiniAppTabBar({
   ];
 
   return (
-    <AppTabBar ariaLabel={t`Mini app`} selected={selected} tabs={tabs} onSelect={onSelect} />
+    <AppTabBar
+      ariaLabel={t`Mini app`}
+      searchEnabled={selected === "products" || selected === "groups"}
+      selected={selected}
+      tabs={tabs}
+      onSelect={onSelect}
+    />
   );
 }
 
@@ -120,6 +157,12 @@ export function WebAppTabBar({
   ];
 
   return (
-    <AppTabBar ariaLabel={t`Navigation`} selected={selected} tabs={tabs} onSelect={onSelect} />
+    <AppTabBar
+      ariaLabel={t`Navigation`}
+      searchEnabled={selected === "products"}
+      selected={selected}
+      tabs={tabs}
+      onSelect={onSelect}
+    />
   );
 }

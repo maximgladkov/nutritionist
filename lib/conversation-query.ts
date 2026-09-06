@@ -8,7 +8,7 @@ export const TELEGRAM_CONVERSATION_CHANNEL = "telegram";
 
 const MEDIA_STUB = /\[(?:image|file): [^\]]*\]/gu;
 export const RECENT_CONVERSATION_HEADER =
-  "Recent Telegram turns for chat context only. Totals, remaining budget, and goals are not live here. The current user message follows separately.";
+  "Recent Telegram turns for chat context only. Do not use calories, macros, remaining, or goals from these lines; those numbers are stale and the user can change them in the app. Use the live snapshot in context or goals, current, and remaining from a tool this turn. The current user message follows separately.";
 
 export function clampConversationSearchLimit(limit: number | undefined) {
   if (limit === undefined || !Number.isFinite(limit)) {

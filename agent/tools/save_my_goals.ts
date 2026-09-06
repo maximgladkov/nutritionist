@@ -1,13 +1,14 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { saveGoals } from "../../lib/goals";
+import { attachTodayNutritionProgress } from "../../lib/nutrition-progress";
 import { requireUser } from "../lib/require-user";
 
 const goalValue = z.union([z.number(), z.null()]).optional();
 
 export default defineTool({
   description:
-    "Save or clear the caller's structured daily goals. Pass a whole number to set a field, or null to clear it. Omit fields you are not changing. caloriesPerDay is kcal; proteinGPerDay, carbsGPerDay, fatGPerDay, and fiberGPerDay are grams. They can also set these in Settings. Never pass another person's id.",
+    "Save or clear the caller's structured daily goals. Pass a whole number to set a field, or null to clear it. Omit fields you are not changing. caloriesPerDay is kcal; proteinGPerDay, carbsGPerDay, fatGPerDay, and fiberGPerDay are grams. They can also set these in Settings. Never pass another person's id. Returns goals, current, and remaining. Use those fields; do not reuse leftover kcal from chat.",
   inputSchema: z.object({
     caloriesPerDay: goalValue,
     carbsGPerDay: goalValue,
@@ -17,6 +18,7 @@ export default defineTool({
   }),
   async execute(patch, ctx) {
     const { userId } = await requireUser(ctx);
-    return saveGoals(userId, patch);
+    const goals = await saveGoals(userId, patch);
+    return attachTodayNutritionProgress(userId, { goals });
   },
 });

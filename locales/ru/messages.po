@@ -37,7 +37,7 @@ msgstr "Аккаунт"
 msgid "Accounts linked. Memory now follows you across channels."
 msgstr "Аккаунты связаны. Память теперь следует за вами между каналами."
 
-#: app/_components/products-app.tsx:425
+#: app/_components/products-app.tsx:448
 msgid "Add"
 msgstr "Добавить"
 
@@ -46,20 +46,20 @@ msgstr "Добавить"
 msgid "Add photo"
 msgstr "Добавить фото"
 
-#: app/_components/products-app.tsx:347
+#: app/_components/products-app.tsx:368
 msgid "Add to"
 msgstr "Добавить в"
 
-#: app/_components/products-app.tsx:216
-#: app/_components/products-app.tsx:232
+#: app/_components/products-app.tsx:237
+#: app/_components/products-app.tsx:253
 msgid "Add to favorites"
 msgstr "Добавить в избранное"
 
-#: app/_components/products-app.tsx:420
+#: app/_components/products-app.tsx:443
 msgid "Added to {mealName}."
 msgstr "Добавлено в {mealName}."
 
-#: app/_components/products-app.tsx:178
+#: app/_components/products-app.tsx:184
 msgid "All"
 msgstr "Все"
 
@@ -112,7 +112,7 @@ msgstr "Калории"
 msgid "Calories and macros for the meals you have logged."
 msgstr "Калории и макронутриенты по записанным приёмам пищи."
 
-#: app/_components/products-app.tsx:396
+#: app/_components/products-app.tsx:419
 msgid "Cancel"
 msgstr "Отмена"
 
@@ -121,7 +121,7 @@ msgid "Carbs"
 msgstr "Углеводы"
 
 #: app/_components/desktop-workspace.tsx:88
-#: app/_components/mini-app-tab-bar.tsx:116
+#: app/_components/mini-app-tab-bar.tsx:196
 msgid "Chat"
 msgstr "Чат"
 
@@ -192,6 +192,11 @@ msgstr "Выберите количество или приём пищи."
 msgid "Choose breakfast, lunch, dinner, or a snack."
 msgstr "Выберите завтрак, обед, ужин или перекус."
 
+#: app/_components/mini-app-tab-bar.tsx:134
+#: app/_components/mini-app-tab-bar.tsx:149
+msgid "Close search"
+msgstr "Закрыть поиск"
+
 #: app/_components/settings-forms.tsx:685
 msgid "Connect Telegram or WhatsApp with a one-time code."
 msgstr "Свяжите Telegram или WhatsApp одноразовым кодом."
@@ -200,7 +205,7 @@ msgstr "Свяжите Telegram или WhatsApp одноразовым кодо�
 msgid "Could not add that food."
 msgstr "Не удалось добавить этот продукт."
 
-#: app/_components/products-app.tsx:137
+#: app/_components/products-app.tsx:141
 #: app/actions/products.ts:48
 msgid "Could not load products."
 msgstr "Не удалось загрузить продукты."
@@ -348,7 +353,7 @@ msgstr "Введите код из чата"
 msgid "Fat"
 msgstr "Жиры"
 
-#: app/_components/products-app.tsx:175
+#: app/_components/products-app.tsx:181
 msgid "Favorites"
 msgstr "Избранное"
 
@@ -356,11 +361,11 @@ msgstr "Избранное"
 msgid "Fiber"
 msgstr "Клетчатка"
 
-#: app/_components/mini-app-tab-bar.tsx:93
+#: app/_components/mini-app-tab-bar.tsx:167
 msgid "Food"
 msgstr "Еда"
 
-#: app/_components/products-app.tsx:156
+#: app/_components/products-app.tsx:162
 msgid "Foods you have logged, ready to add again."
 msgstr "Продукты, которые вы уже записывали — можно добавить снова."
 
@@ -381,7 +386,7 @@ msgid "grams per day"
 msgstr "граммы в день"
 
 #: app/_components/mini-app-groups.tsx:16
-#: app/_components/mini-app-tab-bar.tsx:95
+#: app/_components/mini-app-tab-bar.tsx:169
 msgid "Groups"
 msgstr "Группы"
 
@@ -422,7 +427,7 @@ msgstr "Связанные аккаунты"
 msgid "Loading day"
 msgstr "Загрузка дня"
 
-#: app/_components/products-app.tsx:204
+#: app/_components/products-app.tsx:210
 msgid "Log a meal in chat and it will appear here for one-tap adding."
 msgstr "Запишите приём пищи в чате — он появится здесь, чтобы добавлять его в один тап."
 
@@ -435,7 +440,7 @@ msgstr "Запишите приём пищи сегодня, чтобы нача
 msgid "Lunch"
 msgstr "Обед"
 
-#: app/_components/mini-app-tab-bar.tsx:100
+#: app/_components/mini-app-tab-bar.tsx:175
 msgid "Mini app"
 msgstr "Мини-приложение"
 
@@ -443,23 +448,27 @@ msgstr "Мини-приложение"
 msgid "Move to"
 msgstr "Переместить в"
 
-#: app/_components/meal-item-sheet.tsx:201
+#: app/_components/meal-item-sheet.tsx:206
 msgid "Moved to {mealName}."
 msgstr "Перемещено в {mealName}."
 
-#: app/_components/mini-app-tab-bar.tsx:123
+#: app/_components/mini-app-tab-bar.tsx:204
 msgid "Navigation"
 msgstr "Навигация"
 
-#: app/_components/app-shell.tsx:68
+#: app/_components/app-shell.tsx:70
 msgid "New chat"
 msgstr "Новый чат"
 
-#: app/_components/products-app.tsx:198
+#: app/_components/products-app.tsx:204
 msgid "No favorites yet"
 msgstr "Пока нет избранного"
 
-#: app/_components/products-app.tsx:198
+#: app/_components/products-app.tsx:223
+msgid "No matching products"
+msgstr "Нет подходящих продуктов"
+
+#: app/_components/products-app.tsx:204
 msgid "No products yet"
 msgstr "Пока нет продуктов"
 
@@ -495,14 +504,14 @@ msgstr "Фото"
 msgid "Pick a day"
 msgstr "Выб. день"
 
-#: app/_components/products-app.tsx:161
+#: app/_components/products-app.tsx:167
 msgid "Product lists"
 msgstr "Списки продуктов"
 
 #: app/_components/desktop-workspace.tsx:113
-#: app/_components/mini-app-tab-bar.tsx:94
-#: app/_components/mini-app-tab-bar.tsx:118
-#: app/_components/products-app.tsx:153
+#: app/_components/mini-app-tab-bar.tsx:168
+#: app/_components/mini-app-tab-bar.tsx:198
+#: app/_components/products-app.tsx:159
 #: app/products/page.tsx:14
 msgid "Products"
 msgstr "Продукты"
@@ -515,7 +524,7 @@ msgstr "Белок"
 msgid "Reasoning"
 msgstr "Рассуждение"
 
-#: app/_components/products-app.tsx:172
+#: app/_components/products-app.tsx:178
 msgid "Recent"
 msgstr "Недавние"
 
@@ -523,7 +532,7 @@ msgstr "Недавние"
 msgid "Reminders saved."
 msgstr "Напоминания сохранены."
 
-#: app/_components/meal-item-sheet.tsx:178
+#: app/_components/meal-item-sheet.tsx:183
 msgid "Remove"
 msgstr "Удалить"
 
@@ -532,12 +541,12 @@ msgstr "Удалить"
 msgid "Remove {0}"
 msgstr "Удалить {0}"
 
-#: app/_components/products-app.tsx:216
-#: app/_components/products-app.tsx:232
+#: app/_components/products-app.tsx:237
+#: app/_components/products-app.tsx:253
 msgid "Remove from favorites"
 msgstr "Убрать из избранного"
 
-#: app/_components/meal-item-sheet.tsx:173
+#: app/_components/meal-item-sheet.tsx:178
 msgid "Removed."
 msgstr "Удалено."
 
@@ -550,7 +559,7 @@ msgstr "Запрос не выполнен"
 msgid "Responded: {0}"
 msgstr "Ответ: {0}"
 
-#: app/_components/meal-item-sheet.tsx:209
+#: app/_components/meal-item-sheet.tsx:214
 msgid "Save"
 msgstr "Сохранить"
 
@@ -562,7 +571,7 @@ msgstr "Сначала сохраните часовой пояс, чтобы м
 msgid "Saved food groups will show up here so you can log them in one tap."
 msgstr "Сохранённые группы продуктов появятся здесь, чтобы добавлять их одним нажатием."
 
-#: app/_components/meal-item-sheet.tsx:203
+#: app/_components/meal-item-sheet.tsx:208
 msgid "Saved."
 msgstr "Сохранено."
 
@@ -571,6 +580,13 @@ msgstr "Сохранено."
 msgid "Scroll to bottom"
 msgstr "Прокрутить вниз"
 
+#: app/_components/mini-app-tab-bar.tsx:76
+#: app/_components/mini-app-tab-bar.tsx:134
+#: app/_components/mini-app-tab-bar.tsx:149
+msgid "Search"
+msgstr "Поиск"
+
+#: app/_components/mini-app-tab-bar.tsx:89
 #: app/_components/settings-forms.tsx:364
 #: app/_components/settings-forms.tsx:420
 msgid "Search…"
@@ -594,8 +610,8 @@ msgstr "Задайте дневные цели в чате, чтобы отсл�
 
 #: app/_components/desktop-workspace.tsx:123
 #: app/_components/mini-app-settings.tsx:72
-#: app/_components/mini-app-tab-bar.tsx:96
-#: app/_components/mini-app-tab-bar.tsx:119
+#: app/_components/mini-app-tab-bar.tsx:170
+#: app/_components/mini-app-tab-bar.tsx:199
 #: app/_components/settings-forms.tsx:209
 msgid "Settings"
 msgstr "Настройки"
@@ -636,8 +652,8 @@ msgstr "Выйти из этого браузера."
 msgid "Signed in as {email}"
 msgstr "Вы вошли как {email}"
 
-#: app/_components/meal-item-sheet.tsx:143
-#: app/_components/products-app.tsx:378
+#: app/_components/meal-item-sheet.tsx:146
+#: app/_components/products-app.tsx:402
 msgid "Size"
 msgstr "Размер"
 
@@ -645,11 +661,11 @@ msgstr "Размер"
 msgid "Snack"
 msgstr "Перекус"
 
-#: app/_components/products-app.tsx:202
+#: app/_components/products-app.tsx:208
 msgid "Star foods you eat often so they show up here."
 msgstr "Отмечайте звёздочкой продукты, которые едите часто, чтобы они появились здесь."
 
-#: app/_components/app-shell.tsx:59
+#: app/_components/app-shell.tsx:61
 msgid "Start a new chat"
 msgstr "Начать новый чат"
 
@@ -658,7 +674,7 @@ msgid "Stop"
 msgstr "Стоп"
 
 #: app/_components/desktop-workspace.tsx:103
-#: app/_components/mini-app-tab-bar.tsx:117
+#: app/_components/mini-app-tab-bar.tsx:197
 #: app/_components/nutrition-summary.tsx:251
 #: app/summary/page.tsx:15
 msgid "Summary"
@@ -720,6 +736,10 @@ msgstr "Время считается по UTC, пока вы не сохран�
 #: app/_components/day-ring-strip.tsx:418
 msgid "Today"
 msgstr "Сегодня"
+
+#: app/_components/products-app.tsx:226
+msgid "Try a different name."
+msgstr "Попробуйте другое название."
 
 #: app/login/page.tsx:55
 msgid "Try the Telegram button again, or use a magic link."

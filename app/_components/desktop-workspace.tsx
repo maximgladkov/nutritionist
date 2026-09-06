@@ -1,6 +1,8 @@
 "use client";
 
 import { AgentChat } from "@/app/_components/agent-chat";
+import { CatalogSearchProvider } from "@/app/_components/catalog-search";
+import { CatalogSearchDock } from "@/app/_components/catalog-search-chrome";
 import { DesktopSettings } from "@/app/_components/desktop-settings";
 import {
   DesktopWorkspaceContext,
@@ -107,16 +109,21 @@ export function DesktopWorkspace({ email }: { readonly email?: string }) {
             >
               <NutritionSummaryApp compact embed={false} />
             </DesktopScreen>
-            <DesktopScreen
-              icon={ShoppingBag}
-              id="products"
-              label={t`Products`}
-              screenRef={(node) => {
-                screenRefs.current.products = node;
-              }}
-            >
-              <ProductsApp compact />
-            </DesktopScreen>
+            <CatalogSearchProvider>
+              <DesktopScreen
+                icon={ShoppingBag}
+                id="products"
+                label={t`Products`}
+                screenRef={(node) => {
+                  screenRefs.current.products = node;
+                }}
+              >
+                <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+                  <ProductsApp compact />
+                  <CatalogSearchDock />
+                </div>
+              </DesktopScreen>
+            </CatalogSearchProvider>
             <DesktopScreen
               icon={Gear}
               id="settings"

@@ -5,6 +5,7 @@ import { Button, Tooltip } from "@heroui/react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
+import { CatalogSearchProvider } from "@/app/_components/catalog-search";
 import { DesktopWorkspace, useDesktopLayout } from "@/app/_components/desktop-workspace";
 import { useAppLocale } from "@/app/_components/lingui-client-provider";
 import { MiniAppShell } from "@/app/_components/mini-app-shell";
@@ -44,44 +45,46 @@ export function AppShell({
   }
 
   return (
-    <div className="relative h-dvh overflow-hidden" key={locale}>
-      <div
-        className={
-          isChat
-            ? "flex h-full min-h-0 flex-col pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]"
-            : "h-full overflow-y-auto pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]"
-        }
-      >
-        {isChat && pathname.startsWith("/s/") ? (
-          <div className="absolute top-3 right-3 z-20">
-            <Tooltip delay={0}>
-              <Button
-                aria-label={t`Start a new chat`}
-                isIconOnly
-                size="sm"
-                variant="ghost"
-                onPress={() => router.push("/s")}
-              >
-                <Plus className="size-4" />
-              </Button>
-              <Tooltip.Content>
-                <Trans>New chat</Trans>
-              </Tooltip.Content>
-            </Tooltip>
-          </div>
-        ) : null}
-        {isChat ? <div className="flex h-full min-h-0 flex-col">{children}</div> : children}
-      </div>
-      <WebAppTabBar
-        selected={selected}
-        onSelect={(tab) => {
-          const href = hrefForTab(tab, pathname);
-          if (href !== pathname) {
-            router.push(href);
+    <CatalogSearchProvider>
+      <div className="relative h-dvh overflow-hidden" key={locale}>
+        <div
+          className={
+            isChat
+              ? "flex h-full min-h-0 flex-col pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]"
+              : "h-full overflow-y-auto pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]"
           }
-        }}
-      />
-    </div>
+        >
+          {isChat && pathname.startsWith("/s/") ? (
+            <div className="absolute top-3 right-3 z-20">
+              <Tooltip delay={0}>
+                <Button
+                  aria-label={t`Start a new chat`}
+                  isIconOnly
+                  size="sm"
+                  variant="ghost"
+                  onPress={() => router.push("/s")}
+                >
+                  <Plus className="size-4" />
+                </Button>
+                <Tooltip.Content>
+                  <Trans>New chat</Trans>
+                </Tooltip.Content>
+              </Tooltip>
+            </div>
+          ) : null}
+          {isChat ? <div className="flex h-full min-h-0 flex-col">{children}</div> : children}
+        </div>
+        <WebAppTabBar
+          selected={selected}
+          onSelect={(tab) => {
+            const href = hrefForTab(tab, pathname);
+            if (href !== pathname) {
+              router.push(href);
+            }
+          }}
+        />
+      </div>
+    </CatalogSearchProvider>
   );
 }
 

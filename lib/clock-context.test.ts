@@ -46,4 +46,15 @@ describe("clockContextText", () => {
     });
     assert.match(text, /Current meal slot: lunch \(11:00–16:00\)/);
   });
+
+  it("appends a live nutrition snapshot when provided", () => {
+    const text = clockContextText({
+      liveNutrition: "Live database snapshot for this nutrition day: calories current 400 / goal 2244 kcal remaining 1844.",
+      now: new Date("2026-09-03T11:00:00.000Z"),
+      timeZone: "Europe/Berlin",
+      timezoneIsFallback: false,
+    });
+    assert.match(text, /Current meal slot: lunch \(11:00–16:00\)/);
+    assert.match(text, /calories current 400 \/ goal 2244 kcal remaining 1844/);
+  });
 });

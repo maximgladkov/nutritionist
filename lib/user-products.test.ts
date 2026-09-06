@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   applyFavorites,
+  filterUserProducts,
   groupLoggedProducts,
   productKey,
   sortUserProducts,
@@ -119,6 +120,27 @@ describe("sortUserProducts", () => {
     assert.deepEqual(
       sortUserProducts(products, "all").map((product) => product.name),
       ["Banana", "Oats"],
+    );
+  });
+});
+
+describe("filterUserProducts", () => {
+  it("filters by name case-insensitively and ignores blank queries", () => {
+    const products = groupLoggedProducts([
+      row({ amount: 50, createdAt: "2026-09-04T10:00:00.000Z", name: "Greek Yogurt" }),
+      row({ amount: 80, createdAt: "2026-09-02T10:00:00.000Z", name: "Banana" }),
+    ]);
+    assert.deepEqual(
+      filterUserProducts(products, "  ").map((product) => product.name),
+      ["Greek Yogurt", "Banana"],
+    );
+    assert.deepEqual(
+      filterUserProducts(products, "yoGU").map((product) => product.name),
+      ["Greek Yogurt"],
+    );
+    assert.deepEqual(
+      filterUserProducts(products, "milk").map((product) => product.name),
+      [],
     );
   });
 });

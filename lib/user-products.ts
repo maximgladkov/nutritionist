@@ -119,3 +119,14 @@ export function applyFavorites(
   return sortUserProducts(favoriteProducts, "recent");
 }
 
+export function filterUserProducts(
+  products: readonly UserProductView[],
+  query: string,
+): UserProductView[] {
+  const needle = query.trim().toLocaleLowerCase();
+  if (!needle) {
+    return [...products];
+  }
+  return products.filter((product) => product.name.toLocaleLowerCase().includes(needle));
+}
+

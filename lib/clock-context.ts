@@ -6,6 +6,7 @@ export function clockContextText(input: {
   now: Date;
   timeZone: string;
   timezoneIsFallback: boolean;
+  liveNutrition?: string;
 }): string {
   const local = getZonedParts(input.now, input.timeZone);
   const weekday = new Intl.DateTimeFormat("en-US", {
@@ -20,5 +21,6 @@ export function clockContextText(input: {
     `Current local time: ${weekday} ${calendarDate} ${formatClock(local.hour, local.minute)} (${zone}).`,
     `Nutrition day: ${formatDateInTimeZone(input.now, input.timeZone)} (04:00 to 04:00 the next morning).`,
     mealSlotContextText(inferMealLabel(input.now, input.timeZone)),
+    ...(input.liveNutrition ? [input.liveNutrition] : []),
   ].join(" ");
 }

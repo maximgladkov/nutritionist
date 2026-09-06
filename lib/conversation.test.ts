@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   CONVERSATION_SEARCH_DEFAULT_LIMIT,
   CONVERSATION_SEARCH_MAX_LIMIT,
+  RECENT_CONVERSATION_HEADER,
   clampConversationSearchLimit,
   conversationMessageText,
   conversationSearchQuery,
@@ -72,7 +73,7 @@ describe("formatRecentConversation", () => {
     assert.equal(
       formatted,
       [
-        "Recent Telegram turns for chat context only. Totals, remaining budget, and goals are not live here. The current user message follows separately.",
+        RECENT_CONVERSATION_HEADER,
         "Assistant: That looks like yogurt, 150g.",
         "User: yes",
       ].join("\n"),
@@ -85,7 +86,7 @@ describe("formatRecentConversation", () => {
     ]);
     assert.equal(
       formatted,
-      ["Recent Telegram turns for chat context only. Totals, remaining budget, and goals are not live here. The current user message follows separately.", "User: lunch"].join("\n"),
+      [RECENT_CONVERSATION_HEADER, "User: lunch"].join("\n"),
     );
   });
 
@@ -102,9 +103,7 @@ describe("formatRecentConversation", () => {
     );
     assert.equal(
       formatted,
-      ["Recent Telegram turns for chat context only. Totals, remaining budget, and goals are not live here. The current user message follows separately.", "Assistant: ok two", "User: three"].join(
-        "\n",
-      ),
+      [RECENT_CONVERSATION_HEADER, "Assistant: ok two", "User: three"].join("\n"),
     );
   });
 
@@ -115,7 +114,7 @@ describe("formatRecentConversation", () => {
         { role: "assistant", text: "bbbbbbbbbb" },
         { role: "user", text: "yes" },
       ],
-      { maxChars: 180 },
+      { maxChars: RECENT_CONVERSATION_HEADER.length + 40 },
     );
     assert.match(formatted ?? "", /User: yes$/u);
     assert.doesNotMatch(formatted ?? "", /aaaaaaaaaa/u);

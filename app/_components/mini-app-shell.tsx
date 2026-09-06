@@ -1,5 +1,6 @@
 "use client";
 
+import { CatalogSearchProvider } from "@/app/_components/catalog-search";
 import { MiniAppGroups } from "@/app/_components/mini-app-groups";
 import { MiniAppSettings } from "@/app/_components/mini-app-settings";
 import { MiniAppTabBar, type MiniAppTab } from "@/app/_components/mini-app-tab-bar";
@@ -25,40 +26,42 @@ export function MiniAppShell({ children }: { readonly children: ReactNode }) {
   }, [tab]);
 
   return (
-    <MiniAppFoodActiveContext.Provider value={tab === "food"}>
-      <div className="relative h-dvh overflow-hidden">
-        <div
-          className={cn(
-            "h-full overflow-y-auto pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]",
-            tab === "food" ? "block" : "hidden",
-          )}
-          ref={foodRef}
-        >
-          {children}
-        </div>
-        <div
-          className={cn(
-            "h-full overflow-y-auto pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]",
-            tab === "products" ? "block" : "hidden",
-          )}
-        >
-          <ProductsApp embed />
-        </div>
-        {tab === "groups" ? (
-          <div className="h-full overflow-y-auto pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]">
-            <MiniAppGroups />
+    <CatalogSearchProvider>
+      <MiniAppFoodActiveContext.Provider value={tab === "food"}>
+        <div className="relative h-dvh overflow-hidden">
+          <div
+            className={cn(
+              "h-full overflow-y-auto pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]",
+              tab === "food" ? "block" : "hidden",
+            )}
+            ref={foodRef}
+          >
+            {children}
           </div>
-        ) : null}
-        <div
-          className={cn(
-            "h-full overflow-y-auto pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]",
-            tab === "settings" ? "block" : "hidden",
-          )}
-        >
-          <MiniAppSettings />
+          <div
+            className={cn(
+              "h-full overflow-y-auto pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]",
+              tab === "products" ? "block" : "hidden",
+            )}
+          >
+            <ProductsApp embed />
+          </div>
+          {tab === "groups" ? (
+            <div className="h-full overflow-y-auto pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]">
+              <MiniAppGroups />
+            </div>
+          ) : null}
+          <div
+            className={cn(
+              "h-full overflow-y-auto pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]",
+              tab === "settings" ? "block" : "hidden",
+            )}
+          >
+            <MiniAppSettings />
+          </div>
+          <MiniAppTabBar selected={tab} onSelect={setTab} />
         </div>
-        <MiniAppTabBar selected={tab} onSelect={setTab} />
-      </div>
-    </MiniAppFoodActiveContext.Provider>
+      </MiniAppFoodActiveContext.Provider>
+    </CatalogSearchProvider>
   );
 }
