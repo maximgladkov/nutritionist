@@ -79,7 +79,7 @@ function NutrientCard({
       </Card.Header>
       <Card.Content className="flex-1 flex flex-col justify-end">
         <div className="flex items-start justify-between gap-3">
-          <MetricStat featured={featured} label={t`Today`} unit={ring.unit} value={consumed} />
+          <MetricStat featured={featured} label={t`Total`} unit={ring.unit} value={consumed} />
           <MetricStat
             align="end"
             featured={featured}

@@ -732,10 +732,13 @@ msgstr "Часовой пояс сохранён."
 msgid "Times use UTC until you save a time zone in Settings."
 msgstr "Время считается по UTC, пока вы не сохраните часовой пояс в Настройках."
 
-#: app/_components/day-goal-progress.tsx:82
 #: app/_components/day-ring-strip.tsx:418
 msgid "Today"
 msgstr "Сегодня"
+
+#: app/_components/day-goal-progress.tsx:82
+msgid "Total"
+msgstr "Всего"
 
 #: app/_components/products-app.tsx:226
 msgid "Try a different name."
