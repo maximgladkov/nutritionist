@@ -1,5 +1,7 @@
 import type { FilePart, UserContent } from "ai";
+import { normalizeChannelKind } from "./agent-turn-model.ts";
 import { isImageMediaType, looksLikeImageFilename, sniffImageMediaType } from "./image-bytes.ts";
+import type { TurnFilePersistScope } from "./persist-turn-files.ts";
 
 export function isAudioMediaType(mediaType: string | undefined): boolean {
   return mediaType?.toLowerCase().startsWith("audio/") === true && mediaType.toLowerCase() !== "audio/*";
@@ -34,11 +36,20 @@ type ChannelAdapterLike = {
 export async function inlineTelegramImages(
   content: string | UserContent,
   fetchFile: TelegramFileFetch,
+  persist?: TurnFilePersistScope,
 ): Promise<string | UserContent> {
   if (typeof content === "string" || !Array.isArray(content)) {
     return content;
   }
-  const parts = await Promise.all(content.map((part) => inlineTelegramImagePart(part, fetchFile)));
+  let fileIndex = 0;
+  const parts = [];
+  for (const part of content) {
+    const next = await inlineTelegramImagePart(part, fetchFile, persist, fileIndex);
+    if (isFilePart(part)) {
+      fileIndex += 1;
+    }
+    parts.push(next);
+  }
   return parts as UserContent;
 }
 
@@ -61,10 +72,13 @@ export function attachTelegramVision<T extends object>(channel: T, fetchFile: Te
     if (!isRecord(step) || step.message === undefined) {
       return delivered ?? payload;
     }
+    const persist = persistScopeFromDeliver(ctx);
     return {
       ...step,
-      message: await inlineTelegramImages(step.message as string | UserContent, (url) =>
-        adapter.fetchFile === undefined ? fetchFile(url) : adapter.fetchFile(url),
+      message: await inlineTelegramImages(
+        step.message as string | UserContent,
+        (url) => (adapter.fetchFile === undefined ? fetchFile(url) : adapter.fetchFile(url)),
+        persist ?? undefined,
       ),
     };
   };
@@ -92,13 +106,19 @@ export function withSniffedImageType(
   return { ...result, mediaType: sniffed };
 }
 
-async function inlineTelegramImagePart(part: unknown, fetchFile: TelegramFileFetch) {
+async function inlineTelegramImagePart(
+  part: unknown,
+  fetchFile: TelegramFileFetch,
+  persist: TurnFilePersistScope | undefined,
+  index: number,
+) {
   if (!isFilePart(part)) {
     return part;
   }
   const url = filePartUrl(part.data);
   if (url === null) {
-    return inlineLocalFilePart(part);
+    const inlined = inlineLocalFilePart(part);
+    return persistIfNeeded(inlined, persist, index, localFileBytes(part.data) ?? undefined);
   }
   if (!shouldInlineTelegramFile(part.mediaType, part.filename)) {
     return part;
@@ -114,7 +134,7 @@ async function inlineTelegramImagePart(part: unknown, fetchFile: TelegramFileFet
     if (mediaType === undefined) {
       return part;
     }
-    return visionFilePart(bytes, mediaType, part.filename);
+    return persistIfNeeded(visionFilePart(bytes, mediaType, part.filename), persist, index, bytes);
   } catch {
     return part;
   }
@@ -211,6 +231,56 @@ function localFileBytes(data: unknown): Uint8Array | null {
     return new Uint8Array(data);
   }
   return null;
+}
+
+function persistScopeFromDeliver(ctx: unknown): TurnFilePersistScope | null {
+  if (!isRecord(ctx)) {
+    return null;
+  }
+  const session = isRecord(ctx.session) ? ctx.session : null;
+  if (session === null || typeof session.id !== "string") {
+    return null;
+  }
+  const turn = isRecord(session.turn) ? session.turn : isRecord(ctx.turn) ? ctx.turn : null;
+  const turnId = typeof turn?.id === "string" ? turn.id : typeof ctx.turnId === "string" ? ctx.turnId : null;
+  if (turnId === null) {
+    return null;
+  }
+  const channel = isRecord(ctx.channel) ? ctx.channel : null;
+  const kind = typeof channel?.kind === "string" ? channel.kind : "telegram";
+  const auth = isRecord(session.auth) ? session.auth : null;
+  const caller = isRecord(auth?.current) ? auth.current : isRecord(auth?.initiator) ? auth.initiator : null;
+  const principalId = typeof caller?.principalId === "string" ? caller.principalId : null;
+  return {
+    channel: normalizeChannelKind(kind),
+    sessionId: session.id,
+    turnId,
+    userId: principalId,
+  };
+}
+
+async function persistIfNeeded(
+  part: FilePart,
+  persist: TurnFilePersistScope | undefined,
+  index: number,
+  bytes?: Uint8Array,
+) {
+  if (persist === undefined) {
+    return part;
+  }
+  const payload = bytes ?? localFileBytes(part.data);
+  if (payload === null) {
+    return part;
+  }
+  const { persistInlineUserFile } = await import("./persist-turn-files.ts");
+  await persistInlineUserFile({
+    ...persist,
+    bytes: payload,
+    filename: part.filename,
+    index,
+    mediaType: part.mediaType,
+  });
+  return part;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

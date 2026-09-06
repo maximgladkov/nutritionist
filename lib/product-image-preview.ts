@@ -11,10 +11,13 @@ export function productImagePreviews(value: unknown): ProductImagePreview[] {
 }
 
 export function looksLikeImageUrl(value: string, keyName?: number | string): boolean {
+  if (value.startsWith("/api/catalog-images/") || value.startsWith("/admin/attachments/")) {
+    return true;
+  }
   if (!/^https?:\/\//i.test(value)) {
     return false;
   }
-  if (keyName === "imageUrl" || keyName === "image_url" || keyName === "image_small_url") {
+  if (keyName === "imageUrl" || keyName === "image_url" || keyName === "image_small_url" || keyName === "url") {
     return true;
   }
   try {

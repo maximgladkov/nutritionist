@@ -25,6 +25,14 @@ export type ProductNutriments = {
   salt100ml?: number;
 };
 
+export type CatalogImageKind = "front" | "nutrition" | "other";
+
+export type CatalogProductImageView = {
+  id: string;
+  kind: CatalogImageKind;
+  url: string;
+};
+
 export type Product = {
   barcode: string;
   name: string | null;
@@ -37,6 +45,7 @@ export type Product = {
   allergens: string | null;
   nutriments: ProductNutriments;
   imageUrl: string | null;
+  images?: readonly CatalogProductImageView[];
   countries: string[];
 };
 

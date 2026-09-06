@@ -27,6 +27,7 @@ model User {
   productFavorites ProductFavorite[]
   agentTurns    AgentTurn[]
   pendingAcks   AgentTurnPendingAck[]
+  attachments   UserAttachment[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -110,11 +111,51 @@ model CatalogProduct {
   searchText      String   @default(dbgenerated("lower(immutable_unaccent(TRIM(BOTH FROM COALESCE(\"name\", '') || ' ' || COALESCE(\"brands\", ''))))"))
   createdByUserId String?
   createdBy       User?    @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  images          CatalogProductImage[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   @@index([createdByUserId])
   @@index([name])
+}
+
+model UserAttachment {
+  id            String   @id @default(cuid())
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  sessionId     String
+  turnId        String
+  channel       String
+  filename      String?
+  mediaType     String
+  size          Int?
+  blobUrl       String
+  blobPath      String   @unique
+  createdAt     DateTime @default(now())
+  catalogImages CatalogProductImage[]
+
+  @@index([sessionId, turnId])
+  @@index([userId])
+}
+
+enum CatalogProductImageKind {
+  front
+  nutrition
+  other
+}
+
+model CatalogProductImage {
+  id           String                   @id @default(cuid())
+  barcode      String
+  product      CatalogProduct           @relation(fields: [barcode], references: [barcode], onDelete: Cascade)
+  attachmentId String
+  attachment   UserAttachment           @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+  kind         CatalogProductImageKind
+  sortOrder    Int
+  createdAt    DateTime                 @default(now())
+
+  @@unique([barcode, attachmentId])
+  @@index([barcode, sortOrder])
 }
 
 model OffProduct {

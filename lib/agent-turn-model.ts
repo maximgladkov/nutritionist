@@ -1,3 +1,5 @@
+import { conversationTextWithoutMediaStubs } from "./conversation-query.ts";
+
 export const USER_PREVIEW_MAX_CHARS = 280;
 export const TOOL_JSON_MAX_CHARS = 16_000;
 
@@ -336,7 +338,7 @@ export function summarizeTranscript(transcript: AgentTurnTranscript): AgentTurnU
     outputTokens:
       transcript.steps.reduce((sum, step) => sum + step.outputTokens, 0) +
       acks.reduce((sum, ack) => sum + ack.outputTokens, 0),
-    userPreview: userPreviewFrom(user?.text),
+    userPreview: userPreviewFrom(user?.text, user?.parts),
   };
 }
 
@@ -412,14 +414,22 @@ export function toolResultFromAction(result: unknown): {
   };
 }
 
-export function userPreviewFrom(text: string | undefined): string | null {
+export function userPreviewFrom(
+  text: string | undefined,
+  parts?: readonly AgentTurnUserPart[],
+): string | null {
   const trimmed = text?.trim() ?? "";
-  if (trimmed.length === 0) {
-    return null;
+  const stripped = conversationTextWithoutMediaStubs(trimmed);
+  if (stripped.length > 0) {
+    return stripped.length <= USER_PREVIEW_MAX_CHARS
+      ? stripped
+      : `${stripped.slice(0, USER_PREVIEW_MAX_CHARS - 1)}…`;
   }
-  return trimmed.length <= USER_PREVIEW_MAX_CHARS
-    ? trimmed
-    : `${trimmed.slice(0, USER_PREVIEW_MAX_CHARS - 1)}…`;
+  const hasFilePart = parts?.some((part) => part.type === "file" || part.type === "image") === true;
+  if (hasFilePart || (trimmed.length > 0 && stripped.length === 0)) {
+    return "Photo";
+  }
+  return null;
 }
 
 function isRetryableTurnItem(

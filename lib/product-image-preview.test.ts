@@ -29,6 +29,7 @@ describe("looksLikeImageUrl", () => {
     assert.equal(looksLikeImageUrl("https://images.openfoodfacts.org/x/front.jpg"), true);
     assert.equal(looksLikeImageUrl("https://example.com/file", "imageUrl"), true);
     assert.equal(looksLikeImageUrl("https://example.com/page"), false);
-    assert.equal(looksLikeImageUrl("not-a-url"), false);
+    assert.equal(looksLikeImageUrl("/api/catalog-images/abc"), true);
+    assert.equal(looksLikeImageUrl("/admin/attachments/xyz"), true);
   });
 });

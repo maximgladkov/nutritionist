@@ -1,4 +1,5 @@
 import { prisma } from "./prisma.ts";
+import { loadCatalogImagesByBarcodes, primaryCatalogImageUrl } from "./catalog-product-images.ts";
 import {
   applyFavorites,
   groupLoggedProducts,
@@ -43,7 +44,18 @@ export async function listUserProducts(input: {
     }),
   ]);
   const grouped = groupLoggedProducts(items);
-  return applyFavorites(grouped, favorites, input.segment);
+  const barcodes = [
+    ...new Set(
+      [...grouped, ...favorites]
+        .map((item) => item.barcode)
+        .filter((barcode): barcode is string => Boolean(barcode && barcode.length > 0)),
+    ),
+  ];
+  const imagesByBarcode = await loadCatalogImagesByBarcodes(barcodes);
+  const withImages = grouped.map((product) => withCatalogProductImages(product, imagesByBarcode));
+  return applyFavorites(withImages, favorites, input.segment).map((product) =>
+    withCatalogProductImages(product, imagesByBarcode),
+  );
 }
 
 export async function setProductFavorite(input: {
@@ -81,4 +93,19 @@ export async function setProductFavorite(input: {
     where: { userId: input.userId, key },
   });
   return { favorite: false, key };
+}
+
+function withCatalogProductImages(
+  product: UserProductView,
+  imagesByBarcode: Map<string, UserProductView["images"]>,
+): UserProductView {
+  if (!product.barcode) {
+    return product;
+  }
+  const images = imagesByBarcode.get(product.barcode) ?? product.images;
+  return {
+    ...product,
+    imageUrl: product.imageUrl ?? primaryCatalogImageUrl(images),
+    images,
+  };
 }

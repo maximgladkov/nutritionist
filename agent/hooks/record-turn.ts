@@ -22,6 +22,7 @@ import {
   toolResultFromAction,
   type AgentTurnUserPart,
 } from "../../lib/agent-turns";
+import { persistTurnUserFiles } from "../../lib/persist-turn-files";
 
 export default defineHook({
   events: {
@@ -46,12 +47,23 @@ export default defineHook({
         }
       });
     },
-    "message.received"(event, ctx) {
-      persistTurnEvent("message.received", ctx, event.data.turnId, event.meta.at, async (scope) => {
+    async "message.received"(event, ctx) {
+      await persistTurnEvent("message.received", ctx, event.data.turnId, event.meta.at, async (scope) => {
+        let parts: AgentTurnUserPart[] | undefined;
+        try {
+          parts = await persistTurnUserFiles({
+            ctx,
+            parts: event.data.parts,
+            scope,
+          });
+        } catch (error) {
+          console.error("user attachment persist failed", error);
+          parts = receivedParts(event.data.parts);
+        }
         await patchAgentTurnTranscript(scope, (transcript) =>
           applyUserMessage(transcript, {
             at: event.meta.at,
-            parts: receivedParts(event.data.parts),
+            parts,
             text: event.data.message,
           }),
         );
@@ -189,8 +201,8 @@ function persistTurnEvent(
   turnId: string,
   at: string,
   work: (scope: TurnScope) => Promise<void>,
-): void {
-  void enqueueAgentTurnPersist(ctx.session.id, turnId, async () => {
+): Promise<void> {
+  return enqueueAgentTurnPersist(ctx.session.id, turnId, async () => {
     await runQuietly(event, async () => {
       const scope = await turnScope(ctx, turnId, at);
       await work(scope);

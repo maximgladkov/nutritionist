@@ -10,6 +10,12 @@ import {
 } from "./catalog-product-query.ts";
 import { searchCatalogProductsFuzzy } from "./off-product-store.ts";
 import {
+  attachCatalogProductPhotos,
+  loadCatalogImagesByBarcodes,
+  withCatalogImages,
+  type CatalogPhotoInput,
+} from "./catalog-product-images.ts";
+import {
   getProductByBarcode,
   InvalidBarcodeError,
   isValidBarcode,
@@ -30,8 +36,11 @@ export type SaveCatalogProductInput = {
   createdByUserId: string;
   name: string;
   nutriments: ProductNutriments;
+  photos?: readonly CatalogPhotoInput[];
   quantity?: string;
   servingSize?: string;
+  sessionId?: string;
+  turnId?: string;
 };
 
 export type SaveCatalogProductResult =
@@ -102,6 +111,15 @@ export async function saveCatalogProduct(input: SaveCatalogProductInput): Promis
   ]);
   const decision = decideCatalogSave(existing, off.found ? off.product : undefined);
   if (decision.action === "exists") {
+    if (decision.source === "custom-catalog") {
+      const images = await attachCatalogProductPhotos({
+        barcode,
+        photos: input.photos,
+        sessionId: input.sessionId,
+        turnId: input.turnId,
+      });
+      return savedResult(withCatalogImages(decision.product, images), decision.source, "exists");
+    }
     return savedResult(decision.product, decision.source, "exists");
   }
 
@@ -126,17 +144,35 @@ export async function saveCatalogProduct(input: SaveCatalogProductInput): Promis
         servingSize: data.servingSize,
       },
     });
-    return savedResult(catalogRowToProduct(updated), "custom-catalog", "updated");
+    const images = await attachCatalogProductPhotos({
+      barcode,
+      photos: input.photos,
+      sessionId: input.sessionId,
+      turnId: input.turnId,
+    });
+    return savedResult(withCatalogImages(catalogRowToProduct(updated), images), "custom-catalog", "updated");
   }
 
   try {
     const created = await prisma.catalogProduct.create({ data });
-    return savedResult(catalogRowToProduct(created), "custom-catalog", "created");
+    const images = await attachCatalogProductPhotos({
+      barcode,
+      photos: input.photos,
+      sessionId: input.sessionId,
+      turnId: input.turnId,
+    });
+    return savedResult(withCatalogImages(catalogRowToProduct(created), images), "custom-catalog", "created");
   } catch (error) {
     if (isUniqueConstraintError(error)) {
       const raced = await findCatalogProduct(barcode);
       if (raced) {
-        return savedResult(raced, "custom-catalog", "exists");
+        const images = await attachCatalogProductPhotos({
+          barcode,
+          photos: input.photos,
+          sessionId: input.sessionId,
+          turnId: input.turnId,
+        });
+        return savedResult(withCatalogImages(raced, images), "custom-catalog", "exists");
       }
     }
     throw error;
@@ -158,11 +194,17 @@ function savedResult(
 
 async function findCatalogProduct(barcode: string): Promise<Product | undefined> {
   const row = await prisma.catalogProduct.findUnique({ where: { barcode } });
-  return row ? catalogRowToProduct(row) : undefined;
+  if (!row) {
+    return undefined;
+  }
+  const images = await loadCatalogImagesByBarcodes([barcode]);
+  return withCatalogImages(catalogRowToProduct(row), images.get(barcode) ?? []);
 }
 
 async function searchCatalogProducts(query: string): Promise<Product[]> {
-  return searchCatalogProductsFuzzy(query, 10);
+  const products = await searchCatalogProductsFuzzy(query, 10);
+  const images = await loadCatalogImagesByBarcodes(products.map((product) => product.barcode));
+  return products.map((product) => withCatalogImages(product, images.get(product.barcode) ?? []));
 }
 
 function catalogRowToProduct(row: {

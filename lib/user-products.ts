@@ -1,3 +1,4 @@
+import type { CatalogProductImageView } from "./open-food-facts-map.ts";
 import type { AmountUnit } from "./nutrition.ts";
 
 export const PRODUCT_MEAL_LABELS = ["breakfast", "lunch", "dinner", "snack"] as const;
@@ -28,6 +29,7 @@ export type UserProductView = {
   energyKcal: number | null;
   favorite: boolean;
   imageUrl: string | null;
+  images: readonly CatalogProductImageView[];
   key: string;
   lastUsedAt: string;
   name: string;
@@ -57,6 +59,7 @@ export function groupLoggedProducts(rows: readonly LoggedProductRow[]): UserProd
       energyKcal: row.energyKcal,
       favorite: false,
       imageUrl: row.imageUrl,
+      images: [],
       key,
       lastUsedAt: row.createdAt.toISOString(),
       name: row.name,
@@ -106,6 +109,7 @@ export function applyFavorites(
       energyKcal: null,
       favorite: true,
       imageUrl: null,
+      images: [],
       key: favorite.key,
       lastUsedAt: favorite.createdAt.toISOString(),
       name: favorite.name,

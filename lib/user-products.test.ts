@@ -74,12 +74,13 @@ describe("groupLoggedProducts", () => {
         amount: product.amount,
         energyKcal: product.energyKcal,
         imageUrl: product.imageUrl,
+        images: product.images,
         key: product.key,
         name: product.name,
       })),
       [
-        { amount: 30, energyKcal: 80, imageUrl: null, key: "b:123", name: "Yogurt A" },
-        { amount: 200, energyKcal: 90, imageUrl: null, key: "n:apple", name: "Apple" },
+        { amount: 30, energyKcal: 80, imageUrl: null, images: [], key: "b:123", name: "Yogurt A" },
+        { amount: 200, energyKcal: 90, imageUrl: null, images: [], key: "n:apple", name: "Apple" },
       ],
     );
   });

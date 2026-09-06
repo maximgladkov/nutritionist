@@ -36,6 +36,14 @@ describe("transcript reducers", () => {
   it("captures a user to assistant turn", () => {
     let transcript = applyUserMessage(emptyTranscript(), {
       at: "2026-09-04T10:00:00.000Z",
+      parts: [
+        {
+          filename: "meal.jpg",
+          mediaType: "image/jpeg",
+          type: "file",
+          url: "/admin/attachments/att1",
+        },
+      ],
       text: "logged yogurt",
     });
     transcript = applyAssistantMessage(transcript, {
@@ -46,6 +54,11 @@ describe("transcript reducers", () => {
     });
     assert.equal(transcript.items.length, 2);
     assert.equal(summarizeTranscript(transcript).userPreview, "logged yogurt");
+    const user = transcript.items[0];
+    assert.equal(user?.type, "user");
+    if (user?.type === "user") {
+      assert.equal(user.parts?.[0]?.url, "/admin/attachments/att1");
+    }
   });
 
   it("records tool input then output", () => {
@@ -226,6 +239,15 @@ describe("transcript reducers", () => {
 describe("userPreviewFrom", () => {
   it("returns null for blank text", () => {
     assert.equal(userPreviewFrom("  "), null);
+  });
+
+  it("strips media stubs and uses Photo when only files remain", () => {
+    assert.equal(userPreviewFrom("lunch\n[file: meal.jpg (image/jpeg)]"), "lunch");
+    assert.equal(userPreviewFrom("[image: image/jpeg]"), "Photo");
+    assert.equal(
+      userPreviewFrom("", [{ type: "file", mediaType: "image/jpeg", url: "/admin/attachments/1" }]),
+      "Photo",
+    );
   });
 
   it("truncates long previews", () => {

@@ -324,6 +324,13 @@ function AddProductSheet({
               </Sheet.Heading>
             </Sheet.Header>
             <Sheet.Body className="flex flex-col gap-5">
+              {product && product.images.length > 1 ? (
+                <div className="flex flex-wrap gap-2">
+                  {product.images.map((image) => (
+                    <FoodThumb alt={product.name} className="size-16" key={image.id} src={image.url} />
+                  ))}
+                </div>
+              ) : null}
               <RadioButtonGroup
                 className="grid w-full grid-cols-2"
                 layout="grid"

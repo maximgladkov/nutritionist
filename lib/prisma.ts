@@ -28,7 +28,8 @@ function hasRequiredModels(client: PrismaClient | undefined): client is PrismaCl
     typeof client?.agentTurn?.findUnique === "function" &&
     typeof client?.agentTurnPendingAck?.findFirst === "function" &&
     typeof client?.offProduct?.findUnique === "function" &&
-    typeof client?.productFavorite?.findMany === "function"
+    typeof client?.productFavorite?.findMany === "function" &&
+    typeof client?.userAttachment?.findUnique === "function"
   );
 }
 
