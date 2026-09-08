@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   CONVERSATION_SEARCH_DEFAULT_LIMIT,
   CONVERSATION_SEARCH_MAX_LIMIT,
+  CONVERSATION_SESSION_GAP_MS,
   RECENT_CONVERSATION_HEADER,
   clampConversationSearchLimit,
   conversationMessageText,
@@ -10,6 +11,7 @@ import {
   conversationTextWithoutMediaStubs,
   formatRecentConversation,
   isTelegramConversationChannel,
+  sliceCurrentConversation,
 } from "./conversation-query.ts";
 
 describe("clampConversationSearchLimit", () => {
@@ -59,6 +61,48 @@ describe("conversationTextWithoutMediaStubs", () => {
   });
 });
 
+describe("sliceCurrentConversation", () => {
+  it("keeps the last stretch after a long pause", () => {
+    const first = new Date("2026-09-08T08:00:00.000Z");
+    const second = new Date("2026-09-08T08:05:00.000Z");
+    const later = new Date(second.getTime() + CONVERSATION_SESSION_GAP_MS + 60_000);
+    const followUp = new Date(later.getTime() + 60_000);
+    assert.deepEqual(
+      sliceCurrentConversation([
+        { at: first, text: "breakfast" },
+        { at: second, text: "logged" },
+        { at: later, text: "lunch" },
+        { at: followUp, text: "and coffee" },
+      ]).map((message) => message.text),
+      ["lunch", "and coffee"],
+    );
+  });
+
+  it("keeps a long stretch when gaps stay under the pause", () => {
+    const start = new Date("2026-09-08T12:00:00.000Z").getTime();
+    const messages = Array.from({ length: 12 }, (_, index) => ({
+      at: new Date(start + index * 5 * 60 * 1000),
+      text: String(index + 1),
+    }));
+    assert.deepEqual(
+      sliceCurrentConversation(messages).map((message) => message.text),
+      messages.map((message) => message.text),
+    );
+  });
+
+  it("starts a new stretch when the gap is exactly the pause", () => {
+    const first = new Date("2026-09-08T08:00:00.000Z");
+    const next = new Date(first.getTime() + CONVERSATION_SESSION_GAP_MS);
+    assert.deepEqual(
+      sliceCurrentConversation([
+        { at: first, text: "old" },
+        { at: next, text: "new" },
+      ]).map((message) => message.text),
+      ["new"],
+    );
+  });
+});
+
 describe("formatRecentConversation", () => {
   it("returns undefined for empty input", () => {
     assert.equal(formatRecentConversation([]), undefined);
@@ -90,21 +134,32 @@ describe("formatRecentConversation", () => {
     );
   });
 
-  it("keeps the newest messages within the count limit", () => {
-    const formatted = formatRecentConversation(
-      [
-        { role: "user", text: "one" },
-        { role: "assistant", text: "ok one" },
-        { role: "user", text: "two" },
-        { role: "assistant", text: "ok two" },
-        { role: "user", text: "three" },
-      ],
-      { limit: 2 },
-    );
+  it("drops messages from the previous conversation after a long pause", () => {
+    const morning = new Date("2026-09-08T08:00:00.000Z");
+    const lunch = new Date(morning.getTime() + CONVERSATION_SESSION_GAP_MS + 60_000);
+    const formatted = formatRecentConversation([
+      { at: morning, role: "user", text: "logged oatmeal" },
+      { at: morning, role: "assistant", text: "ok breakfast" },
+      { at: lunch, role: "user", text: "chicken bowl" },
+      { at: lunch, role: "assistant", text: "ok lunch" },
+    ]);
     assert.equal(
       formatted,
-      [RECENT_CONVERSATION_HEADER, "Assistant: ok two", "User: three"].join("\n"),
+      [RECENT_CONVERSATION_HEADER, "User: chicken bowl", "Assistant: ok lunch"].join("\n"),
     );
+  });
+
+  it("keeps more than eight messages from the current conversation", () => {
+    const start = new Date("2026-09-08T12:00:00.000Z").getTime();
+    const formatted = formatRecentConversation(
+      Array.from({ length: 10 }, (_, index) => ({
+        at: new Date(start + index * 60 * 1000),
+        role: index % 2 === 0 ? ("user" as const) : ("assistant" as const),
+        text: `m${String(index + 1)}`,
+      })),
+    );
+    assert.match(formatted ?? "", /User: m1/u);
+    assert.match(formatted ?? "", /Assistant: m10/u);
   });
 
   it("drops the oldest lines to stay under the character cap", () => {

@@ -12,7 +12,7 @@
     "dev": "lingui compile && next dev",
     "lingui:compile": "lingui compile",
     "lingui:extract": "lingui extract --clean",
-    "eval": "eve eval",
+    "eval": "eve build && eve eval",
     "start": "next start",
     "typecheck": "lingui compile && tsc --noEmit -p tsconfig.json",
     "test": "node --experimental-strip-types --test lib/*.test.ts",

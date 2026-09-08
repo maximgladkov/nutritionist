@@ -2,15 +2,16 @@ import { prisma } from "./prisma.ts";
 import {
   clampConversationSearchLimit,
   conversationSearchQuery,
+  CONVERSATION_SESSION_LOOKBACK,
   formatRecentConversation,
-  RECENT_CONVERSATION_LIMIT,
   TELEGRAM_CONVERSATION_CHANNEL,
 } from "./conversation-query.ts";
 
 export {
   CONVERSATION_SEARCH_DEFAULT_LIMIT,
   CONVERSATION_SEARCH_MAX_LIMIT,
-  RECENT_CONVERSATION_LIMIT,
+  CONVERSATION_SESSION_GAP_MS,
+  CONVERSATION_SESSION_LOOKBACK,
   RECENT_CONVERSATION_MAX_CHARS,
   clampConversationSearchLimit,
   conversationMessageText,
@@ -18,6 +19,7 @@ export {
   conversationTextWithoutMediaStubs,
   formatRecentConversation,
   isTelegramConversationChannel,
+  sliceCurrentConversation,
   TELEGRAM_CONVERSATION_CHANNEL,
 } from "./conversation-query.ts";
 
@@ -103,10 +105,22 @@ export async function loadRecentConversation(input: {
   channel: string;
   userId: string;
 }): Promise<string | undefined> {
-  const messages = await searchConversation({
-    channel: input.channel,
-    limit: RECENT_CONVERSATION_LIMIT,
-    userId: input.userId,
+  const rows = await prisma.conversationMessage.findMany({
+    orderBy: { createdAt: "desc" },
+    select: { createdAt: true, role: true, text: true },
+    take: CONVERSATION_SESSION_LOOKBACK,
+    where: {
+      channel: input.channel,
+      userId: input.userId,
+    },
   });
-  return formatRecentConversation(messages);
+  return formatRecentConversation(
+    rows
+      .map((row) => ({
+        at: row.createdAt,
+        role: row.role === "assistant" ? ("assistant" as const) : ("user" as const),
+        text: row.text,
+      }))
+      .reverse(),
+  );
 }

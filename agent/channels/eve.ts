@@ -10,6 +10,7 @@ import type { ChannelReceiveContext } from "eve/channels";
 import { appPrincipal } from "../../lib/principal";
 import { prisma } from "../../lib/prisma";
 import { eveSessionIdFromPath, getUserFromRequest } from "../../lib/session";
+import { formatToolCategoriesContext } from "../../lib/tool-categories";
 
 function appSession(): AuthFn<Request> {
   return async (request) => {
@@ -63,7 +64,10 @@ Object.assign(channel, {
     if (!sessionId) {
       throw new Error("Web reminder delivery requires target.sessionId");
     }
-    return ctx.from(sessionId).send(input.message, { auth: input.auth });
+    return ctx.from(sessionId).send(input.message, {
+      auth: input.auth,
+      context: [formatToolCategoriesContext(["none"])],
+    });
   },
 });
 

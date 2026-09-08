@@ -3,6 +3,7 @@ import eve from "../channels/eve";
 import telegram from "../channels/telegram";
 import whatsapp from "../channels/whatsapp";
 import { appPrincipal } from "../../lib/principal";
+import { formatToolCategoriesContext } from "../../lib/tool-categories";
 import {
   buildCheckInPrompt,
   claimDueReminders,
@@ -69,7 +70,7 @@ async function sendCheckIn(
   label: ClaimedReminder["label"],
   target: ReachTarget,
 ): Promise<void> {
-  const prompt = await buildCheckInPrompt({ label, userId });
+  const prompt = `${formatToolCategoriesContext(["none"])}\n${await buildCheckInPrompt({ label, userId })}`;
   if (target.channel === "telegram") {
     await to(telegram, { chatId: target.chatId }).send(prompt, {
       auth: appPrincipal(userId, "telegram"),

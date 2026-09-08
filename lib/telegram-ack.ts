@@ -1,7 +1,14 @@
-import { generateText } from "ai";
+import { generateText, Output } from "ai";
 import { APP_NAME } from "./brand.ts";
 import { isImageMediaType, looksLikeImageFilename } from "./image-bytes.ts";
 import { isAudioMediaType, isVideoMediaType, looksLikeAudioFilename, looksLikeVideoFilename } from "./telegram-vision.ts";
+import {
+  normalizeIntents,
+  normalizeToolCategories,
+  toolCategoriesPreludeSchema,
+  type ToolCategory,
+  type ToolIntent,
+} from "./tool-categories.ts";
 
 export const TELEGRAM_ACK_MODEL = "google/gemini-3.5-flash-lite";
 export const TELEGRAM_ACK_TIMEOUT_MS = 4000;
@@ -9,7 +16,7 @@ export const TELEGRAM_ACK_TURN_CONTEXT =
   "A short acknowledgement was already sent to the user. Do not narrate what you are about to do. For logged intake, remaining budget, meals, or goals, use the live snapshot in context or goals, current, and remaining from a meal or goal tool this turn. Never reuse numbers from chat; the user can change meals and goals in the app. Then send only the actual result.";
 
 export const TELEGRAM_ACK_SYSTEM =
-  `You are ${APP_NAME} sending one Telegram acknowledgement. Reply with a very short, natural chat status that matches what they just asked, as if you already started. A few words is enough. Sound like a person, not a canned bot status. Vary the wording every time. Examples of the kind of reply, not lines to copy: calories or totals — Checking calories… / Смотрю калории… / Гляну, сколько вышло…; logging a meal — Logging that… / Записываю… / Сейчас внесу…; a photo — Looking at the photo… / Смотрю фото…; a voice note — Listening… / Слушаю…; a video — Watching the video… / Смотрю видео…; other — One sec… / Hang on… / Сейчас гляну…. Match look / listen / watch to the attachments listed for this turn. If there are several attachments, you can name the mix in a few words. Match the language of the latest user message. Do not use markdown. Do not ask a question. Do not say you will get back later. Do not claim the work is done.`;
+  `You are ${APP_NAME} sending one Telegram acknowledgement. Return JSON with ack and intents. ack is a very short, natural chat status that matches what they just asked, as if you already started. A few words is enough. Sound like a person, not a canned bot status. Vary the wording every time. Examples of the kind of ack, not lines to copy: calories or totals — Checking calories… / Смотрю калории… / Гляну, сколько вышло…; logging a meal — Logging that… / Записываю… / Сейчас внесу…; a photo — Looking at the photo… / Смотрю фото…; a voice note — Listening… / Слушаю…; a video — Watching the video… / Смотрю видео…; other — One sec… / Hang on… / Сейчас гляну…. Match look / listen / watch to the attachments listed for this turn. If there are several attachments, you can name the mix in a few words. Match the language of the latest user message. Do not use markdown. Do not ask a question. Do not say you will get back later. Do not claim the work is done. intents is an ordered list of what this turn must do. Each item has text (a short phrase) and category: none, meal, meal_delete, goals, profile, reminders, summary, memory. Include every distinct request. Classify from the user's request, not from the fact that a file is attached. A photo, voice note, or video can be a meal log, a nutrient question, a recap, or unrelated. Use none when no write is needed (greeting, how they are doing, a question about nutrients, offering to log later, unrelated media). meal: they asked to log or add food, or look up a product. meal_delete: remove a logged item. goals: daily calorie or macro targets. profile: name, timezone, country, or other profile fields. reminders: meal reminder times. summary: meals or nutrition for another date, or a list of what they ate. memory: save or forget a durable personal fact. Do not put tool names in intents.`;
 
 export type TelegramAckFileKind = "audio" | "file" | "photo" | "video" | "voice";
 
@@ -115,6 +122,8 @@ export type TelegramAckUsage = {
 };
 
 export type TelegramAckGeneration = TelegramAckUsage & {
+  categories: ToolCategory[];
+  intents: ToolIntent[];
   model: string;
   text: string;
 };
@@ -152,24 +161,52 @@ export async function generateTelegramAckText(input: TelegramAckInput): Promise<
     generateText({
       abortSignal: AbortSignal.timeout(TELEGRAM_ACK_TIMEOUT_MS),
       instructions: telegramAckSystem(input),
-      maxOutputTokens: 80,
+      maxOutputTokens: 200,
       maxRetries: 0,
       messages: telegramAckMessages(input),
       model: TELEGRAM_ACK_MODEL,
+      output: Output.object({ schema: toolCategoriesPreludeSchema }),
     }),
     new Promise<never>((_, reject) => {
       setTimeout(() => reject(new Error("telegram ack timed out")), TELEGRAM_ACK_TIMEOUT_MS);
     }),
   ]);
-  const ack = result.text.trim();
+  const parsed = toolCategoriesPreludeSchema.parse(result.output);
+  const ack = parsed.ack.trim();
   if (ack.length === 0) {
     throw new Error("telegram ack model returned empty text");
   }
+  const intents = normalizeIntents({
+    intents: parsed.intents,
+  });
   return {
+    categories: normalizeToolCategories({
+      categories: intents.map((intent) => intent.category),
+    }),
+    intents,
     model: TELEGRAM_ACK_MODEL,
     text: ack,
     ...telegramAckUsageFromGenerateResult(result),
   };
+}
+
+export function fallbackToolCategories(_files?: readonly TelegramAckFile[]): ToolCategory[] {
+  return normalizeToolCategories({ categories: [] });
+}
+
+export function fallbackIntents(_files?: readonly TelegramAckFile[]): ToolIntent[] {
+  return normalizeIntents({ intents: [] });
+}
+
+export async function classifyToolCategories(input: {
+  text: string;
+}): Promise<{ categories: readonly ToolCategory[]; intents: readonly ToolIntent[] }> {
+  try {
+    const generated = await generateTelegramAckText({ caption: "", text: input.text });
+    return { categories: generated.categories, intents: generated.intents };
+  } catch {
+    return { categories: ["none"], intents: [{ category: "none", text: "respond" }] };
+  }
 }
 
 export async function postTelegramAck(

@@ -20,8 +20,10 @@ import type { PendingAgentTurnAck } from "./agent-turn-ack.ts";
 const ack: TelegramAckGeneration = {
   cacheReadTokens: 0,
   cacheWriteTokens: 0,
+  categories: ["none"],
   costUsd: 0.0001,
   inputTokens: 12,
+  intents: [{ category: "none", text: "respond" }],
   model: "google/gemini-3.5-flash-lite",
   outputTokens: 4,
   text: "Checking calories…",

@@ -4,6 +4,8 @@ import {
   TELEGRAM_ACK_SYSTEM,
   TELEGRAM_ACK_TURN_CONTEXT,
   coalesceTelegramAckTurns,
+  fallbackToolCategories,
+  fallbackIntents,
   telegramAckErrorMessage,
   telegramAckFileSummary,
   telegramAckFiles,
@@ -111,6 +113,7 @@ describe("telegramAckMessages", () => {
     assert.match(TELEGRAM_ACK_SYSTEM, /Checking calories/);
     assert.match(TELEGRAM_ACK_SYSTEM, /Listening/);
     assert.match(TELEGRAM_ACK_SYSTEM, /Watching the video/);
+    assert.match(TELEGRAM_ACK_SYSTEM, /Classify from the user's request/);
     assert.match(TELEGRAM_ACK_TURN_CONTEXT, /goals, current, and remaining/);
     assert.match(TELEGRAM_ACK_TURN_CONTEXT, /Never reuse numbers from chat/);
     assert.ok(telegramAckSystem(input).startsWith(TELEGRAM_ACK_SYSTEM));
@@ -133,6 +136,27 @@ describe("coalesceTelegramAckTurns", () => {
         { role: "user", content: "а ужин?" },
       ],
     );
+  });
+});
+
+describe("fallbackToolCategories", () => {
+  it("does not assume a write from attachments", () => {
+    assert.deepEqual(fallbackToolCategories([{ format: "jpeg", kind: "photo" }]), ["none"]);
+    assert.deepEqual(fallbackToolCategories([{ format: "ogg", kind: "voice" }]), ["none"]);
+    assert.deepEqual(fallbackToolCategories([{ format: "mp4", kind: "video" }]), ["none"]);
+    assert.deepEqual(fallbackToolCategories([]), ["none"]);
+  });
+});
+
+describe("fallbackIntents", () => {
+  it("plans a reply when classification is missing", () => {
+    assert.deepEqual(fallbackIntents([{ format: "jpeg", kind: "photo" }]), [
+      { category: "none", text: "respond" },
+    ]);
+    assert.deepEqual(fallbackIntents([{ format: "ogg", kind: "voice" }]), [
+      { category: "none", text: "respond" },
+    ]);
+    assert.deepEqual(fallbackIntents([]), [{ category: "none", text: "respond" }]);
   });
 });
 

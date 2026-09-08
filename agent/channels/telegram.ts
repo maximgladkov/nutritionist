@@ -4,7 +4,7 @@ import { handleChannelLink, resolveChannelUser, saveChannelThreadId } from "../l
 import { telegramGroupInviteUrl, telegramSummaryMiniAppUrl } from "../../lib/app-url";
 import { getGroupInvitePreview, GroupError } from "../../lib/groups";
 import { parseTelegramStartInvite } from "../../lib/groups-invite";
-import { telegramAckFiles } from "../../lib/telegram-ack";
+import { telegramAckFiles, fallbackIntents, fallbackToolCategories } from "../../lib/telegram-ack";
 import {
   generateTelegramAckOrFalse,
   markTelegramTurnReplyPosted,
@@ -25,6 +25,7 @@ import { wrapTelegramLastMessageChannel, settleTelegramTurn } from "../../lib/te
 import { persistTelegramConversationMessage } from "../../lib/conversation";
 import { beginLatencyTrace, chatLatencyKey, markLatency } from "../../lib/latency-log";
 import { appPrincipal } from "../../lib/principal";
+import { formatIntentPlanContext, formatToolCategoriesContext } from "../../lib/tool-categories";
 import { getLiveUserId } from "../lib/require-user";
 
 const credentials = {
@@ -131,7 +132,7 @@ export default wrapTelegramLastMessageChannel(
         markLatency(chatLatencyKey(message.chat.id), "burst_claimed");
         applyTelegramBurstMerge(message, mergeTelegramBurstItems(burst));
         const files = telegramAckFiles(message.attachments);
-        const ackGenerated = generateTelegramAckOrFalse({
+        const generated = generateTelegramAckOrFalse({
           caption: message.caption,
           files,
           text: message.text,
@@ -147,13 +148,21 @@ export default wrapTelegramLastMessageChannel(
           void ensureSummaryMenuButton(ctx);
         }
         const ackTurn = await startTelegramAckTurn({
-          generate: ackGenerated,
+          generate: generated,
           telegram: ctx.telegram,
           userId: user.id,
         });
+        const prelude = await generated;
+        const categories = "categories" in prelude ? prelude.categories : fallbackToolCategories(files);
+        const intents = "intents" in prelude ? prelude.intents : fallbackIntents(files);
+        const intentPlan = formatIntentPlanContext(intents);
         return {
           auth: appPrincipal(user.id, "telegram"),
-          context: ackTurn.context,
+          context: [
+            ...ackTurn.context,
+            formatToolCategoriesContext(categories),
+            ...(intentPlan === null ? [] : [intentPlan]),
+          ],
         };
       },
     }),
