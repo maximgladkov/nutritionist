@@ -1,4 +1,5 @@
 import { conversationTextWithoutMediaStubs } from "./conversation-query.ts";
+import type { ToolCategory, ToolIntent } from "./tool-categories.ts";
 
 export const USER_PREVIEW_MAX_CHARS = 280;
 export const TOOL_JSON_MAX_CHARS = 16_000;
@@ -25,8 +26,10 @@ export type AgentTurnAckMessage = {
   readonly at: string;
   readonly cacheReadTokens: number;
   readonly cacheWriteTokens: number;
+  readonly categories?: readonly ToolCategory[];
   readonly costUsd: number;
   readonly inputTokens: number;
+  readonly intents?: readonly ToolIntent[];
   readonly model: string;
   readonly outputTokens: number;
   readonly text: string;
@@ -175,8 +178,10 @@ export function applyAckMessage(
     at: string;
     cacheReadTokens?: number;
     cacheWriteTokens?: number;
+    categories?: readonly ToolCategory[];
     costUsd?: number;
     inputTokens?: number;
+    intents?: readonly ToolIntent[];
     model: string;
     outputTokens?: number;
     text: string;
@@ -190,8 +195,10 @@ export function applyAckMessage(
     at: input.at,
     cacheReadTokens: input.cacheReadTokens ?? 0,
     cacheWriteTokens: input.cacheWriteTokens ?? 0,
+    categories: input.categories,
     costUsd: input.costUsd ?? 0,
     inputTokens: input.inputTokens ?? 0,
+    intents: input.intents,
     model: input.model,
     outputTokens: input.outputTokens ?? 0,
     text: input.text,
@@ -426,6 +433,17 @@ export function toolResultFromAction(result: unknown): {
     isError: record.isError === true,
     output: record.output,
     toolName,
+  };
+}
+
+export function ackLlmOutput(message: AgentTurnAckMessage): unknown {
+  if (message.intents === undefined && message.categories === undefined) {
+    return message.text;
+  }
+  return {
+    ack: message.text,
+    ...(message.categories === undefined ? {} : { categories: message.categories }),
+    ...(message.intents === undefined ? {} : { intents: message.intents }),
   };
 }
 

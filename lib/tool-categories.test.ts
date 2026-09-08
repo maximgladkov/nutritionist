@@ -35,6 +35,7 @@ describe("writeAllowlistForCategories", () => {
     const names = writeAllowlistForCategories(["meal"]);
     assert.equal(names.includes("lookup_product"), true);
     assert.equal(names.includes("log_meal"), true);
+    assert.equal(names.includes("copy_meal"), true);
     assert.equal(names.includes("delete_meal_item"), false);
     assert.equal(names.includes("save_my_goals"), false);
   });
@@ -172,6 +173,7 @@ describe("requiredWriteStepCap", () => {
 describe("categoryForTool", () => {
   it("maps log_meal to meal and bash to none", () => {
     assert.equal(categoryForTool("log_meal"), "meal");
+    assert.equal(categoryForTool("copy_meal"), "meal");
     assert.equal(categoryForTool("delete_meal_item"), "meal_delete");
     assert.equal(categoryForTool("bash"), null);
   });

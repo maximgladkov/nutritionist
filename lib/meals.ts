@@ -330,6 +330,199 @@ export async function upsertMealItems(input: {
   });
 }
 
+export type CopyMealSlots = {
+  sameSlot: boolean;
+  sourceLabel: MealLabel;
+  sourceRange: { from: Date; to: Date };
+  targetDate: string;
+  targetLabel: MealLabel;
+  targetRange: { from: Date; to: Date };
+};
+
+export type CopyMealResult =
+  | {
+      asLabel: MealLabel;
+      copied: true;
+      date: string;
+      from: string;
+      label: MealLabel;
+      meal: MealView;
+    }
+  | {
+      asLabel: MealLabel;
+      copied: false;
+      date: string;
+      from: string;
+      label: MealLabel;
+      reason: string;
+    };
+
+export function copyMealSlots(input: {
+  asLabel?: MealLabel;
+  date?: string;
+  from: string;
+  label: MealLabel;
+  now?: Date;
+  timeZone: string;
+}): CopyMealSlots {
+  const sourceRange = mealWriteRange({ date: input.from, timeZone: input.timeZone });
+  const targetRange = mealWriteRange({
+    date: input.date,
+    now: input.now,
+    timeZone: input.timeZone,
+  });
+  const targetLabel = input.asLabel ?? input.label;
+  return {
+    sameSlot:
+      sourceRange.from.getTime() === targetRange.from.getTime() &&
+      sourceRange.to.getTime() === targetRange.to.getTime() &&
+      input.label === targetLabel,
+    sourceLabel: input.label,
+    sourceRange,
+    targetDate: formatDateInTimeZone(targetRange.from, input.timeZone),
+    targetLabel,
+    targetRange,
+  };
+}
+
+export function cloneMealItemCreateData(item: {
+  amount: number;
+  barcode: string | null;
+  carbohydrates: number | null;
+  energyKcal: number | null;
+  fat: number | null;
+  fiber: number | null;
+  grams: number;
+  imageUrl: string | null;
+  name: string;
+  nutrimentsPer100g: Prisma.JsonValue;
+  proteins: number | null;
+  salt: number | null;
+  saturatedFat: number | null;
+  sugars: number | null;
+  unit: MealItemUnit;
+}): Prisma.MealItemCreateWithoutMealInput {
+  return {
+    amount: item.amount,
+    barcode: item.barcode,
+    carbohydrates: item.carbohydrates,
+    energyKcal: item.energyKcal,
+    fat: item.fat,
+    fiber: item.fiber,
+    grams: item.grams,
+    imageUrl: item.imageUrl,
+    name: item.name,
+    nutrimentsPer100g: (item.nutrimentsPer100g ?? {}) as Prisma.InputJsonValue,
+    proteins: item.proteins,
+    salt: item.salt,
+    saturatedFat: item.saturatedFat,
+    sugars: item.sugars,
+    unit: item.unit,
+  };
+}
+
+export async function copyMeal(input: {
+  asLabel?: MealLabel;
+  date?: string;
+  from: string;
+  label?: MealLabel;
+  now?: Date;
+  userId: string;
+}): Promise<CopyMealResult> {
+  const now = input.now ?? new Date();
+  const timeZone = (await callerTimezone(input.userId)) ?? "UTC";
+  const label = input.label ?? inferMealLabel(now, timeZone);
+  const slots = copyMealSlots({
+    asLabel: input.asLabel,
+    date: input.date,
+    from: input.from,
+    label,
+    now,
+    timeZone,
+  });
+  const base = {
+    asLabel: slots.targetLabel,
+    date: slots.targetDate,
+    from: input.from,
+    label,
+  };
+  if (slots.sameSlot) {
+    return {
+      ...base,
+      copied: false,
+      reason: "Source and target are the same meal",
+    };
+  }
+  const sourceMeals = await prisma.meal.findMany({
+    where: {
+      eatenAt: { gte: slots.sourceRange.from, lt: slots.sourceRange.to },
+      label,
+      userId: input.userId,
+    },
+    include: { items: true },
+    orderBy: { eatenAt: "asc" },
+  });
+  const items = sourceMeals.flatMap((meal) => meal.items);
+  if (items.length === 0) {
+    return {
+      ...base,
+      copied: false,
+      reason: `No ${label} logged on ${input.from}`,
+    };
+  }
+  if (items.length > MAX_ITEMS) {
+    throw new MealError(`A meal can have at most ${MAX_ITEMS} items`);
+  }
+  const meal = await writeClonedMealItems({
+    items: items.map(cloneMealItemCreateData),
+    label: slots.targetLabel,
+    now,
+    range: slots.targetRange,
+    userId: input.userId,
+  });
+  return {
+    ...base,
+    copied: true,
+    meal,
+  };
+}
+
+async function writeClonedMealItems(input: {
+  items: Prisma.MealItemCreateWithoutMealInput[];
+  label: MealLabel;
+  now: Date;
+  range: { from: Date; to: Date };
+  userId: string;
+}): Promise<MealView> {
+  const existing = await prisma.meal.findFirst({
+    where: {
+      eatenAt: { gte: input.range.from, lt: input.range.to },
+      label: input.label,
+      userId: input.userId,
+    },
+    orderBy: { eatenAt: "desc" },
+    select: { id: true },
+  });
+  if (existing) {
+    const meal = await prisma.meal.update({
+      data: { items: { create: input.items } },
+      include: { items: true },
+      where: { id: existing.id },
+    });
+    return toMealView(meal);
+  }
+  const meal = await prisma.meal.create({
+    data: {
+      eatenAt: eatenAtForCreate(undefined, input.now, input.range),
+      items: { create: input.items },
+      label: input.label,
+      userId: input.userId,
+    },
+    include: { items: true },
+  });
+  return toMealView(meal);
+}
+
 export async function addItemToTodaysMeal(input: {
   userId: string;
   label: MealLabel;

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  cloneMealItemCreateData,
+  copyMealSlots,
   eatenAtForCreate,
   MealError,
   mealQueryRange,
@@ -213,5 +215,109 @@ describe("scaleMealItemNutrition", () => {
         }),
       (error: unknown) => error instanceof MealError,
     );
+  });
+});
+
+describe("copyMealSlots", () => {
+  it("copies onto today with the same label by default", () => {
+    const now = new Date("2026-09-08T08:00:00.000Z");
+    const plan = copyMealSlots({
+      from: "2026-09-07",
+      label: "breakfast",
+      now,
+      timeZone: "UTC",
+    });
+    assert.equal(plan.sameSlot, false);
+    assert.equal(plan.sourceLabel, "breakfast");
+    assert.equal(plan.targetLabel, "breakfast");
+    assert.equal(plan.targetDate, "2026-09-08");
+    assert.deepEqual(plan.sourceRange, mealWriteRange({ date: "2026-09-07", timeZone: "UTC" }));
+    assert.deepEqual(plan.targetRange, mealWriteRange({ now, timeZone: "UTC" }));
+  });
+
+  it("uses asLabel when they want a different slot", () => {
+    const plan = copyMealSlots({
+      asLabel: "lunch",
+      date: "2026-09-08",
+      from: "2026-09-07",
+      label: "breakfast",
+      now: new Date("2026-09-08T15:00:00.000Z"),
+      timeZone: "UTC",
+    });
+    assert.equal(plan.sameSlot, false);
+    assert.equal(plan.targetLabel, "lunch");
+    assert.equal(plan.targetDate, "2026-09-08");
+  });
+
+  it("treats the same day and label as a no-op", () => {
+    const plan = copyMealSlots({
+      date: "2026-09-07",
+      from: "2026-09-07",
+      label: "breakfast",
+      now: new Date("2026-09-08T08:00:00.000Z"),
+      timeZone: "UTC",
+    });
+    assert.equal(plan.sameSlot, true);
+  });
+});
+
+describe("cloneMealItemCreateData", () => {
+  it("copies stored item fields without an id", () => {
+    const cloned = cloneMealItemCreateData({
+      amount: 125,
+      barcode: "8410000000001",
+      carbohydrates: 12,
+      energyKcal: 80,
+      fat: 2,
+      fiber: 0,
+      grams: 125,
+      imageUrl: "https://example.com/yogurt.jpg",
+      name: "Yogurt",
+      nutrimentsPer100g: { energyKcal100g: 64, proteins100g: 4 },
+      proteins: 5,
+      salt: 0.1,
+      saturatedFat: 1,
+      sugars: 8,
+      unit: "g",
+    });
+    assert.deepEqual(cloned, {
+      amount: 125,
+      barcode: "8410000000001",
+      carbohydrates: 12,
+      energyKcal: 80,
+      fat: 2,
+      fiber: 0,
+      grams: 125,
+      imageUrl: "https://example.com/yogurt.jpg",
+      name: "Yogurt",
+      nutrimentsPer100g: { energyKcal100g: 64, proteins100g: 4 },
+      proteins: 5,
+      salt: 0.1,
+      saturatedFat: 1,
+      sugars: 8,
+      unit: "g",
+    });
+  });
+
+  it("uses an empty nutriments object when stored JSON is null", () => {
+    const cloned = cloneMealItemCreateData({
+      amount: 73,
+      barcode: null,
+      carbohydrates: null,
+      energyKcal: 30,
+      fat: null,
+      fiber: null,
+      grams: 73,
+      imageUrl: null,
+      name: "Milk",
+      nutrimentsPer100g: null,
+      proteins: null,
+      salt: null,
+      saturatedFat: null,
+      sugars: null,
+      unit: "ml",
+    });
+    assert.deepEqual(cloned.nutrimentsPer100g, {});
+    assert.equal(cloned.barcode, null);
   });
 });

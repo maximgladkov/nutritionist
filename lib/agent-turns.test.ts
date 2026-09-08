@@ -8,6 +8,7 @@ import {
   applyToolRequested,
   applyToolResult,
   applyUserMessage,
+  ackLlmOutput,
   clipJson,
   emptyTranscript,
   normalizeChannelKind,
@@ -190,6 +191,7 @@ describe("transcript reducers", () => {
     );
     const ack = transcript.items.find((item) => item.type === "ack");
     assert.equal(ack?.type === "ack" ? ack.text : null, "Checking calories…");
+    assert.equal(ack?.type === "ack" ? ack.intents : undefined, undefined);
     const summary = summarizeTranscript(transcript);
     assert.equal(Number(summary.costUsd.toFixed(6)), 0.00312);
     assert.equal(summary.inputTokens, 122);
@@ -220,6 +222,27 @@ describe("transcript reducers", () => {
       transcript.items.map((item) => item.type),
       ["user", "ack", "assistant"],
     );
+  });
+
+  it("stores the prelude JSON on the ack message", () => {
+    const transcript = applyAckMessage(emptyTranscript(), {
+      at: "2026-09-08T10:00:00.000Z",
+      categories: ["meal"],
+      intents: [{ category: "meal", text: "log yogurt" }],
+      model: "google/gemini-3.5-flash-lite",
+      text: "Записываю…",
+    });
+    const ack = transcript.items[0];
+    assert.equal(ack?.type, "ack");
+    if (ack?.type !== "ack") {
+      return;
+    }
+    assert.deepEqual(ack.intents, [{ category: "meal", text: "log yogurt" }]);
+    assert.deepEqual(ackLlmOutput(ack), {
+      ack: "Записываю…",
+      categories: ["meal"],
+      intents: [{ category: "meal", text: "log yogurt" }],
+    });
   });
 
   it("clips oversized tool payloads", () => {

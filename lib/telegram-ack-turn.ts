@@ -96,6 +96,8 @@ export function prismaTelegramAckTurnStore(): TelegramAckTurnStore {
         model: ack.model,
         outputTokens: ack.outputTokens,
         text: ack.text,
+        categories: ack.categories,
+        intents: ack.intents,
       });
       if (!filled) {
         return null;
@@ -195,8 +197,10 @@ export async function settleTelegramAckTurn(input: {
       at: new Date().toISOString(),
       cacheReadTokens: ack.cacheReadTokens,
       cacheWriteTokens: ack.cacheWriteTokens,
+      categories: ack.categories,
       costUsd: ack.costUsd,
       inputTokens: ack.inputTokens,
+      intents: ack.intents,
       model: ack.model,
       outputTokens: ack.outputTokens,
       text: ack.text,

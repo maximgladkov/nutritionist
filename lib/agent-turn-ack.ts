@@ -1,13 +1,21 @@
 import { Prisma } from "../generated/prisma/client.ts";
 import { prisma } from "./prisma.ts";
 import { bindTelegramAckPosted } from "./telegram-ack-posted.ts";
+import {
+  isToolCategory,
+  normalizeIntents,
+  type ToolCategory,
+  type ToolIntent,
+} from "./tool-categories.ts";
 
 export type PendingAgentTurnAck = {
   readonly at: string;
   readonly cacheReadTokens: number;
   readonly cacheWriteTokens: number;
+  readonly categories?: readonly ToolCategory[];
   readonly costUsd: number;
   readonly inputTokens: number;
+  readonly intents?: readonly ToolIntent[];
   readonly model: string;
   readonly outputTokens: number;
   readonly text: string;
@@ -135,9 +143,11 @@ export async function claimPendingAgentTurnAck(input: {
 export async function completePendingAgentTurnAck(input: {
   cacheReadTokens: number;
   cacheWriteTokens: number;
+  categories?: readonly ToolCategory[];
   costUsd: number;
   id: string;
   inputTokens: number;
+  intents?: readonly ToolIntent[];
   model: string;
   outputTokens: number;
   text: string;
@@ -151,7 +161,11 @@ export async function completePendingAgentTurnAck(input: {
         inputTokens: input.inputTokens,
         model: input.model,
         outputTokens: input.outputTokens,
-        text: input.text,
+        text: encodePendingAckOutput({
+          categories: input.categories,
+          intents: input.intents,
+          text: input.text,
+        }),
       },
       where: { id: input.id },
     });
@@ -194,21 +208,79 @@ function pendingAckFromRow(row: {
   outputTokens: number;
   text: string | null;
 }): PendingAgentTurnAck | null {
-  const text = row.text?.trim() ?? "";
+  const decoded = decodePendingAckOutput(row.text?.trim() ?? "");
   const model = row.model?.trim() ?? "";
-  if (!pendingAckIsReady(row)) {
+  if (decoded.text.length === 0 || model.length === 0) {
     return null;
   }
   return {
     at: row.createdAt.toISOString(),
     cacheReadTokens: row.cacheReadTokens,
     cacheWriteTokens: row.cacheWriteTokens,
+    categories: decoded.categories,
     costUsd: decimalToNumber(row.costUsd),
     inputTokens: row.inputTokens,
+    intents: decoded.intents,
     model,
     outputTokens: row.outputTokens,
-    text,
+    text: decoded.text,
   };
+}
+
+export function encodePendingAckOutput(input: {
+  categories?: readonly ToolCategory[];
+  intents?: readonly ToolIntent[];
+  text: string;
+}): string {
+  if (input.intents === undefined && input.categories === undefined) {
+    return input.text;
+  }
+  return JSON.stringify({
+    ack: input.text,
+    ...(input.categories === undefined ? {} : { categories: input.categories }),
+    ...(input.intents === undefined ? {} : { intents: input.intents }),
+  });
+}
+
+export function decodePendingAckOutput(text: string): {
+  categories?: ToolCategory[];
+  intents?: ToolIntent[];
+  text: string;
+} {
+  const trimmed = text.trim();
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+    try {
+      const parsed = JSON.parse(trimmed) as {
+        ack?: unknown;
+        categories?: unknown;
+        intents?: unknown;
+      };
+      if (typeof parsed.ack === "string" && parsed.ack.trim().length > 0) {
+        const intents = Array.isArray(parsed.intents)
+          ? normalizeIntents({
+              intents: parsed.intents.filter(
+                (intent): intent is { category: string; text: string } =>
+                  intent !== null &&
+                  typeof intent === "object" &&
+                  typeof (intent as { category?: unknown }).category === "string" &&
+                  typeof (intent as { text?: unknown }).text === "string",
+              ),
+            })
+          : undefined;
+        const categories = Array.isArray(parsed.categories)
+          ? parsed.categories.filter((value): value is ToolCategory => typeof value === "string" && isToolCategory(value))
+          : undefined;
+        return {
+          categories: categories !== undefined && categories.length > 0 ? categories : undefined,
+          intents: intents !== undefined && intents.length > 0 ? intents : undefined,
+          text: parsed.ack.trim(),
+        };
+      }
+    } catch {
+      return { text: trimmed };
+    }
+  }
+  return { text: trimmed };
 }
 
 function decimalUsd(value: number): Prisma.Decimal {

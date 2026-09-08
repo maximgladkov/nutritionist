@@ -91,6 +91,7 @@ describe("writeToolPolicy", () => {
     assert.equal(policy.shouldRequire, true);
     assert.equal(policy.remainingAllowlist.includes("lookup_product"), true);
     assert.equal(policy.remainingAllowlist.includes("log_meal"), true);
+    assert.equal(policy.remainingAllowlist.includes("copy_meal"), true);
     assert.equal(policy.remainingAllowlist.includes("ask_question"), true);
   });
 

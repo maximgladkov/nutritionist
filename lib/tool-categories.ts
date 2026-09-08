@@ -33,7 +33,7 @@ export type ToolIntent = {
 
 export const TOOL_CATEGORY_TOOLS: Record<ToolCategory, readonly string[]> = {
   none: [],
-  meal: ["lookup_product", "search_products", "save_product", "log_meal", "add_meal_items"],
+  meal: ["lookup_product", "search_products", "save_product", "log_meal", "add_meal_items", "copy_meal"],
   meal_delete: ["delete_meal_item"],
   goals: ["save_my_goals", "get_my_goals"],
   profile: ["save_my_profile", "get_my_profile"],

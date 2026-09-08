@@ -18,7 +18,7 @@ export function liveNutritionContextText(progress: NutritionDayProgress): string
   return [
     "Live database snapshot for this nutrition day (not from chat; the user can change meals and goals in the app):",
     `${metrics.join("; ")}.`,
-    "After you log, add, or delete food this turn, use goals, current, and remaining from that tool result instead of this snapshot.",
+    "After you log, add, copy, or delete food this turn, use goals, current, and remaining from that tool result instead of this snapshot.",
     "Never subtract leftover kcal from a previous assistant message.",
   ].join(" ");
 }

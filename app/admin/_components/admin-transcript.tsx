@@ -2,7 +2,7 @@
 
 import { AdminJsonViewer } from "@/app/admin/_components/admin-json-viewer";
 import { conversationTextWithoutMediaStubs } from "@/lib/conversation-query";
-import type { AgentTurnMessage, AgentTurnUserPart } from "@/lib/agent-turn-model";
+import { ackLlmOutput, type AgentTurnMessage, type AgentTurnUserPart } from "@/lib/agent-turn-model";
 import { formatTokenCount, formatUsd } from "@/lib/admin-format";
 import { isImageMediaType } from "@/lib/image-bytes";
 import { Chip, Modal } from "@heroui/react";
@@ -20,12 +20,16 @@ export function AdminTranscript({ messages }: { readonly messages: readonly Agen
           key={`${message.type}-${message.at}-${String(index)}`}
         >
           <p className="text-muted mb-1 text-xs font-medium tracking-wide uppercase">
-            {message.type === "ack" ? "Quick answer" : message.type}
+            {message.type}
           </p>
           {message.type === "user" ? <AdminUserMessage message={message} /> : null}
           {message.type === "ack" ? (
-            <div className="flex flex-col gap-1">
-              <p className="whitespace-pre-wrap text-sm">{message.text}</p>
+            <div className="flex flex-col gap-2">
+              {typeof ackLlmOutput(message) === "string" ? (
+                <p className="whitespace-pre-wrap text-sm">{message.text}</p>
+              ) : (
+                <AdminJsonViewer label="Output" value={ackLlmOutput(message)} />
+              )}
               <p className="text-muted text-xs">
                 {message.model} · {formatUsd(message.costUsd)} · {formatTokenCount(message.inputTokens)} in ·{" "}
                 {formatTokenCount(message.outputTokens)} out

@@ -35,6 +35,7 @@ describe("liveNutritionContextText", () => {
     assert.match(text, /calories current 1508\.5 \/ goal 2244 kcal remaining 735\.5/);
     assert.match(text, /protein current 82\.1 \/ goal 160 g remaining 77\.9/);
     assert.match(text, /use goals, current, and remaining from that tool result instead of this snapshot/);
+    assert.match(text, /After you log, add, copy, or delete food this turn/);
     assert.match(text, /Never subtract leftover kcal from a previous assistant message/);
   });
 

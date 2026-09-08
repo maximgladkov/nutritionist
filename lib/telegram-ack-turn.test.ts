@@ -6,6 +6,8 @@ import {
   oldestUnclaimedPendingAck,
   pendingAckIsReady,
   pendingAckToClaim,
+  decodePendingAckOutput,
+  encodePendingAckOutput,
 } from "./agent-turn-ack.ts";
 import {
   shouldDeliverTelegramAck,
@@ -108,6 +110,24 @@ describe("pendingAckIsReady", () => {
   });
 });
 
+describe("pending ack output", () => {
+  it("round-trips the prelude JSON and keeps legacy plain text", () => {
+    const encoded = encodePendingAckOutput({
+      categories: ["meal"],
+      intents: [{ category: "meal", text: "log yogurt" }],
+      text: "Записываю…",
+    });
+    assert.deepEqual(decodePendingAckOutput(encoded), {
+      categories: ["meal"],
+      intents: [{ category: "meal", text: "log yogurt" }],
+      text: "Записываю…",
+    });
+    assert.deepEqual(decodePendingAckOutput("Checking calories…"), {
+      text: "Checking calories…",
+    });
+  });
+});
+
 describe("shouldDeliverTelegramAck", () => {
   it("sends while the turn is still running without an assistant reply", () => {
     assert.equal(
@@ -171,6 +191,8 @@ describe("startTelegramAckTurn", () => {
     assert.equal(world.completed.length, 1);
     assert.equal(world.attached.length, 1);
     assert.equal(world.attached[0]?.text, ack.text);
+    assert.deepEqual(world.attached[0]?.intents, ack.intents);
+    assert.deepEqual(world.attached[0]?.categories, ack.categories);
   });
 
   it("abandons a failed ack so the next reservation can be claimed", async () => {
