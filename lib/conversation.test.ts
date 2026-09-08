@@ -38,18 +38,7 @@ describe("conversationSearchQuery", () => {
 describe("conversationSearchCreatedAt", () => {
   it("returns undefined when no bounds are passed", () => {
     assert.equal(conversationSearchCreatedAt({ timeZone: "UTC" }), undefined);
-    assert.equal(conversationSearchCreatedAt({ after: "  ", before: "", date: "  ", timeZone: "UTC" }), undefined);
-  });
-
-  it("filters one local calendar day", () => {
-    assert.deepEqual(conversationSearchCreatedAt({ date: "2026-09-07", timeZone: "UTC" }), {
-      gte: new Date("2026-09-07T00:00:00.000Z"),
-      lt: new Date("2026-09-08T00:00:00.000Z"),
-    });
-    assert.deepEqual(conversationSearchCreatedAt({ date: "2026-09-07", timeZone: "Europe/Berlin" }), {
-      gte: new Date("2026-09-06T22:00:00.000Z"),
-      lt: new Date("2026-09-07T22:00:00.000Z"),
-    });
+    assert.equal(conversationSearchCreatedAt({ after: "  ", before: "", timeZone: "UTC" }), undefined);
   });
 
   it("treats ISO before and after as exclusive instants", () => {
@@ -80,23 +69,17 @@ describe("conversationSearchCreatedAt", () => {
     );
   });
 
-  it("intersects date with ISO before and after", () => {
-    assert.deepEqual(
-      conversationSearchCreatedAt({
-        after: "2026-09-07T08:00:00.000Z",
-        before: "2026-09-07T18:00:00.000Z",
-        date: "2026-09-07",
-        timeZone: "UTC",
-      }),
-      {
-        gt: new Date("2026-09-07T08:00:00.000Z"),
-        lt: new Date("2026-09-07T18:00:00.000Z"),
-      },
-    );
+  it("allows after or before alone", () => {
+    assert.deepEqual(conversationSearchCreatedAt({ after: "2026-09-07", timeZone: "UTC" }), {
+      gte: new Date("2026-09-08T00:00:00.000Z"),
+    });
+    assert.deepEqual(conversationSearchCreatedAt({ before: "2026-09-10", timeZone: "UTC" }), {
+      lt: new Date("2026-09-10T00:00:00.000Z"),
+    });
   });
 
   it("rejects invalid strings and inverted ranges", () => {
-    assert.throws(() => conversationSearchCreatedAt({ date: "2026-02-30", timeZone: "UTC" }), ConversationError);
+    assert.throws(() => conversationSearchCreatedAt({ after: "2026-02-30", timeZone: "UTC" }), ConversationError);
     assert.throws(() => conversationSearchCreatedAt({ before: "nope", timeZone: "UTC" }), ConversationError);
     assert.throws(
       () =>

@@ -89,7 +89,6 @@ export async function searchConversation(input: {
   after?: string;
   before?: string;
   channel: string;
-  date?: string;
   limit?: number;
   query?: string;
   timeZone: string;
@@ -99,7 +98,6 @@ export async function searchConversation(input: {
   const createdAt = conversationSearchCreatedAt({
     after: input.after,
     before: input.before,
-    date: input.date,
     timeZone: input.timeZone,
   });
   const limit = clampConversationSearchLimit(input.limit);
