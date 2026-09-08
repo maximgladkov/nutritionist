@@ -1,6 +1,8 @@
 import { prisma } from "./prisma.ts";
 import {
   clampConversationSearchLimit,
+  conversationSearchCreatedAt,
+  conversationSearchHasMore,
   conversationSearchQuery,
   CONVERSATION_SESSION_LOOKBACK,
   formatRecentConversation,
@@ -13,8 +15,11 @@ export {
   CONVERSATION_SESSION_GAP_MS,
   CONVERSATION_SESSION_LOOKBACK,
   RECENT_CONVERSATION_MAX_CHARS,
+  ConversationError,
   clampConversationSearchLimit,
   conversationMessageText,
+  conversationSearchCreatedAt,
+  conversationSearchHasMore,
   conversationSearchQuery,
   conversationTextWithoutMediaStubs,
   formatRecentConversation,
@@ -75,30 +80,50 @@ export async function persistTelegramConversationMessage(input: {
   }
 }
 
+export type ConversationSearchResult = {
+  hasMore: boolean;
+  messages: ConversationMessageView[];
+};
+
 export async function searchConversation(input: {
+  after?: string;
+  before?: string;
   channel: string;
+  date?: string;
   limit?: number;
   query?: string;
+  timeZone: string;
   userId: string;
-}): Promise<ConversationMessageView[]> {
+}): Promise<ConversationSearchResult> {
   const query = conversationSearchQuery(input.query);
+  const createdAt = conversationSearchCreatedAt({
+    after: input.after,
+    before: input.before,
+    date: input.date,
+    timeZone: input.timeZone,
+  });
+  const limit = clampConversationSearchLimit(input.limit);
   const rows = await prisma.conversationMessage.findMany({
     orderBy: { createdAt: "desc" },
     select: { createdAt: true, role: true, text: true },
-    take: clampConversationSearchLimit(input.limit),
+    take: limit,
     where: {
       channel: input.channel,
       userId: input.userId,
+      ...(createdAt === undefined ? {} : { createdAt }),
       ...(query === undefined ? {} : { text: { contains: query, mode: "insensitive" as const } }),
     },
   });
-  return rows
-    .map((row) => ({
-      at: row.createdAt.toISOString(),
-      role: row.role === "assistant" ? ("assistant" as const) : ("user" as const),
-      text: row.text,
-    }))
-    .reverse();
+  return {
+    hasMore: conversationSearchHasMore(rows.length, limit),
+    messages: rows
+      .map((row) => ({
+        at: row.createdAt.toISOString(),
+        role: row.role === "assistant" ? ("assistant" as const) : ("user" as const),
+        text: row.text,
+      }))
+      .reverse(),
+  };
 }
 
 export async function loadRecentConversation(input: {

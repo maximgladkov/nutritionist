@@ -5,8 +5,11 @@ import {
   CONVERSATION_SEARCH_MAX_LIMIT,
   CONVERSATION_SESSION_GAP_MS,
   RECENT_CONVERSATION_HEADER,
+  ConversationError,
   clampConversationSearchLimit,
   conversationMessageText,
+  conversationSearchCreatedAt,
+  conversationSearchHasMore,
   conversationSearchQuery,
   conversationTextWithoutMediaStubs,
   formatRecentConversation,
@@ -29,6 +32,89 @@ describe("conversationSearchQuery", () => {
     assert.equal(conversationSearchQuery(undefined), undefined);
     assert.equal(conversationSearchQuery("   "), undefined);
     assert.equal(conversationSearchQuery("yogurt"), "yogurt");
+  });
+});
+
+describe("conversationSearchCreatedAt", () => {
+  it("returns undefined when no bounds are passed", () => {
+    assert.equal(conversationSearchCreatedAt({ timeZone: "UTC" }), undefined);
+    assert.equal(conversationSearchCreatedAt({ after: "  ", before: "", date: "  ", timeZone: "UTC" }), undefined);
+  });
+
+  it("filters one local calendar day", () => {
+    assert.deepEqual(conversationSearchCreatedAt({ date: "2026-09-07", timeZone: "UTC" }), {
+      gte: new Date("2026-09-07T00:00:00.000Z"),
+      lt: new Date("2026-09-08T00:00:00.000Z"),
+    });
+    assert.deepEqual(conversationSearchCreatedAt({ date: "2026-09-07", timeZone: "Europe/Berlin" }), {
+      gte: new Date("2026-09-06T22:00:00.000Z"),
+      lt: new Date("2026-09-07T22:00:00.000Z"),
+    });
+  });
+
+  it("treats ISO before and after as exclusive instants", () => {
+    assert.deepEqual(
+      conversationSearchCreatedAt({
+        after: "2026-09-01T12:00:00.000Z",
+        before: "2026-09-07T08:00:00.000Z",
+        timeZone: "UTC",
+      }),
+      {
+        gt: new Date("2026-09-01T12:00:00.000Z"),
+        lt: new Date("2026-09-07T08:00:00.000Z"),
+      },
+    );
+  });
+
+  it("treats YYYY-MM-DD before and after as exclusive local days", () => {
+    assert.deepEqual(
+      conversationSearchCreatedAt({
+        after: "2026-09-07",
+        before: "2026-09-10",
+        timeZone: "Europe/Berlin",
+      }),
+      {
+        gte: new Date("2026-09-07T22:00:00.000Z"),
+        lt: new Date("2026-09-09T22:00:00.000Z"),
+      },
+    );
+  });
+
+  it("intersects date with ISO before and after", () => {
+    assert.deepEqual(
+      conversationSearchCreatedAt({
+        after: "2026-09-07T08:00:00.000Z",
+        before: "2026-09-07T18:00:00.000Z",
+        date: "2026-09-07",
+        timeZone: "UTC",
+      }),
+      {
+        gt: new Date("2026-09-07T08:00:00.000Z"),
+        lt: new Date("2026-09-07T18:00:00.000Z"),
+      },
+    );
+  });
+
+  it("rejects invalid strings and inverted ranges", () => {
+    assert.throws(() => conversationSearchCreatedAt({ date: "2026-02-30", timeZone: "UTC" }), ConversationError);
+    assert.throws(() => conversationSearchCreatedAt({ before: "nope", timeZone: "UTC" }), ConversationError);
+    assert.throws(
+      () =>
+        conversationSearchCreatedAt({
+          after: "2026-09-08T00:00:00.000Z",
+          before: "2026-09-07T00:00:00.000Z",
+          timeZone: "UTC",
+        }),
+      ConversationError,
+    );
+  });
+});
+
+describe("conversationSearchHasMore", () => {
+  it("is true only when the fetched page equals the limit", () => {
+    assert.equal(conversationSearchHasMore(10, 10), true);
+    assert.equal(conversationSearchHasMore(9, 10), false);
+    assert.equal(conversationSearchHasMore(0, 10), false);
   });
 });
 

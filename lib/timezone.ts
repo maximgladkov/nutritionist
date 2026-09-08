@@ -157,6 +157,37 @@ export function parseYmd(value: string): { year: number; month: number; day: num
   return { year, month, day };
 }
 
+export function localCalendarDateRange(timeZone: string, ymd: string): { from: Date; to: Date } {
+  const start = parseYmd(ymd);
+  if (!start) {
+    throw new RangeError("date must be a valid YYYY-MM-DD");
+  }
+  const end = parseYmd(shiftYmd(ymd, 1));
+  if (!end) {
+    throw new RangeError("date must be a valid YYYY-MM-DD");
+  }
+  return {
+    from: zonedLocalToUtc({
+      timeZone,
+      year: start.year,
+      month: start.month,
+      day: start.day,
+      hour: 0,
+      minute: 0,
+      second: 0,
+    }),
+    to: zonedLocalToUtc({
+      timeZone,
+      year: end.year,
+      month: end.month,
+      day: end.day,
+      hour: 0,
+      minute: 0,
+      second: 0,
+    }),
+  };
+}
+
 export function localInclusiveDateRange(
   timeZone: string,
   fromYmd: string,

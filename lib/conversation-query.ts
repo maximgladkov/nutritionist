@@ -1,4 +1,5 @@
 import type { UserContent } from "ai";
+import { localCalendarDateRange, parseYmd } from "./timezone.ts";
 
 export const CONVERSATION_SEARCH_DEFAULT_LIMIT = 10;
 export const CONVERSATION_SEARCH_MAX_LIMIT = 25;
@@ -27,6 +28,116 @@ export function clampConversationSearchLimit(limit: number | undefined) {
 export function conversationSearchQuery(query: string | undefined) {
   const normalized = query?.trim() ?? "";
   return normalized.length > 0 ? normalized : undefined;
+}
+
+export class ConversationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ConversationError";
+  }
+}
+
+export type ConversationSearchCreatedAt = {
+  gt?: Date;
+  gte?: Date;
+  lt?: Date;
+};
+
+type SearchLowerBound = {
+  at: Date;
+  exclusive: boolean;
+};
+
+export function conversationSearchCreatedAt(input: {
+  after?: string;
+  before?: string;
+  date?: string;
+  timeZone: string;
+}): ConversationSearchCreatedAt | undefined {
+  let lower: SearchLowerBound | undefined;
+  let upper: Date | undefined;
+
+  const date = input.date?.trim() ?? "";
+  if (date.length > 0) {
+    const range = calendarDateRange(date, "date", input.timeZone);
+    lower = mergeLower(lower, { at: range.from, exclusive: false });
+    upper = mergeUpper(upper, range.to);
+  }
+
+  const after = input.after?.trim() ?? "";
+  if (after.length > 0) {
+    const bound = parseSearchBound(after, "after", input.timeZone);
+    lower = mergeLower(
+      lower,
+      bound.kind === "date" ? { at: bound.range.to, exclusive: false } : { at: bound.at, exclusive: true },
+    );
+  }
+
+  const before = input.before?.trim() ?? "";
+  if (before.length > 0) {
+    const bound = parseSearchBound(before, "before", input.timeZone);
+    upper = mergeUpper(upper, bound.kind === "date" ? bound.range.from : bound.at);
+  }
+
+  if (lower === undefined && upper === undefined) {
+    return undefined;
+  }
+  if (lower !== undefined && upper !== undefined && lower.at.getTime() >= upper.getTime()) {
+    throw new ConversationError("before must be later than after");
+  }
+
+  return {
+    ...(lower === undefined ? {} : lower.exclusive ? { gt: lower.at } : { gte: lower.at }),
+    ...(upper === undefined ? {} : { lt: upper }),
+  };
+}
+
+export function conversationSearchHasMore(fetched: number, limit: number) {
+  return fetched === limit;
+}
+
+function calendarDateRange(value: string, field: "after" | "before" | "date", timeZone: string) {
+  try {
+    return localCalendarDateRange(timeZone, value);
+  } catch (error) {
+    if (error instanceof RangeError) {
+      throw new ConversationError(
+        field === "date" ? "date must be a valid YYYY-MM-DD" : `${field} must be a valid YYYY-MM-DD date or ISO datetime`,
+      );
+    }
+    throw error;
+  }
+}
+
+function parseSearchBound(value: string, field: "after" | "before", timeZone: string) {
+  if (parseYmd(value)) {
+    return { kind: "date" as const, range: calendarDateRange(value, field, timeZone) };
+  }
+  const time = conversationMessageTime(value);
+  if (time === null) {
+    throw new ConversationError(`${field} must be a valid YYYY-MM-DD date or ISO datetime`);
+  }
+  return { kind: "instant" as const, at: new Date(time) };
+}
+
+function mergeLower(current: SearchLowerBound | undefined, next: SearchLowerBound): SearchLowerBound {
+  if (current === undefined) {
+    return next;
+  }
+  if (current.at.getTime() > next.at.getTime()) {
+    return current;
+  }
+  if (next.at.getTime() > current.at.getTime()) {
+    return next;
+  }
+  return { at: current.at, exclusive: current.exclusive || next.exclusive };
+}
+
+function mergeUpper(current: Date | undefined, next: Date): Date {
+  if (current === undefined || next.getTime() < current.getTime()) {
+    return next;
+  }
+  return current;
 }
 
 export function isTelegramConversationChannel(kind: string | undefined) {

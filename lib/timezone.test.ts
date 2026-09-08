@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   formatDateInTimeZone,
   listLocalDates,
+  localCalendarDateRange,
   localDayRange,
   localInclusiveDateRange,
   localRollingDaysRange,
@@ -136,6 +137,30 @@ describe("shiftYmd", () => {
 
   it("rejects invalid dates", () => {
     assert.throws(() => shiftYmd("2026-02-30", 1), RangeError);
+  });
+});
+
+describe("localCalendarDateRange", () => {
+  it("converts a UTC calendar day to an exclusive UTC range at midnight", () => {
+    const range = localCalendarDateRange("UTC", "2026-09-07");
+    assert.equal(range.from.toISOString(), "2026-09-07T00:00:00.000Z");
+    assert.equal(range.to.toISOString(), "2026-09-08T00:00:00.000Z");
+  });
+
+  it("converts a Berlin calendar day at local midnight", () => {
+    const range = localCalendarDateRange("Europe/Berlin", "2026-09-07");
+    assert.equal(range.from.toISOString(), "2026-09-06T22:00:00.000Z");
+    assert.equal(range.to.toISOString(), "2026-09-07T22:00:00.000Z");
+  });
+
+  it("keeps a DST spring-forward day from local midnight to the next midnight", () => {
+    const range = localCalendarDateRange("Europe/Berlin", "2026-03-29");
+    assert.equal(range.from.toISOString(), "2026-03-28T23:00:00.000Z");
+    assert.equal(range.to.toISOString(), "2026-03-29T22:00:00.000Z");
+  });
+
+  it("rejects invalid dates", () => {
+    assert.throws(() => localCalendarDateRange("UTC", "2026-02-30"), RangeError);
   });
 });
 
