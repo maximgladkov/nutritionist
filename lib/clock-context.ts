@@ -1,7 +1,7 @@
 import { inferMealLabel, mealSlotContextText } from "./meal-label.ts";
 import { preferredLanguageForCountry } from "./open-food-facts-name.ts";
 import { formatClock } from "./reminder-clock.ts";
-import { formatDateInTimeZone, getZonedParts } from "./timezone.ts";
+import { formatDateInTimeZone, getZonedParts, localWeekDates, shiftYmd } from "./timezone.ts";
 
 export function catalogCountryContextText(country?: string | null): string {
   const code = country?.trim().toUpperCase() ?? "";
@@ -32,12 +32,15 @@ export function clockContextText(input: {
     weekday: "long",
   }).format(input.now);
   const calendarDate = `${String(local.year).padStart(4, "0")}-${String(local.month).padStart(2, "0")}-${String(local.day).padStart(2, "0")}`;
+  const week = localWeekDates(input.now, input.timeZone);
+  const lastWeek = { from: shiftYmd(week.from, -7), to: shiftYmd(week.to, -7) };
   const zone = input.timezoneIsFallback
     ? `${input.timeZone}; timezone is unknown`
     : input.timeZone;
   return [
     `Current local time: ${weekday} ${calendarDate} ${formatClock(local.hour, local.minute)} (${zone}).`,
     `Nutrition day: ${formatDateInTimeZone(input.now, input.timeZone)} (04:00 to 04:00 the next morning).`,
+    `Current week (Monday to Sunday): ${week.from} to ${week.to}. Last week: ${lastWeek.from} to ${lastWeek.to}.`,
     mealSlotContextText(inferMealLabel(input.now, input.timeZone)),
     catalogCountryContextText(input.catalogCountry),
     ...(input.liveNutrition ? [input.liveNutrition] : []),

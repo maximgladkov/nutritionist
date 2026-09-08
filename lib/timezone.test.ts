@@ -7,6 +7,7 @@ import {
   localDayRange,
   localInclusiveDateRange,
   localRollingDaysRange,
+  localWeekDates,
   localWeekRange,
   nextLocalOccurrence,
   normalizeTimezone,
@@ -100,6 +101,30 @@ describe("localWeekRange", () => {
     const range = localWeekRange(new Date("2026-08-29T07:00:00.000Z"), "Europe/Berlin");
     assert.equal(range.from.toISOString(), "2026-08-24T02:00:00.000Z");
     assert.equal(range.to.toISOString(), "2026-08-31T02:00:00.000Z");
+  });
+});
+
+describe("localWeekDates", () => {
+  it("returns inclusive Monday to Sunday nutrition dates", () => {
+    assert.deepEqual(localWeekDates(new Date("2026-08-29T07:00:00.000Z"), "Europe/Berlin"), {
+      from: "2026-08-24",
+      to: "2026-08-30",
+    });
+    assert.deepEqual(localWeekDates(new Date("2026-09-08T10:00:00.000Z"), "Europe/Berlin"), {
+      from: "2026-09-07",
+      to: "2026-09-13",
+    });
+    assert.deepEqual(localWeekDates(new Date("2026-09-06T12:00:00.000Z"), "Europe/Berlin"), {
+      from: "2026-08-31",
+      to: "2026-09-06",
+    });
+  });
+
+  it("stays on the previous week until Monday 04:00", () => {
+    assert.deepEqual(localWeekDates(new Date("2026-09-07T01:30:00.000Z"), "Europe/Berlin"), {
+      from: "2026-08-31",
+      to: "2026-09-06",
+    });
   });
 });
 

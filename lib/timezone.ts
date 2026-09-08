@@ -113,9 +113,13 @@ export function localDayRange(now: Date, timeZone: string): { from: Date; to: Da
 }
 
 export function localWeekRange(now: Date, timeZone: string): { from: Date; to: Date } {
-  const local = nutritionDayParts(now, timeZone);
-  const start = addCalendarDays(local, -mondayOffset(local));
+  const start = weekMonday(now, timeZone);
   return rangeFromLocalStart(start, 7, timeZone);
+}
+
+export function localWeekDates(now: Date, timeZone: string): { from: string; to: string } {
+  const start = weekMonday(now, timeZone);
+  return { from: formatYmd(start), to: formatYmd(addCalendarDays(start, 6)) };
 }
 
 export function localRollingDaysRange(
@@ -278,6 +282,11 @@ function rangeFromLocalStart(
     second: 0,
   });
   return { from, to };
+}
+
+function weekMonday(now: Date, timeZone: string): Pick<ZonedParts, "year" | "month" | "day"> {
+  const local = nutritionDayParts(now, timeZone);
+  return addCalendarDays(local, -mondayOffset(local));
 }
 
 function mondayOffset(parts: Pick<ZonedParts, "year" | "month" | "day">): number {
