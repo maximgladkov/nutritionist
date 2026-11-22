@@ -1,6 +1,6 @@
 export type ChannelName = "web" | "telegram" | "whatsapp";
 
-export type ChannelProvider = "telegram" | "whatsapp" | "email";
+export type ChannelProvider = "telegram" | "whatsapp" | "email" | "apple";
 
 export const APP_AUTHENTICATOR = "app";
 export const APP_ISSUER = "nutritionist";

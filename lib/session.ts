@@ -2,6 +2,7 @@ import { decode } from "next-auth/jwt";
 import { AUTH_SESSION_COOKIE_NAMES, readAuthJwt } from "./auth-cookies";
 import { prisma } from "./prisma";
 import type { UserRecord } from "./identity-core";
+import { verifyAccessToken } from "./api/tokens.ts";
 
 function readCookie(request: Request, name: string): string | undefined {
   const header = request.headers.get("cookie");
@@ -25,6 +26,18 @@ async function resolveUserFromRequest(request: Request): Promise<UserRecord | nu
   const secret = process.env.AUTH_SECRET;
   if (!secret) {
     return null;
+  }
+
+  // Mobile clients send an API access token instead of a session cookie.
+  const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get("authorization") ?? "")?.[1]?.trim();
+  if (bearer) {
+    const userId = await verifyAccessToken(bearer);
+    if (userId) {
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (user) {
+        return { id: user.id, email: user.email, name: user.name };
+      }
+    }
   }
 
   const jwt = await readAuthJwt(request);

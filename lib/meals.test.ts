@@ -266,6 +266,7 @@ describe("cloneMealItemCreateData", () => {
     const cloned = cloneMealItemCreateData({
       amount: 125,
       barcode: "8410000000001",
+      brand: "Danone",
       carbohydrates: 12,
       energyKcal: 80,
       fat: 2,
@@ -283,6 +284,7 @@ describe("cloneMealItemCreateData", () => {
     assert.deepEqual(cloned, {
       amount: 125,
       barcode: "8410000000001",
+      brand: "Danone",
       carbohydrates: 12,
       energyKcal: 80,
       fat: 2,

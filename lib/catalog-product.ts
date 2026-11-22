@@ -238,6 +238,14 @@ async function findCatalogProductForSave(barcode: string | null, name: string): 
   return findCatalogProductByName(name);
 }
 
+export async function findCatalogProductById(id: string): Promise<Product | undefined> {
+  const row = await prisma.catalogProduct.findUnique({ where: { id } });
+  if (!row) {
+    return undefined;
+  }
+  return productWithImages(catalogRowToProduct(row));
+}
+
 async function findCatalogProductByBarcode(barcode: string): Promise<Product | undefined> {
   const row = await prisma.catalogProduct.findUnique({ where: { barcode } });
   if (!row) {
