@@ -84,6 +84,13 @@ describe("foods", () => {
     assert.equal(byBarcode.status, 200);
     assert.equal(byBarcode.body.brand, "La Carloteña");
 
+    // The next scan of the same barcode lands on the saved product instead of food_not_found.
+    const rescan = await api("POST", "/log/analyze", { body: { barcode: "4000000000006", source: "barcode" }, token: kira.accessToken });
+    assert.equal(rescan.status, 200, JSON.stringify(rescan.body));
+    assert.equal(rescan.body.items[0].match, "barcode");
+    assert.equal(rescan.body.items[0].foodId, saved.body.food.id);
+    assert.equal(rescan.body.items[0].amount, 108);
+
     const stranger = await api("POST", "/foods", {
       body: { name: "Thief", nutrimentsPer100g: { energyKcal100g: 1 }, photos: [{ kind: "front", uploadId }] },
       token: other.accessToken,
@@ -179,7 +186,7 @@ describe("analyze", () => {
       assert.equal(input.source, "label");
       assert.equal(input.images.length, 1);
       return {
-        foods: [{ amount: 30, brand: "Brand", name: "Granola", nutrimentsPer100g: { energyKcal100g: 450, proteins100g: 10 }, searchQueries: ["granola"], unit: "g" }],
+        foods: [{ amount: 30, brand: "Brand", name: "Granola", nutrimentsPer100g: { energyKcal100g: 450, proteins100g: 10 }, searchQueries: ["granola"], servingSize: "30 g", unit: "g" }],
       };
     });
     const result = await api("POST", "/log/analyze", { body: { source: "label", uploadIds: [uploadId] }, token: other.accessToken });
@@ -187,6 +194,8 @@ describe("analyze", () => {
     const [item] = result.body.items;
     assert.equal(item.match, "label");
     assert.equal(item.saveable, true);
+    assert.equal(item.servingSize, "30 g", "the printed serving travels with the draft so saving keeps it");
+    assert.ok(item.servings.some((serving: { amount: number }) => serving.amount === 30));
     assert.equal(item.per100.energyKcal, 450);
     assert.equal(Math.round(item.metrics.energyKcal), 135);
   });

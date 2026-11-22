@@ -27,6 +27,8 @@ export type DraftItem = {
   per100: NutrientValues;
   // True when the item is not in the catalog yet and can be saved with POST /foods.
   saveable: boolean;
+  // Serving size as printed on the pack ("40 g"), to send along when saving a label read.
+  servingSize: string | null;
   servings: ServingView[];
   unit: "g" | "ml" | "serving";
 };
@@ -60,6 +62,7 @@ function estimateItem(food: RecognizedFood, match: "label" | "estimate", alterna
   const nutriments = nutrimentsFromRecognized(food);
   const basis = foodBasis(nutriments);
   const unit = food.unit === "serving" ? basis : food.unit;
+  const servingSize = match === "label" ? food.servingSize?.trim() || null : null;
   return {
     alternatives,
     amount: food.amount,
@@ -73,7 +76,8 @@ function estimateItem(food: RecognizedFood, match: "label" | "estimate", alterna
     nutrimentsPer100g: nutriments,
     per100: scaleNutriments(nutriments, 100, basis),
     saveable: match === "label",
-    servings: servingsFor({ quantity: null, servingSize: null }, basis),
+    servingSize,
+    servings: servingsFor({ quantity: null, servingSize }, basis),
     unit,
   };
 }
@@ -94,6 +98,7 @@ async function catalogItem(foodId: string, amount: number, unit: DraftItem["unit
     nutrimentsPer100g: food.nutrimentsPer100g,
     per100: food.per100,
     saveable: false,
+    servingSize: food.servingSize,
     servings: food.servings,
     unit: effectiveUnit,
   };
