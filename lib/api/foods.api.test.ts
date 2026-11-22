@@ -206,8 +206,8 @@ describe("analyze", () => {
       assert.equal(input.text, "two slices of cheese and a mystery stew");
       return {
         foods: [
-          { amount: 40, name: "cheese slices", searchQueries: ["processed cheese slices"], unit: "g" },
-          { amount: 300, name: "Mystery stew", nutrimentsPer100g: { energyKcal100g: 90 }, searchQueries: ["qqqqzzzz"], unit: "g" },
+          { amount: 40, name: "cheese slices", position: { x: 0.3, y: 0.6 }, searchQueries: ["processed cheese slices"], unit: "g" },
+          { amount: 300, name: "Mystery stew", nutrimentsPer100g: { energyKcal100g: 90 }, position: { x: 0.7, y: 0.4 }, searchQueries: ["qqqqzzzz"], unit: "g" },
         ],
         note: "Portion of stew is a guess.",
       };
@@ -222,6 +222,8 @@ describe("analyze", () => {
     assert.equal(cheese.barcode, CHEESE);
     assert.equal(stew.match, "estimate");
     assert.equal(Math.round(stew.metrics.energyKcal), 270);
+    assert.deepEqual(cheese.position, { x: 0.3, y: 0.6 }, "catalog matches keep where the food is in the photo");
+    assert.deepEqual(stew.position, { x: 0.7, y: 0.4 });
     assert.equal(result.body.note, "Portion of stew is a guess.");
 
     const committed = await api("POST", "/meals/items", {

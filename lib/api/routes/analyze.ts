@@ -25,6 +25,9 @@ export type DraftItem = {
   name: string;
   nutrimentsPer100g: ProductNutriments;
   per100: NutrientValues;
+  // Centre of the food in a meal photo (fractions of width and height), so the app can number it
+  // on the image; null for other sources.
+  position: { x: number; y: number } | null;
   // True when the item is not in the catalog yet and can be saved with POST /foods.
   saveable: boolean;
   // Serving size as printed on the pack ("40 g"), to send along when saving a label read.
@@ -75,6 +78,7 @@ function estimateItem(food: RecognizedFood, match: "label" | "estimate", alterna
     name: food.name.trim(),
     nutrimentsPer100g: nutriments,
     per100: scaleNutriments(nutriments, 100, basis),
+    position: food.position ?? null,
     saveable: match === "label",
     servingSize,
     servings: servingsFor({ quantity: null, servingSize }, basis),
@@ -97,6 +101,7 @@ async function catalogItem(foodId: string, amount: number, unit: DraftItem["unit
     name: food.name,
     nutrimentsPer100g: food.nutrimentsPer100g,
     per100: food.per100,
+    position: null,
     saveable: false,
     servingSize: food.servingSize,
     servings: food.servings,
@@ -114,7 +119,8 @@ async function groundFood(food: RecognizedFood, country?: string): Promise<Draft
     return estimateItem(food, "estimate", []);
   }
   const unit = food.unit === "serving" ? best.unit : food.unit;
-  return catalogItem(best.id, food.amount, unit, "catalog", rest.slice(0, 3), country);
+  const item = await catalogItem(best.id, food.amount, unit, "catalog", rest.slice(0, 3), country);
+  return { ...item, position: food.position ?? null };
 }
 
 async function loadImages(userId: string, uploadIds: readonly string[]) {
