@@ -200,6 +200,8 @@ describe("log food helpers", () => {
     const bread = result.body.often.find((entry: { barcode: string | null }) => entry.barcode === BREAD);
     assert.ok(bread, "bread was eaten at breakfast");
     assert.equal(bread.brand, "Hacendado");
+    assert.equal(bread.nutrimentsPer100g.energyKcal100g, 265, "suggestions carry nutrition so the app can log them");
+    assert.equal(result.body.repeat.items[0].nutrimentsPer100g.energyKcal100g, 265);
   });
 
   it("lists recent products and manages favorites", async () => {
@@ -207,6 +209,8 @@ describe("log food helpers", () => {
     assert.equal(recent.status, 200);
     const bread = recent.body.products.find((entry: { barcode: string | null }) => entry.barcode === BREAD);
     assert.ok(bread);
+    assert.equal(bread.brand, "Hacendado");
+    assert.equal(bread.nutrimentsPer100g.energyKcal100g, 265);
 
     const key = encodeURIComponent(bread.key);
     assert.equal((await api("PUT", `/products/favorites/${key}`, { body: { barcode: BREAD, name: bread.name }, token: kira.accessToken })).status, 200);

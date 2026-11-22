@@ -38,6 +38,8 @@ describe("foods", () => {
     assert.ok(cheese, JSON.stringify(result.body));
     assert.equal(cheese.kcalPer100, 287);
     assert.equal(cheese.unit, "g");
+    assert.equal(cheese.nutrimentsPer100g.proteins100g, 17);
+    assert.deepEqual(cheese.servings.map((serving: { amount: number }) => serving.amount), [100, 20, 200]);
     assert.equal((await api("GET", "/foods/search?q=a", { token: kira.accessToken })).status, 400);
   });
 

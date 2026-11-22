@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { handleApiRequest } from "../index.ts";
 import { resetApiDeps, setApiDeps, type EmailCodeMessage, type FoodRecognizer, type PushMessage } from "../deps.ts";
+import type { AppleIdentity } from "../apple.ts";
 import { prisma } from "../../prisma.ts";
 
 export const emails: EmailCodeMessage[] = [];
@@ -11,6 +12,11 @@ let recognizer: FoodRecognizer = async () => ({ foods: [] });
 
 export function setRecognizer(next: FoodRecognizer): void {
   recognizer = next;
+}
+
+// Identity tokens in tests are `apple:<json identity>`; anything else fails verification.
+export function appleToken(identity: Partial<AppleIdentity> & { sub: string }): string {
+  return `apple:${JSON.stringify({ email: null, emailVerified: false, isPrivateEmail: false, ...identity })}`;
 }
 
 export function installFakes(): void {
@@ -36,6 +42,12 @@ export function installFakes(): void {
     },
     async sendPush(messages) {
       pushes.push(...messages);
+    },
+    async verifyAppleToken(identityToken) {
+      if (!identityToken.startsWith("apple:")) {
+        throw new Error("bad token");
+      }
+      return JSON.parse(identityToken.slice("apple:".length)) as AppleIdentity;
     },
   });
 }

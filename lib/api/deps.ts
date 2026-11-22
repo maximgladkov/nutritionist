@@ -1,5 +1,6 @@
 import { get, put } from "@vercel/blob";
 import { APP_NAME } from "../brand.ts";
+import { verifyAppleIdentityToken, type AppleIdentity } from "./apple.ts";
 
 export type EmailCodeMessage = { code: string; email: string; locale: string };
 
@@ -35,11 +36,17 @@ export type ApiDeps = {
   recognizeFoods: FoodRecognizer;
   sendEmailCode: (message: EmailCodeMessage) => Promise<void>;
   sendPush: (messages: readonly PushMessage[]) => Promise<void>;
+  verifyAppleToken: (identityToken: string) => Promise<AppleIdentity>;
 };
 
 async function sendEmailCodeWithResend({ code, email }: EmailCodeMessage): Promise<void> {
   const key = process.env.AUTH_RESEND_KEY?.trim();
   if (!key) {
+    if (process.env.NODE_ENV !== "production") {
+      // Lets the mobile app sign in against a local server without an email provider.
+      console.info(`[api] sign-in code for ${email}: ${code}`);
+      return;
+    }
     throw new Error("AUTH_RESEND_KEY is not configured");
   }
   const response = await fetch("https://api.resend.com/emails", {
@@ -101,6 +108,7 @@ const defaults: ApiDeps = {
   recognizeFoods: recognizeWithModel,
   sendEmailCode: sendEmailCodeWithResend,
   sendPush: sendExpoPush,
+  verifyAppleToken: verifyAppleIdentityToken,
 };
 
 let current: ApiDeps = defaults;

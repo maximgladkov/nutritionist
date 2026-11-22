@@ -20,17 +20,17 @@ export type FoodSummary = {
   imageUrl: string | null;
   kcalPer100: number | null;
   name: string;
+  nutrimentsPer100g: ProductNutriments;
+  servings: ServingView[];
   source: ProductSource;
   unit: "g" | "ml";
 };
 
 export type FoodDetail = FoodSummary & {
   images: { id: string; kind: string; url: string }[];
-  nutrimentsPer100g: ProductNutriments;
   per100: NutrientValues;
   quantity: string | null;
   servingSize: string | null;
-  servings: ServingView[];
 };
 
 const CATALOG_PREFIX = "catalog:";
@@ -74,6 +74,8 @@ export function toFoodSummary(product: Product, source: ProductSource): FoodSumm
     imageUrl: product.images?.[0]?.url ?? product.imageUrl,
     kcalPer100: scaleNutriments(product.nutriments, 100, basis).energyKcal,
     name: product.name?.trim() || product.barcode || "Unnamed product",
+    nutrimentsPer100g: product.nutriments,
+    servings: servingsFor(product, basis),
     source,
     unit: basis,
   };
@@ -84,11 +86,9 @@ export function toFoodDetail(product: Product, source: ProductSource): FoodDetai
   return {
     ...summary,
     images: (product.images ?? []).map((image) => ({ id: image.id, kind: image.kind, url: image.url })),
-    nutrimentsPer100g: product.nutriments,
     per100: scaleNutriments(product.nutriments, 100, summary.unit),
     quantity: product.quantity,
     servingSize: product.servingSize,
-    servings: servingsFor(product, summary.unit),
   };
 }
 

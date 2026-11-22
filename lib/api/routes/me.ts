@@ -12,6 +12,8 @@ import { invalid, notFound } from "../errors.ts";
 import { noContent, readJson } from "../http.ts";
 import type { RouteDefinition } from "../router.ts";
 import { issueTokens } from "../tokens.ts";
+import { ApiError } from "../errors.ts";
+import { apiDeps } from "../deps.ts";
 
 export type MeView = {
   country: string | null;
@@ -43,6 +45,9 @@ export async function toMeView(userId: string): Promise<MeView> {
     timezone: user.profile?.timezone ?? null,
   };
 }
+
+const UNLINKABLE = new Set(["apple", "telegram", "whatsapp"]);
+const SIGN_IN_PROVIDERS = new Set(["apple", "email"]);
 
 const goalNumber = (field: (typeof GOAL_FIELDS)[number]) =>
   z.number().int().min(GOAL_SPECS[field].min).max(GOAL_SPECS[field].max).nullable().optional();
@@ -212,7 +217,12 @@ export const meRoutes: RouteDefinition[] = [
   {
     async handler({ user }) {
       const link = await createLinkCode(user.id);
-      return { code: link.code, expiresAt: link.expiresAt.toISOString() };
+      const bot = process.env.TELEGRAM_BOT_USERNAME?.trim().replace(/^@/, "");
+      return {
+        code: link.code,
+        expiresAt: link.expiresAt.toISOString(),
+        telegramBotUrl: bot ? `https://t.me/${bot}` : null,
+      };
     },
     method: "POST",
     path: "/me/link-codes",
@@ -231,6 +241,58 @@ export const meRoutes: RouteDefinition[] = [
     },
     method: "POST",
     path: "/me/link-codes/consume",
+  },
+  {
+    async handler({ request, user }) {
+      const body = await readJson(request, z.object({ identityToken: z.string().min(20) }));
+      let apple;
+      try {
+        apple = await apiDeps().verifyAppleToken(body.identityToken);
+      } catch {
+        throw new ApiError(401, "unauthorized", "Apple sign-in failed. Try again.");
+      }
+      const existing = await prisma.channelIdentity.findUnique({
+        where: { provider_providerUserId: { provider: "apple", providerUserId: apple.sub } },
+      });
+      if (existing && existing.userId !== user.id) {
+        throw new ApiError(409, "already_linked", "That Apple ID already opens another Btr.me account. Use a link code to join the two.");
+      }
+      if (!existing) {
+        await prisma.channelIdentity.create({ data: { provider: "apple", providerUserId: apple.sub, userId: user.id } });
+      }
+      return toMeView(user.id);
+    },
+    method: "POST",
+    path: "/me/linked-channels/apple",
+  },
+  {
+    async handler({ params, user }) {
+      const provider = params.provider ?? "";
+      if (!UNLINKABLE.has(provider)) {
+        throw invalid("Choose apple, telegram, or whatsapp.");
+      }
+      const identities = await prisma.channelIdentity.findMany({ where: { userId: user.id } });
+      if (!identities.some((identity) => identity.provider === provider)) {
+        throw notFound("That account is not linked.");
+      }
+      const signInLeft = identities.some((identity) => SIGN_IN_PROVIDERS.has(identity.provider) && identity.provider !== provider);
+      if (SIGN_IN_PROVIDERS.has(provider) && !signInLeft) {
+        throw new ApiError(409, "last_sign_in_method", "Add another way to sign in before removing this one.");
+      }
+      await prisma.channelIdentity.deleteMany({ where: { provider, userId: user.id } });
+      return toMeView(user.id);
+    },
+    method: "DELETE",
+    path: "/me/linked-channels/:provider",
+  },
+  {
+    async handler({ user }) {
+      // Cascades to meals, goals, groups the user owns, tokens and identities.
+      await prisma.user.delete({ where: { id: user.id } });
+      return noContent();
+    },
+    method: "DELETE",
+    path: "/me",
   },
   {
     auth: false,

@@ -31,6 +31,36 @@ const saveFoodSchema = z.object({
   servingSize: z.string().trim().max(100).optional(),
 });
 
+// Adds the brand and per-100 nutrition from the newest diary entry of each product, so a
+// client can show and log it without another lookup.
+async function withLoggedNutrition<T extends { barcode: string | null; key: string; name: string }>(userId: string, products: readonly T[]) {
+  if (products.length === 0) {
+    return [];
+  }
+  const items = await prisma.mealItem.findMany({
+    orderBy: { createdAt: "desc" },
+    select: { barcode: true, brand: true, name: true, nutrimentsPer100g: true },
+    where: {
+      meal: { userId },
+      OR: [
+        { barcode: { in: products.flatMap((product) => (product.barcode ? [product.barcode] : [])) } },
+        { name: { in: products.map((product) => product.name) } },
+      ],
+    },
+  });
+  const latest = new Map<string, (typeof items)[number]>();
+  for (const item of items) {
+    const key = productKey(item.barcode, item.name);
+    if (!latest.has(key)) {
+      latest.set(key, item);
+    }
+  }
+  return products.map((product) => {
+    const logged = latest.get(product.key);
+    return { ...product, brand: logged?.brand ?? null, nutrimentsPer100g: logged?.nutrimentsPer100g ?? {} };
+  });
+}
+
 async function logSuggestions(userId: string, date: string, label: MealLabel) {
   const ctx = await readSummaryContext(userId);
   const yesterday = shiftYmd(date, -1);
@@ -45,7 +75,14 @@ async function logSuggestions(userId: string, date: string, label: MealLabel) {
       ? {
           date: yesterday,
           itemCount: previous.items.length,
-          items: previous.items.map((item) => ({ amount: item.amount, brand: item.brand, name: item.name, unit: item.unit })),
+          items: previous.items.map((item) => ({
+            amount: item.amount,
+            barcode: item.barcode,
+            brand: item.brand,
+            name: item.name,
+            nutrimentsPer100g: item.nutrimentsPer100g,
+            unit: item.unit,
+          })),
           label,
           mealId: previous.id,
           totals: sumNutrients(
@@ -77,6 +114,7 @@ async function logSuggestions(userId: string, date: string, label: MealLabel) {
       imageUrl: true,
       meal: { select: { eatenAt: true } },
       name: true,
+      nutrimentsPer100g: true,
       unit: true,
     },
     where: { meal: { eatenAt: { gte: since.from, lt: since.to }, label, userId } },
@@ -103,6 +141,7 @@ async function logSuggestions(userId: string, date: string, label: MealLabel) {
       key,
       lastLoggedOn: formatDateInTimeZone(latest.meal.eatenAt, ctx.timezone),
       name: latest.name,
+      nutrimentsPer100g: latest.nutrimentsPer100g,
       timesLogged: count,
       unit: latest.unit,
     }));
@@ -180,7 +219,8 @@ export const foodRoutes: RouteDefinition[] = [
   {
     async handler({ url, user }) {
       const query = readQuery(url, z.object({ segment: z.enum(PRODUCT_SEGMENTS).default("recent") }));
-      return { products: await listUserProducts({ segment: query.segment, userId: user.id }), segment: query.segment };
+      const products = await listUserProducts({ segment: query.segment, userId: user.id });
+      return { products: await withLoggedNutrition(user.id, products), segment: query.segment };
     },
     method: "GET",
     path: "/products",
