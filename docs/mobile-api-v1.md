@@ -160,7 +160,7 @@ POST /log/analyze                  { source: "barcode"|"label"|"photo"|"text", b
 POST /meals/items                  commit the edited items (same endpoint as above)
 ```
 
-`DraftItem` is `{ key, name, brand, barcode, foodId, amount, unit, per100, nutrimentsPer100g, metrics, servings, match, saveable, alternatives }`, with `match` one of `barcode`, `catalog`, `label` or `estimate`. To commit, send `{ foodId, amount, unit }` for catalog items, or `{ name, nutrimentsPer100g, amount, unit }` for estimates. A `label` draft is `saveable`: `POST /foods` adds it to the catalog first. An unknown barcode returns 404 `food_not_found`, which is the client's cue to offer a label scan.
+`DraftItem` is `{ key, name, brand, barcode, foodId, amount, unit, per100, nutrimentsPer100g, metrics, servings, servingSize, match, saveable, alternatives }`, with `match` one of `barcode`, `catalog`, `label` or `estimate`. To commit, send `{ foodId, amount, unit }` for catalog items, or `{ name, nutrimentsPer100g, amount, unit }` for estimates. A `label` draft is `saveable`: `POST /foods` adds it to the catalog first, with the barcode that wasn't found, the label photo and the printed `servingSize`, so the next scan of that barcode finds it. An unknown barcode returns 404 `food_not_found`, which is the client's cue to offer a label scan.
 
 - `barcode` is deterministic: `resolveProductByBarcode`, with no model call.
 - `label` reads the nutrition table with a vision model. It can return a product to save through `POST /foods` (photos attached).
