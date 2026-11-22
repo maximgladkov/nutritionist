@@ -34,6 +34,7 @@ export class MealError extends Error {
 
 export type MealItemInput = {
   barcode?: string;
+  brand?: string;
   name?: string;
   amount: number;
   unit: AmountUnit;
@@ -43,6 +44,7 @@ export type MealItemInput = {
 export type MealItemView = {
   id: string;
   name: string;
+  brand: string | null;
   barcode: string | null;
   imageUrl: string | null;
   amount: number;
@@ -50,6 +52,7 @@ export type MealItemView = {
   grams: number;
   metrics: NutrientValues;
   incomplete: NutrientKey[];
+  nutrimentsPer100g: ProductNutriments;
 };
 
 export type MealView = {
@@ -79,6 +82,7 @@ export type NutritionSummary = {
 
 type ResolvedItem = {
   name: string;
+  brand: string | null;
   barcode: string | null;
   imageUrl: string | null;
   amount: number;
@@ -388,6 +392,7 @@ export function copyMealSlots(input: {
 export function cloneMealItemCreateData(item: {
   amount: number;
   barcode: string | null;
+  brand?: string | null;
   carbohydrates: number | null;
   energyKcal: number | null;
   fat: number | null;
@@ -405,6 +410,7 @@ export function cloneMealItemCreateData(item: {
   return {
     amount: item.amount,
     barcode: item.barcode,
+    brand: item.brand ?? null,
     carbohydrates: item.carbohydrates,
     energyKcal: item.energyKcal,
     fat: item.fat,
@@ -758,6 +764,7 @@ async function resolveItem(
   assertPositiveAmount(item.amount);
 
   let name: string | undefined = item.name?.trim() || undefined;
+  let brand: string | null = item.brand?.trim() || null;
   let barcode: string | null = null;
   let imageUrl: string | null = null;
   let nutriments: ProductNutriments = item.nutrimentsPer100g ?? {};
@@ -772,6 +779,7 @@ async function resolveItem(
           throw new MealError(`Product not found for barcode ${result.barcode}`);
         }
         barcode = result.product.barcode;
+        brand = result.product.brands?.trim() || brand;
         imageUrl = result.product.imageUrl;
         name = choosePackagedFoodName({
           barcode: result.product.barcode,
@@ -801,6 +809,7 @@ async function resolveItem(
     });
     return {
       name,
+      brand,
       barcode,
       imageUrl,
       amount: item.amount,
@@ -820,6 +829,7 @@ async function resolveItem(
 function toCreateData(item: ResolvedItem): Prisma.MealItemCreateWithoutMealInput {
   return {
     name: item.name,
+    brand: item.brand,
     barcode: item.barcode,
     imageUrl: item.imageUrl,
     amount: item.amount,
@@ -835,6 +845,19 @@ function toCreateData(item: ResolvedItem): Prisma.MealItemCreateWithoutMealInput
     fiber: item.metrics.fiber,
     salt: item.metrics.salt,
   };
+}
+
+function nutrimentsFromJson(value: Prisma.JsonValue | undefined): ProductNutriments {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  const out: Record<string, number> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (typeof entry === "number" && Number.isFinite(entry)) {
+      out[key] = entry;
+    }
+  }
+  return out as ProductNutriments;
 }
 
 function nutrimentsToJson(nutriments: ProductNutriments): Prisma.InputJsonValue {
@@ -854,11 +877,13 @@ function toMealView(meal: {
   items: {
     id: string;
     name: string;
+    brand?: string | null;
     barcode: string | null;
     imageUrl: string | null;
     amount: number;
     unit: MealItemUnit;
     grams: number;
+    nutrimentsPer100g?: Prisma.JsonValue;
     energyKcal: number | null;
     proteins: number | null;
     carbohydrates: number | null;
@@ -884,6 +909,8 @@ function toMealView(meal: {
 function toItemView(item: {
   id: string;
   name: string;
+  brand?: string | null;
+  nutrimentsPer100g?: Prisma.JsonValue;
   barcode: string | null;
   imageUrl: string | null;
   amount: number;
@@ -911,6 +938,7 @@ function toItemView(item: {
   return {
     id: item.id,
     name: item.name,
+    brand: item.brand ?? null,
     barcode: item.barcode,
     imageUrl: item.imageUrl,
     amount: item.amount,
@@ -918,6 +946,7 @@ function toItemView(item: {
     grams: item.grams,
     metrics,
     incomplete: incompleteNutrients([metrics]),
+    nutrimentsPer100g: nutrimentsFromJson(item.nutrimentsPer100g),
   };
 }
 

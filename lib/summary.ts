@@ -53,7 +53,7 @@ export type NutritionDiaryPayload = {
   mealStreak: number;
 };
 
-type SummaryContext = {
+export type SummaryContext = {
   goals: GoalsView;
   now: Date;
   timezone: string;
@@ -116,7 +116,7 @@ export async function loadTodayNutritionDay(input: {
   return loadDayForContext(ctx, ctx.today);
 }
 
-async function readSummaryContext(userId: string, now = new Date()): Promise<SummaryContext> {
+export async function readSummaryContext(userId: string, now = new Date()): Promise<SummaryContext> {
   const profile = await prisma.userProfile.findUnique({
     where: { userId },
     select: { timezone: true },

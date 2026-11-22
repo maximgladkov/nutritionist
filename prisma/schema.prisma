@@ -32,6 +32,11 @@ model User {
   groupMemberships GroupMember[]
   groupMessagesSent     GroupMessage[] @relation("GroupMessagesSent")
   groupMessagesReceived GroupMessage[] @relation("GroupMessagesReceived")
+  refreshTokens RefreshToken[]
+  pushDevices   PushDevice[]
+  savedMeals    SavedMeal[]
+  weightEntries WeightEntry[]
+  progressPhotos ProgressPhoto[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -138,6 +143,8 @@ model UserAttachment {
   blobPath      String   @unique
   createdAt     DateTime @default(now())
   catalogImages CatalogProductImage[]
+  mealPhotos    MealPhoto[]
+  progressPhotos ProgressPhoto[]
 
   @@index([sessionId, turnId])
   @@index([userId])
@@ -283,6 +290,9 @@ model UserProfile {
   country   String?
   locale    String?
   timezone  String?
+  startWeightKg Float?
+  goalWeightKg  Float?
+  notificationsReadAt DateTime?
   updatedAt DateTime @updatedAt
 }
 
@@ -354,6 +364,7 @@ model Meal {
   eatenAt   DateTime   @db.Timestamptz
   label     MealLabel
   items     MealItem[]
+  photos    MealPhoto[]
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
@@ -365,6 +376,7 @@ model MealItem {
   mealId            String
   meal              Meal         @relation(fields: [mealId], references: [id], onDelete: Cascade)
   name              String
+  brand             String?
   barcode           String?
   amount            Float
   unit              MealItemUnit
@@ -434,6 +446,8 @@ model GroupMember {
   userId   String
   user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   role     GroupMemberRole
+  sharing  Boolean         @default(true)
+  lastReadAt DateTime?
   joinedAt DateTime        @default(now())
 
   @@unique([groupId, userId])
@@ -449,6 +463,8 @@ model GroupMessage {
   toUserId   String
   toUser     User     @relation("GroupMessagesReceived", fields: [toUserId], references: [id], onDelete: Cascade)
   body       String   @db.Text
+  targetDate String?
+  targetMealItemId String?
   createdAt  DateTime @default(now())
 
   @@index([groupId, toUserId, createdAt])
@@ -469,4 +485,106 @@ model TelegramInboundBurstItem {
 
   @@unique([chatId, messageId])
   @@index([chatId, consumedAt, createdAt])
+}
+
+// Mobile API: rotating refresh tokens. Only a SHA-256 hash of each token is stored.
+model RefreshToken {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash   String    @unique
+  deviceName  String?
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  lastUsedAt  DateTime?
+
+  @@index([userId])
+}
+
+// Mobile API: one-time email sign-in codes. Only a hash of each code is stored.
+model EmailLoginCode {
+  id         String    @id @default(cuid())
+  email      String
+  codeHash   String
+  attempts   Int       @default(0)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([email, createdAt])
+}
+
+model PushDevice {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  platform  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model SavedMeal {
+  id        String          @id @default(cuid())
+  userId    String
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  items     SavedMealItem[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@index([userId])
+}
+
+model SavedMealItem {
+  id                String       @id @default(cuid())
+  savedMealId       String
+  savedMeal         SavedMeal    @relation(fields: [savedMealId], references: [id], onDelete: Cascade)
+  sortOrder         Int
+  name              String
+  brand             String?
+  barcode           String?
+  amount            Float
+  unit              MealItemUnit
+  nutrimentsPer100g Json
+
+  @@index([savedMealId, sortOrder])
+}
+
+model MealPhoto {
+  id           String         @id @default(cuid())
+  mealId       String
+  meal         Meal           @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  attachmentId String
+  attachment   UserAttachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+  createdAt    DateTime       @default(now())
+
+  @@unique([mealId, attachmentId])
+}
+
+model WeightEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      String
+  weightKg  Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, date])
+}
+
+model ProgressPhoto {
+  id           String         @id @default(cuid())
+  userId       String
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attachmentId String
+  attachment   UserAttachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+  date         String
+  createdAt    DateTime       @default(now())
+
+  @@index([userId, date])
 }

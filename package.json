@@ -16,6 +16,8 @@
     "start": "next start",
     "typecheck": "lingui compile && tsc --noEmit -p tsconfig.json",
     "test": "node --experimental-strip-types --test lib/*.test.ts",
+    "test:api": "node --experimental-strip-types --no-warnings --import ./scripts/test/register.mjs --import ./scripts/test/api-env.mjs --test --test-concurrency=1 'lib/api/*.api.test.ts'",
+    "test:api:db": "scripts/test/api-db.sh",
     "db:generate": "prisma generate",
     "db:validate": "prisma validate",
     "db:migrate": "prisma migrate dev",
