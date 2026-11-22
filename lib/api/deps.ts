@@ -19,6 +19,8 @@ export type RecognizedFood = {
   name: string;
   // Per-100 g or ml values read from a nutrition label, when the source shows them.
   nutrimentsPer100g?: Record<string, number>;
+  // Centre of the food in a meal photo, as fractions of the image width and height.
+  position?: { x: number; y: number };
   searchQueries: string[];
   // Serving size as printed on a nutrition label ("40 g"), when the label states one.
   servingSize?: string;

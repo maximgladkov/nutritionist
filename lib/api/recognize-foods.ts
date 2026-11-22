@@ -36,6 +36,13 @@ const resultSchema = z.object({
         brand: z.string().optional().describe("Brand, only when printed on the pack or named by the user."),
         name: z.string().min(1).describe("Short food name in the user's language."),
         nutrimentsPer100g: per100Schema.optional(),
+        position: z
+          .object({
+            x: z.number().min(0).max(1).describe("From the left edge: 0 is left, 1 is right."),
+            y: z.number().min(0).max(1).describe("From the top edge: 0 is top, 1 is bottom."),
+          })
+          .nullable()
+          .describe("Meal photos only: the centre of this food in the image, as fractions of its width and height; null otherwise."),
         searchQueries: z
           .array(z.string().min(1))
           .min(1)
@@ -56,7 +63,7 @@ const INSTRUCTIONS: Record<"label" | "photo" | "text", string> = {
   label:
     "The image is a packaged food's nutrition table. Return exactly one food. Copy the per-100 g (or per-100 ml) values from the table into nutrimentsPer100g. Use the product name and brand from the pack when visible. Set servingSize to the serving the label states (for example '40 g'), and amount to that serving in grams or ml; when there is no serving, leave servingSize out and use 100.",
   photo:
-    "The image shows a meal. List each distinct food a person would log separately (a sandwich is one food unless its parts are clearly separate; a side salad is another). Estimate a realistic portion from the plate size. Use unit g, or ml for drinks; never serving. Always fill nutrimentsPer100g with typical values for that food as served.",
+    "The image shows a meal. List each distinct food a person would log separately (a sandwich is one food unless its parts are clearly separate; a side salad is another). Estimate a realistic portion from the plate size. Use unit g, or ml for drinks; never serving. Always fill nutrimentsPer100g with typical values for that food as served. Set position to the centre of each food in the photo.",
   text:
     "The user described what they ate. List each food with the amount they said, converted to grams (or ml for drinks): 2 eggs is about 100 g, a slice of bread about 35 g. Use a typical portion when they gave no amount. Use unit g or ml; never serving. Always fill nutrimentsPer100g with typical values for that food as eaten.",
 };
@@ -85,6 +92,10 @@ export const recognizeFoodsWithModel: FoodRecognizer = async (input) => {
   });
   return {
     ...result.output,
-    foods: result.output.foods.map(({ servingSize, ...food }) => ({ ...food, servingSize: servingSize ?? undefined })),
+    foods: result.output.foods.map(({ position, servingSize, ...food }) => ({
+      ...food,
+      position: position ?? undefined,
+      servingSize: servingSize ?? undefined,
+    })),
   };
 };
