@@ -1,5 +1,6 @@
 import { get, put } from "@vercel/blob";
 import { APP_NAME } from "../brand.ts";
+import { fatSecretClient, type FatSecretClient } from "../fatsecret.ts";
 import { verifyAppleIdentityToken, type AppleIdentity } from "./apple.ts";
 
 export type EmailCodeMessage = { code: string; email: string; locale: string };
@@ -56,11 +57,14 @@ export type ApiDeps = {
   embedDocuments: (texts: readonly string[]) => Promise<number[][]>;
   // Query embeddings for meaning-based search; an empty array when embeddings are unavailable.
   embedTexts: (texts: readonly string[]) => Promise<number[][]>;
+  fatSecret: FatSecretClient;
   now: () => Date;
   pickMatches: MatchPicker;
   recognizeFoods: FoodRecognizer;
   sendEmailCode: (message: EmailCodeMessage) => Promise<void>;
   sendPush: (messages: readonly PushMessage[]) => Promise<void>;
+  // Queues the FatSecret history import as a background workflow.
+  startFatSecretImport: (userId: string) => Promise<void>;
   verifyAppleToken: (identityToken: string) => Promise<AppleIdentity>;
 };
 
@@ -151,6 +155,14 @@ function runAfterResponse(task: () => Promise<void>): void {
     .catch(() => task().catch(logBackgroundFailure));
 }
 
+async function startFatSecretImportWorkflow(userId: string): Promise<void> {
+  const [{ start }, { fatSecretImportWorkflow }] = await Promise.all([
+    import("workflow/api"),
+    import("../../workflows/fatsecret-import.ts"),
+  ]);
+  await start(fatSecretImportWorkflow, [userId]);
+}
+
 async function pickWithModel(questions: readonly MatchQuestion[]) {
   const { pickMatchesWithModel } = await import("./pick-matches.ts");
   return pickMatchesWithModel(questions);
@@ -161,11 +173,13 @@ const defaults: ApiDeps = {
   blobs: vercelBlobStore,
   embedDocuments: embedDocumentsWithGateway,
   embedTexts: embedWithGateway,
+  fatSecret: fatSecretClient,
   now: () => new Date(),
   pickMatches: pickWithModel,
   recognizeFoods: recognizeWithModel,
   sendEmailCode: sendEmailCodeWithResend,
   sendPush: sendExpoPush,
+  startFatSecretImport: startFatSecretImportWorkflow,
   verifyAppleToken: verifyAppleIdentityToken,
 };
 

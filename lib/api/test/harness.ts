@@ -3,6 +3,8 @@ import { handleApiRequest } from "../index.ts";
 import { resetApiDeps, setApiDeps, type EmailCodeMessage, type FoodRecognizer, type MatchPicker, type PushMessage } from "../deps.ts";
 import type { AppleIdentity } from "../apple.ts";
 import { prisma } from "../../prisma.ts";
+import type { FatSecretFoodEntry, FatSecretServing } from "../../fatsecret.ts";
+import { runFatSecretImportInline } from "../../fatsecret-import.ts";
 
 export const emails: EmailCodeMessage[] = [];
 export const pushes: PushMessage[] = [];
@@ -34,6 +36,18 @@ export function setMatchPicker(next: MatchPicker): void {
   picker = next;
 }
 
+// A fake FatSecret account: diary entries and weights by day (days since 1970-01-01).
+export const fatSecretDiary = {
+  entries: new Map<number, FatSecretFoodEntry[]>(),
+  servings: new Map<string, FatSecretServing[]>(),
+  weights: new Map<number, number>(),
+};
+
+function sameMonth(dateInt: number, monthDateInt: number): boolean {
+  const month = (value: number) => new Date(value * 86_400_000).toISOString().slice(0, 7);
+  return month(dateInt) === month(monthDateInt);
+}
+
 // Identity tokens in tests are `apple:<json identity>`; anything else fails verification.
 export function appleToken(identity: Partial<AppleIdentity> & { sub: string }): string {
   return `apple:${JSON.stringify({ email: null, emailVerified: false, isPrivateEmail: false, ...identity })}`;
@@ -42,6 +56,9 @@ export function appleToken(identity: Partial<AppleIdentity> & { sub: string }): 
 export function installFakes(): void {
   emails.length = 0;
   pushes.length = 0;
+  fatSecretDiary.entries.clear();
+  fatSecretDiary.servings.clear();
+  fatSecretDiary.weights.clear();
   blobs.clear();
   resetApiDeps();
   setApiDeps({
@@ -63,6 +80,33 @@ export function installFakes(): void {
       backgroundTasks.push(task());
     },
     embedDocuments: (texts) => documentEmbedder(texts),
+    fatSecret: {
+      configured: () => true,
+      async requestToken() {
+        return { secret: "request-secret", token: `request-${Math.random().toString(36).slice(2)}` };
+      },
+      authorizeUrl: (token) => `https://fatsecret.test/authorize?oauth_token=${token}`,
+      async accessToken(request, verifier) {
+        assert.equal(request.secret, "request-secret");
+        if (verifier !== "good-verifier") throw new Error("bad verifier");
+        return { secret: "access-secret", token: "access-token" };
+      },
+      async monthDays(access, dateInt) {
+        assert.equal(access.token, "access-token");
+        return [...fatSecretDiary.entries.keys()].filter((day) => sameMonth(day, dateInt));
+      },
+      async dayEntries(_access, dateInt) {
+        return fatSecretDiary.entries.get(dateInt) ?? [];
+      },
+      async monthWeights(_access, dateInt) {
+        return [...fatSecretDiary.weights]
+          .filter(([day]) => sameMonth(day, dateInt))
+          .map(([day, weightKg]) => ({ dateInt: day, weightKg }));
+      },
+      async foodServings(foodId) {
+        return fatSecretDiary.servings.get(foodId) ?? null;
+      },
+    },
     embedTexts: async () => [],
     pickMatches: (questions) => picker(questions),
     recognizeFoods: (input) => recognizer(input),
@@ -71,6 +115,9 @@ export function installFakes(): void {
     },
     async sendPush(messages) {
       pushes.push(...messages);
+    },
+    async startFatSecretImport(userId) {
+      backgroundTasks.push(runFatSecretImportInline(userId));
     },
     async verifyAppleToken(identityToken) {
       if (!identityToken.startsWith("apple:")) {

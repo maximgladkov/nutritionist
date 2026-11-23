@@ -5,6 +5,7 @@ import { bodyRoutes } from "./routes/body.ts";
 import { diaryRoutes } from "./routes/diary.ts";
 import { foodRoutes } from "./routes/foods.ts";
 import { groupRoutes } from "./routes/groups.ts";
+import { integrationRoutes } from "./routes/integrations.ts";
 import { mealRoutes } from "./routes/meals.ts";
 import { meRoutes } from "./routes/me.ts";
 import { notificationRoutes } from "./routes/notifications.ts";
@@ -24,6 +25,7 @@ export const apiRoutes: readonly RouteDefinition[] = [
   ...uploadRoutes,
   ...groupRoutes,
   ...notificationRoutes,
+  ...integrationRoutes,
 ];
 
 export const handleApiRequest = createRouter(apiRoutes);

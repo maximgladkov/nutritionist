@@ -36,6 +36,8 @@ model User {
   pushDevices   PushDevice[]
   savedMeals    SavedMeal[]
   weightEntries WeightEntry[]
+  fatSecretConnection FatSecretConnection?
+  externalImports ExternalImport[]
   progressPhotos ProgressPhoto[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -612,4 +614,44 @@ model GenericFood {
   updatedAt  DateTime @updatedAt
 
   @@unique([source, sourceId])
+}
+
+// A user's link to their FatSecret account (OAuth 1.0) and the state of their diary import.
+// Tokens are sealed with AUTH_SECRET (lib/secret-box.ts) before they are stored.
+model FatSecretConnection {
+  userId           String    @id
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // pending: sign-in started, waiting for FatSecret to send the user back; connected: tokens stored.
+  status           String    @default("pending")
+  requestToken     String?   @unique
+  requestSecret    String?
+  returnUrl        String?
+  accessToken      String?
+  accessSecret     String?
+  // idle | running | done | failed
+  importStatus     String    @default("idle")
+  // The month being imported (YYYY-MM), so the app can show how far back it has got.
+  importMonth      String?
+  importMonthsDone Int       @default(0)
+  importedEntries  Int       @default(0)
+  importedDays     Int       @default(0)
+  importedWeights  Int       @default(0)
+  importOldestDate String?
+  importError      String?
+  importStartedAt  DateTime?
+  importFinishedAt DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+// Entries already brought in from another app, so importing again never duplicates them (and
+// doesn't bring back ones the user deleted here).
+model ExternalImport {
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  source     String
+  externalId String
+  createdAt  DateTime @default(now())
+
+  @@id([userId, source, externalId])
 }
