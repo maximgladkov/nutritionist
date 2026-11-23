@@ -1,3 +1,4 @@
+import { APICallError } from "ai";
 import assert from "node:assert/strict";
 import { handleApiRequest } from "../index.ts";
 import { resetApiDeps, setApiDeps, type EmailCodeMessage, type FoodRecognizer, type MatchPicker, type PushMessage } from "../deps.ts";
@@ -55,7 +56,11 @@ export function appleToken(identity: Partial<AppleIdentity> & { sub: string }): 
   return `apple:${JSON.stringify({ email: null, emailVerified: false, isPrivateEmail: false, ...identity })}`;
 }
 
+// Media types the fake transcriber was asked to read, in order.
+export const transcriptions: string[] = [];
+
 export function installFakes(): void {
+  transcriptions.length = 0;
   emails.length = 0;
   pushes.length = 0;
   fatSecretDiary.entries.clear();
@@ -114,6 +119,17 @@ export function installFakes(): void {
     embedTexts: async () => [],
     pickMatches: (questions) => picker(questions),
     recognizeFoods: (input) => recognizer(input),
+    // Reads the "spoken" text straight out of the test recording.
+    async transcribe({ bytes, mediaType }) {
+      transcriptions.push(mediaType);
+      if (bytes.byteLength <= 44) {
+        // As the gateway reports it: its own error, with the provider's 400 as the cause.
+        const cause = new APICallError({ message: "Audio file might be corrupted or unsupported", requestBodyValues: {}, statusCode: 400, url: "test" });
+        throw Object.assign(new Error("Audio file might be corrupted or unsupported"), { cause });
+      }
+      const spoken = new TextDecoder().decode(bytes.subarray(44));
+      return { language: spoken.startsWith("Dos") ? "spanish" : "english", text: spoken };
+    },
     async sendEmailCode(message) {
       emails.push(message);
     },
