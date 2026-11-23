@@ -32,6 +32,7 @@ model User {
   groupMemberships GroupMember[]
   groupMessagesSent     GroupMessage[] @relation("GroupMessagesSent")
   groupMessagesReceived GroupMessage[] @relation("GroupMessagesReceived")
+  groupNoticesAuthored  GroupNotice[]  @relation("GroupNoticesAuthored")
   refreshTokens RefreshToken[]
   pushDevices   PushDevice[]
   savedMeals    SavedMeal[]
@@ -444,11 +445,18 @@ model Group {
   imageUrl      String
   imageBlobPath String
   inviteToken   String   @unique
+  // Short code people type in the app ("LEAN-7K2P"); rotates with the invite link.
+  joinCode      String?  @unique
+  // Shown under the owner's name to members ("Nutritionist").
+  ownerTitle    String   @default("")
+  // When false, members see neither the member list nor each other; only the owner does.
+  membersVisible Boolean @default(true)
   locale        String   @default("en")
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   members       GroupMember[]
   messages      GroupMessage[]
+  notices       GroupNotice[]
 
   @@index([ownerId])
 }
@@ -462,6 +470,7 @@ model GroupMember {
   role     GroupMemberRole
   sharing  Boolean         @default(true)
   lastReadAt DateTime?
+  noticesReadAt DateTime?
   joinedAt DateTime        @default(now())
 
   @@unique([groupId, userId])
@@ -479,11 +488,35 @@ model GroupMessage {
   body       String   @db.Text
   targetDate String?
   targetMealItemId String?
+  // Replies point at the thread's first message and share its target.
+  replyToId  String?
+  replyTo    GroupMessage?  @relation("GroupMessageReplies", fields: [replyToId], references: [id], onDelete: Cascade)
+  replies    GroupMessage[] @relation("GroupMessageReplies")
+  // Set when the member marks the coach's comment as helpful.
+  helpfulAt  DateTime?
   createdAt  DateTime @default(now())
 
   @@index([groupId, toUserId, createdAt])
+  @@index([replyToId])
   @@index([toUserId, createdAt])
   @@index([fromUserId])
+}
+
+// A post from the group owner that every member sees.
+model GroupNotice {
+  id        String   @id @default(cuid())
+  groupId   String
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation("GroupNoticesAuthored", fields: [authorId], references: [id], onDelete: Cascade)
+  title     String
+  body      String   @db.Text
+  pinned    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([groupId, createdAt])
+  @@index([authorId])
 }
 
 model TelegramInboundBurstItem {

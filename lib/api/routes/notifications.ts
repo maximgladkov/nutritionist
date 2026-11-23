@@ -6,6 +6,10 @@ import type { RouteDefinition } from "../router.ts";
 
 const PAGE_SIZE = 30;
 
+function noticeFeedWhere(userId: string, createdAt: { gt: Date } | { lt: Date } | undefined) {
+  return { authorId: { not: userId }, createdAt, group: { members: { some: { userId } } } };
+}
+
 type NotificationView = {
   createdAt: string;
   groupId: string;
@@ -15,26 +19,34 @@ type NotificationView = {
 } & (
   | { body: string; fromName: string | null; target: { date: string } | { mealItemId: string } | null; type: "group_message" }
   | { memberName: string | null; type: "member_joined" }
+  | { fromName: string | null; noticeId: string; title: string; type: "group_notice" }
 );
 
-// The feed is derived from existing rows: messages sent to the user, and people joining
-// groups the user owns.
+// The feed is derived from existing rows: comments the group owner sent the user, notices in
+// groups the user belongs to, and people joining groups the user owns. The user's own replies and
+// notices never show up here.
 async function loadNotifications(userId: string, before?: Date) {
   const profile = await prisma.userProfile.findUnique({ select: { notificationsReadAt: true }, where: { userId } });
   const readAt = profile?.notificationsReadAt ?? null;
   const createdBefore = before ? { lt: before } : undefined;
-  const [messages, joins] = await Promise.all([
+  const [messages, joins, notices] = await Promise.all([
     prisma.groupMessage.findMany({
       include: { fromUser: { select: { name: true } }, group: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
       take: PAGE_SIZE,
-      where: { createdAt: createdBefore, toUserId: userId },
+      where: { createdAt: createdBefore, fromUserId: { not: userId }, toUserId: userId },
     }),
     prisma.groupMember.findMany({
       include: { group: { select: { name: true } }, user: { select: { name: true } } },
       orderBy: { joinedAt: "desc" },
       take: PAGE_SIZE,
       where: { group: { ownerId: userId }, joinedAt: createdBefore, role: "member" },
+    }),
+    prisma.groupNotice.findMany({
+      include: { author: { select: { name: true } }, group: { select: { name: true } } },
+      orderBy: { createdAt: "desc" },
+      take: PAGE_SIZE,
+      where: noticeFeedWhere(userId, createdBefore),
     }),
   ]);
   const isRead = (date: Date) => readAt !== null && date <= readAt;
@@ -59,19 +71,31 @@ async function loadNotifications(userId: string, before?: Date) {
       read: isRead(row.joinedAt),
       type: "member_joined" as const,
     })),
+    ...notices.map((row) => ({
+      createdAt: row.createdAt.toISOString(),
+      fromName: row.author.name,
+      groupId: row.groupId,
+      groupName: row.group.name,
+      id: `notice:${row.id}`,
+      noticeId: row.id,
+      read: isRead(row.createdAt),
+      title: row.title,
+      type: "group_notice" as const,
+    })),
   ]
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .slice(0, PAGE_SIZE);
 
   const unreadSince = readAt ? { gt: readAt } : undefined;
-  const [unreadMessages, unreadJoins] = await Promise.all([
-    prisma.groupMessage.count({ where: { createdAt: unreadSince, toUserId: userId } }),
+  const [unreadMessages, unreadJoins, unreadNotices] = await Promise.all([
+    prisma.groupMessage.count({ where: { createdAt: unreadSince, fromUserId: { not: userId }, toUserId: userId } }),
     prisma.groupMember.count({ where: { group: { ownerId: userId }, joinedAt: unreadSince, role: "member" } }),
+    prisma.groupNotice.count({ where: noticeFeedWhere(userId, unreadSince) }),
   ]);
   return {
     items,
     nextBefore: items.length === PAGE_SIZE ? items.at(-1)?.createdAt ?? null : null,
-    unreadCount: unreadMessages + unreadJoins,
+    unreadCount: unreadMessages + unreadJoins + unreadNotices,
   };
 }
 

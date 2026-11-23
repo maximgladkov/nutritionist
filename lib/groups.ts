@@ -6,6 +6,7 @@ import {
   GROUP_DESCRIPTION_MAX,
   GROUP_MESSAGE_MAX,
   GROUP_NAME_MAX,
+  GROUP_OWNER_TITLE_MAX,
   type GroupRole,
 } from "./groups-core.ts";
 import {
@@ -13,6 +14,7 @@ import {
   isInviteToken,
   planMembershipMerge,
 } from "./groups-invite.ts";
+import { generateJoinCode, normalizeJoinCode } from "./groups-join-code.ts";
 import { resolveLocale, type Locale } from "./i18n/locales.ts";
 import { prisma } from "./prisma.ts";
 import { resolveReachTarget } from "./reminders.ts";
@@ -24,6 +26,9 @@ export {
   GROUP_IMAGE_MAX_BYTES,
   GROUP_MESSAGE_MAX,
   GROUP_NAME_MAX,
+  GROUP_NOTICE_BODY_MAX,
+  GROUP_NOTICE_TITLE_MAX,
+  GROUP_OWNER_TITLE_MAX,
   type GroupRole,
 } from "./groups-core.ts";
 
@@ -32,8 +37,10 @@ export type GroupListItem = {
   readonly id: string;
   readonly imageUrl: string;
   readonly memberCount: number;
+  readonly membersVisible: boolean;
   readonly name: string;
   readonly ownerName: string | null;
+  readonly ownerTitle: string;
   readonly role: GroupRole;
 };
 
@@ -41,8 +48,11 @@ export type GroupInvitePreview = {
   readonly description: string;
   readonly imageUrl: string;
   readonly locale: Locale;
+  readonly memberCount: number;
+  readonly membersVisible: boolean;
   readonly name: string;
   readonly ownerName: string | null;
+  readonly ownerTitle: string;
   readonly token: string;
 };
 
@@ -64,8 +74,11 @@ export type GroupOwnerDetail = {
   readonly id: string;
   readonly imageUrl: string;
   readonly inviteToken: string;
+  readonly joinCode: string | null;
   readonly members: readonly GroupMemberView[];
+  readonly membersVisible: boolean;
   readonly name: string;
+  readonly ownerTitle: string;
   readonly role: "owner";
   readonly telegramInviteUrl: string | null;
   readonly webInviteUrl: string | null;
@@ -75,9 +88,15 @@ export type GroupMemberDetail = {
   readonly description: string;
   readonly id: string;
   readonly imageUrl: string;
+  readonly memberCount: number;
+  // Everyone in the group, owner first (the enum orders owner before member); null when the owner hides the member list.
+  readonly members: readonly GroupMemberView[] | null;
+  readonly membersVisible: boolean;
   readonly messages: readonly GroupMessageView[];
   readonly name: string;
+  readonly ownerId: string;
   readonly ownerName: string | null;
+  readonly ownerTitle: string;
   readonly role: "member";
 };
 
@@ -105,20 +124,31 @@ export async function listGroupsForUser(userId: string): Promise<GroupListItem[]
     id: row.group.id,
     imageUrl: row.group.imageUrl,
     memberCount: row.group._count.members,
+    membersVisible: row.group.membersVisible,
     name: row.group.name,
     ownerName: row.group.owner.name,
+    ownerTitle: row.group.ownerTitle,
     role: row.role,
   }));
 }
 
-export async function getGroupInvitePreview(token: string): Promise<GroupInvitePreview> {
-  if (!isInviteToken(token)) {
-    throw new GroupError("That invite link is not valid.");
+// An invite is either the long link token or the short code people type in the app.
+function inviteWhere(tokenOrCode: string): Prisma.GroupWhereUniqueInput | null {
+  if (isInviteToken(tokenOrCode)) {
+    return { inviteToken: tokenOrCode };
   }
-  const group = await prisma.group.findUnique({
-    include: { owner: { select: { name: true } } },
-    where: { inviteToken: token },
-  });
+  const joinCode = normalizeJoinCode(tokenOrCode);
+  return joinCode ? { joinCode } : null;
+}
+
+export async function getGroupInvitePreview(tokenOrCode: string): Promise<GroupInvitePreview> {
+  const where = inviteWhere(tokenOrCode);
+  const group = where
+    ? await prisma.group.findUnique({
+        include: { _count: { select: { members: true } }, owner: { select: { name: true } } },
+        where,
+      })
+    : null;
   if (!group) {
     throw new GroupError("That invite link is not valid.");
   }
@@ -126,9 +156,12 @@ export async function getGroupInvitePreview(token: string): Promise<GroupInviteP
     description: group.description,
     imageUrl: group.imageUrl,
     locale: resolveLocale(group.locale),
+    memberCount: group._count.members,
+    membersVisible: group.membersVisible,
     name: group.name,
     ownerName: group.owner.name,
-    token,
+    ownerTitle: group.ownerTitle,
+    token: group.inviteToken,
   };
 }
 
@@ -136,13 +169,11 @@ export async function getMembershipForInvite(input: {
   token: string;
   userId: string;
 }): Promise<{ groupId: string; role: GroupRole } | null> {
-  if (!isInviteToken(input.token)) {
+  const where = inviteWhere(input.token);
+  if (!where) {
     return null;
   }
-  const group = await prisma.group.findUnique({
-    select: { id: true },
-    where: { inviteToken: input.token },
-  });
+  const group = await prisma.group.findUnique({ select: { id: true }, where });
   if (!group) {
     return null;
   }
@@ -164,6 +195,7 @@ export async function createGroup(input: {
   const name = normalizeName(input.name);
   const description = normalizeDescription(input.description);
   const inviteToken = await uniqueInviteToken();
+  const joinCode = await uniqueJoinCode(name);
   const profile = await prisma.userProfile.findUnique({
     select: { locale: true },
     where: { userId: input.ownerId },
@@ -174,6 +206,7 @@ export async function createGroup(input: {
       imageBlobPath: "",
       imageUrl: "",
       inviteToken,
+      joinCode,
       locale: resolveLocale(profile?.locale),
       members: {
         create: { role: "owner", userId: input.ownerId },
@@ -188,8 +221,10 @@ export async function createGroup(input: {
       id: group.id,
       imageUrl: group.imageUrl,
       memberCount: 1,
+      membersVisible: group.membersVisible,
       name: group.name,
       ownerName: null,
+      ownerTitle: group.ownerTitle,
       role: "owner",
     };
   }
@@ -204,8 +239,10 @@ export async function createGroup(input: {
       id: updated.id,
       imageUrl: updated.imageUrl,
       memberCount: 1,
+      membersVisible: updated.membersVisible,
       name: updated.name,
       ownerName: null,
+      ownerTitle: updated.ownerTitle,
       role: "owner",
     };
   } catch (error) {
@@ -218,8 +255,10 @@ export async function updateGroup(input: {
   description?: string;
   groupId: string;
   image?: File;
+  membersVisible?: boolean;
   name?: string;
   ownerId: string;
+  ownerTitle?: string;
 }): Promise<void> {
   await requireOwnedGroup(input.groupId, input.ownerId);
   const data: Prisma.GroupUpdateInput = {};
@@ -228,6 +267,12 @@ export async function updateGroup(input: {
   }
   if (input.description !== undefined) {
     data.description = normalizeDescription(input.description);
+  }
+  if (input.membersVisible !== undefined) {
+    data.membersVisible = input.membersVisible;
+  }
+  if (input.ownerTitle !== undefined) {
+    data.ownerTitle = normalizeOwnerTitle(input.ownerTitle);
   }
   if (input.image && input.image.size > 0) {
     const cover = await uploadGroupCover({ file: input.image, groupId: input.groupId });
@@ -245,20 +290,22 @@ export async function deleteGroup(input: { groupId: string; ownerId: string }): 
   await prisma.group.delete({ where: { id: input.groupId } });
 }
 
+// Rotating revokes both the link and the typed code.
 export async function rotateInviteToken(input: { groupId: string; ownerId: string }): Promise<string> {
-  await requireOwnedGroup(input.groupId, input.ownerId);
+  const group = await requireOwnedGroup(input.groupId, input.ownerId);
   const inviteToken = await uniqueInviteToken();
-  await prisma.group.update({ data: { inviteToken }, where: { id: input.groupId } });
+  const joinCode = await uniqueJoinCode(group.name);
+  await prisma.group.update({ data: { inviteToken, joinCode }, where: { id: input.groupId } });
   return inviteToken;
 }
 
-export async function joinGroupByToken(input: { token: string; userId: string }): Promise<JoinGroupResult> {
-  if (!isInviteToken(input.token)) {
-    throw new GroupError("That invite link is not valid.");
-  }
-  const group = await prisma.group.findUnique({
-    where: { inviteToken: input.token },
-  });
+export async function joinGroupByToken(input: {
+  sharing?: boolean;
+  token: string;
+  userId: string;
+}): Promise<JoinGroupResult> {
+  const where = inviteWhere(input.token);
+  const group = where ? await prisma.group.findUnique({ where }) : null;
   if (!group) {
     throw new GroupError("That invite link is not valid.");
   }
@@ -269,7 +316,7 @@ export async function joinGroupByToken(input: { token: string; userId: string })
     return { alreadyMember: true, groupId: group.id, role: existing.role };
   }
   await prisma.groupMember.create({
-    data: { groupId: group.id, role: "member", userId: input.userId },
+    data: { groupId: group.id, role: "member", sharing: input.sharing ?? true, userId: input.userId },
   });
   return { alreadyMember: false, groupId: group.id, role: "member" };
 }
@@ -327,6 +374,7 @@ export async function getOwnedGroupDetail(input: {
     id: group.id,
     imageUrl: group.imageUrl,
     inviteToken: group.inviteToken,
+    joinCode: group.joinCode,
     members: group.members
       .filter((row) => row.userId !== group.ownerId)
       .map((row) => ({
@@ -334,7 +382,9 @@ export async function getOwnedGroupDetail(input: {
         name: row.user.name,
         userId: row.userId,
       })),
+    membersVisible: group.membersVisible,
     name: group.name,
+    ownerTitle: group.ownerTitle,
     role: "owner",
     telegramInviteUrl: links.telegramInviteUrl,
     webInviteUrl: links.webInviteUrl,
@@ -349,6 +399,7 @@ export async function getJoinedGroupDetail(input: {
     include: {
       group: {
         include: {
+          _count: { select: { members: true } },
           owner: { select: { name: true } },
         },
       },
@@ -358,6 +409,13 @@ export async function getJoinedGroupDetail(input: {
   if (!member || member.role === "owner") {
     throw new GroupError("You are not a member of that group.");
   }
+  const members = member.group.membersVisible
+    ? await prisma.groupMember.findMany({
+        include: { user: { select: { name: true } } },
+        orderBy: [{ role: "asc" }, { joinedAt: "asc" }],
+        where: { groupId: input.groupId },
+      })
+    : null;
   const messages = await prisma.groupMessage.findMany({
     include: { fromUser: { select: { name: true } } },
     orderBy: { createdAt: "desc" },
@@ -367,6 +425,10 @@ export async function getJoinedGroupDetail(input: {
     description: member.group.description,
     id: member.group.id,
     imageUrl: member.group.imageUrl,
+    memberCount: member.group._count.members,
+    members:
+      members?.map((row) => ({ joinedAt: row.joinedAt.toISOString(), name: row.user.name, userId: row.userId })) ?? null,
+    membersVisible: member.group.membersVisible,
     messages: messages.map((row) => ({
       body: row.body,
       createdAt: row.createdAt.toISOString(),
@@ -374,7 +436,9 @@ export async function getJoinedGroupDetail(input: {
       id: row.id,
     })),
     name: member.group.name,
+    ownerId: member.group.ownerId,
     ownerName: member.group.owner.name,
+    ownerTitle: member.group.ownerTitle,
     role: "member",
   };
 }
@@ -444,6 +508,7 @@ export async function reassignGroupsOnUserMerge(
   absorbedId: string,
 ): Promise<void> {
   await tx.group.updateMany({ data: { ownerId: survivorId }, where: { ownerId: absorbedId } });
+  await tx.groupNotice.updateMany({ data: { authorId: survivorId }, where: { authorId: absorbedId } });
   await tx.groupMessage.updateMany({
     data: { fromUserId: survivorId },
     where: { fromUserId: absorbedId },
@@ -502,6 +567,25 @@ function normalizeMessage(value: string): string {
     throw new GroupError("Choose a shorter message.");
   }
   return body;
+}
+
+function normalizeOwnerTitle(value: string): string {
+  const title = value.trim().replace(/\s+/gu, " ");
+  if (title.length > GROUP_OWNER_TITLE_MAX) {
+    throw new GroupError("Choose a shorter title.");
+  }
+  return title;
+}
+
+async function uniqueJoinCode(name: string): Promise<string> {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const joinCode = generateJoinCode(name);
+    const existing = await prisma.group.findUnique({ select: { id: true }, where: { joinCode } });
+    if (!existing) {
+      return joinCode;
+    }
+  }
+  throw new GroupError("Could not create that group.");
 }
 
 async function uniqueInviteToken(): Promise<string> {
