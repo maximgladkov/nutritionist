@@ -56,39 +56,84 @@ export function toVectorLiteral(embedding: readonly number[]): string {
 
 type Query = (sql: string, params: unknown[]) => Promise<{ rows: Record<string, unknown>[] }>;
 
-const BACKFILL_BATCH = 250;
+export type EmbedBackfillOptions = {
+  batchSize?: number;
+  // Batches embedded and written at the same time. Each needs its own database connection, so a
+  // single pg Client should use 1 (the import does); the backfill script uses a pool.
+  concurrency?: number;
+  embed?: (texts: readonly string[]) => Promise<number[][]>;
+  log?: (message: string) => void;
+};
+
+const DEFAULT_BATCH = 250;
 
 const HAS_NUTRITION = `(("nutriments" ->> 'energyKcal100g') IS NOT NULL OR ("nutriments" ->> 'energyKcal100ml') IS NOT NULL)`;
 
+const TABLES = [
+  { key: "barcode", name: "OffProduct", text: `"searchSource"` },
+  { key: "id", name: "CatalogProduct", text: `concat_ws(' ', "name", "brands")` },
+] as const;
+
+function formatDuration(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) return "?";
+  const minutes = Math.round(seconds / 60);
+  return minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
+}
+
 // Embeds every product with nutrition that has no embedding yet (new imports, or rows whose
-// names changed). Safe to stop and rerun: each batch is written before the next one starts.
-export async function embedMissingProducts(query: Query, log: (message: string) => void = () => undefined): Promise<number> {
+// names changed). It walks each table in key order, so finding the next batch never rescans
+// rows it already passed, and keeps several batches in flight at once. Safe to stop and rerun:
+// each batch is written as soon as it's embedded, and the next run skips what's done.
+export async function embedMissingProducts(query: Query, options: EmbedBackfillOptions = {}): Promise<number> {
+  const batchSize = options.batchSize ?? DEFAULT_BATCH;
+  const concurrency = Math.max(1, options.concurrency ?? 1);
+  const embed = options.embed ?? ((texts: readonly string[]) => embedTexts(texts, { purpose: "document" }));
+  const log = options.log ?? (() => undefined);
   let total = 0;
-  for (const table of [
-    { key: "barcode", name: "OffProduct", text: `"searchSource"` },
-    { key: "id", name: "CatalogProduct", text: `concat_ws(' ', "name", "brands")` },
-  ]) {
-    for (;;) {
-      const { rows } = await query(
-        `SELECT "${table.key}" AS key, ${table.text} AS text FROM "${table.name}"
-         WHERE "embedding" IS NULL AND ${HAS_NUTRITION}
-         LIMIT ${BACKFILL_BATCH}`,
-        [],
-      );
-      if (rows.length === 0) break;
-      const embeddings = await embedTexts(
-        rows.map((row) => productEmbeddingText({ searchSource: String(row.text ?? "") })),
-        { purpose: "document" },
-      );
+  for (const table of TABLES) {
+    const missingSql = `"embedding" IS NULL AND ${HAS_NUTRITION}`;
+    const { rows: counted } = await query(`SELECT count(*)::int AS left FROM "${table.name}" WHERE ${missingSql}`, []);
+    const remaining = Number(counted[0]?.left ?? 0);
+    if (remaining === 0) continue;
+    log(`${table.name}: ${remaining.toLocaleString()} products to embed`);
+
+    const started = Date.now();
+    let done = 0;
+    let cursor = "";
+    const inFlight = new Set<Promise<void>>();
+    const writeBatch = async (rows: Record<string, unknown>[]) => {
+      const embeddings = await embed(rows.map((row) => productEmbeddingText({ searchSource: String(row.text ?? "") })));
+      if (embeddings.length !== rows.length) throw new Error(`Got ${embeddings.length} embeddings for ${rows.length} products.`);
       await query(
         `UPDATE "${table.name}" AS p SET "embedding" = v.embedding::vector
          FROM (SELECT unnest($1::text[]) AS key, unnest($2::text[]) AS embedding) AS v
          WHERE p."${table.key}" = v.key`,
         [rows.map((row) => String(row.key)), embeddings.map(toVectorLiteral)],
       );
-      total += rows.length;
-      log(`Embedded ${total.toLocaleString()} products (${table.name})`);
+      done += rows.length;
+      const perMinute = (done / Math.max(1, Date.now() - started)) * 60_000;
+      const left = Math.max(0, remaining - done);
+      log(
+        `${table.name}: ${done.toLocaleString()} / ${remaining.toLocaleString()} · ${Math.round(perMinute).toLocaleString()}/min · about ${formatDuration((left / perMinute) * 60)} left`,
+      );
+    };
+
+    for (;;) {
+      const { rows } = await query(
+        `SELECT "${table.key}" AS key, ${table.text} AS text FROM "${table.name}"
+         WHERE "${table.key}" > $1 AND ${missingSql}
+         ORDER BY "${table.key}"
+         LIMIT ${batchSize}`,
+        [cursor],
+      );
+      if (rows.length === 0) break;
+      cursor = String(rows[rows.length - 1]!.key);
+      const task: Promise<void> = writeBatch(rows).finally(() => inFlight.delete(task));
+      inFlight.add(task);
+      if (inFlight.size >= concurrency) await Promise.race(inFlight);
     }
+    await Promise.all(inFlight);
+    total += done;
   }
   return total;
 }
