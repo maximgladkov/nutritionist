@@ -1,3 +1,4 @@
+import { APICallError } from "ai";
 import assert from "node:assert/strict";
 import { handleApiRequest } from "../index.ts";
 import { resetApiDeps, setApiDeps, type EmailCodeMessage, type FoodRecognizer, type MatchPicker, type PushMessage } from "../deps.ts";
@@ -121,6 +122,11 @@ export function installFakes(): void {
     // Reads the "spoken" text straight out of the test recording.
     async transcribe({ bytes, mediaType }) {
       transcriptions.push(mediaType);
+      if (bytes.byteLength <= 44) {
+        // As the gateway reports it: its own error, with the provider's 400 as the cause.
+        const cause = new APICallError({ message: "Audio file might be corrupted or unsupported", requestBodyValues: {}, statusCode: 400, url: "test" });
+        throw Object.assign(new Error("Audio file might be corrupted or unsupported"), { cause });
+      }
       const spoken = new TextDecoder().decode(bytes.subarray(44));
       return { language: spoken.startsWith("Dos") ? "spanish" : "english", text: spoken };
     },

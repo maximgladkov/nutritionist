@@ -43,4 +43,10 @@ describe("voice dictation", () => {
     assert.equal((await api("POST", "/log/transcribe", { raw: wav("hi") })).status, 401);
     assert.equal(transcriptions.length, 0);
   });
+
+  it("says plainly when there's no speech it can read", async () => {
+    const silent = await api("POST", "/log/transcribe", { raw: wav(""), token: session.accessToken });
+    assert.equal(silent.status, 422);
+    assert.equal(silent.body.error.code, "unreadable_audio");
+  });
 });

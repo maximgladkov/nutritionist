@@ -1,3 +1,4 @@
+import { APICallError } from "ai";
 import { apiDeps } from "../deps.ts";
 import { ApiError, invalid } from "../errors.ts";
 import { json } from "../http.ts";
@@ -30,6 +31,19 @@ async function readAudio(request: Request): Promise<Uint8Array> {
   return new Uint8Array(await request.arrayBuffer());
 }
 
+// The gateway reports the provider refusing the audio as its own server error, so recognise it by
+// the provider's words, anywhere in the cause chain.
+const REJECTED_AUDIO = /corrupted or unsupported|does not support the format|audio file/i;
+
+function rejectedAudio(error: unknown): boolean {
+  for (let current = error, depth = 0; current && depth < 5; depth += 1) {
+    if (APICallError.isInstance(current) && current.statusCode === 400) return true;
+    if (current instanceof Error && REJECTED_AUDIO.test(current.message)) return true;
+    current = (current as { cause?: unknown }).cause;
+  }
+  return false;
+}
+
 export const voiceRoutes: RouteDefinition[] = [
   {
     // Turns a voice recording into text, in whatever language was spoken. The audio is not kept.
@@ -45,8 +59,17 @@ export const voiceRoutes: RouteDefinition[] = [
       if (!mediaType) {
         throw new ApiError(415, "unsupported_media_type", "Send the recording as WAV, M4A, MP3, OGG, FLAC or WebM.");
       }
-      const { language, text } = await apiDeps().transcribe({ bytes, mediaType });
-      return json({ language, text });
+      try {
+        const { language, text } = await apiDeps().transcribe({ bytes, mediaType });
+        return json({ language, text });
+      } catch (error) {
+        // The model refuses recordings it can't read (cut off, silent, damaged): say so plainly
+        // rather than failing as if the server broke.
+        if (rejectedAudio(error)) {
+          throw new ApiError(422, "unreadable_audio", "We couldn't make out any speech in that recording.");
+        }
+        throw error;
+      }
     },
     method: "POST",
     path: "/log/transcribe",
