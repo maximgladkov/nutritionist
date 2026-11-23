@@ -79,7 +79,7 @@ export async function searchOffProductsByName(
       FROM "OffProduct"
       WHERE 1=1
       ${Prisma.join(fuzzyTokenFilters(tokens), " ")}
-      ORDER BY ${countryFirstSql(options.country)} ${productSearchOrderSql(query)}
+      ORDER BY ${countryFirstSql(options.country)} ${productSearchOrderSql(query, { branded: true })}
       LIMIT ${options.pageSize}
     `;
   }, SEARCH_TRANSACTION_OPTIONS);
@@ -101,7 +101,7 @@ export async function searchCatalogProductsFuzzy(
       FROM "CatalogProduct"
       WHERE 1=1
       ${Prisma.join(fuzzyTokenFilters(tokens), " ")}
-      ORDER BY ${productSearchOrderSql(query)}
+      ORDER BY ${productSearchOrderSql(query, { branded: true })}
       LIMIT ${pageSize}
     `;
   }, SEARCH_TRANSACTION_OPTIONS);
@@ -130,6 +130,9 @@ function offRowToProduct(row: OffProductRow, country?: string): Product {
     name: pickProductName(
       { product_name: row.name, ...names },
       preferredLanguageForCountry(country),
+    ),
+    names: [row.name, ...Object.values(names)].filter(
+      (value): value is string => typeof value === "string" && value.trim().length > 0,
     ),
     novaGroup: row.novaGroup,
     nutriments: pickNutriments(asRecord(row.nutriments)),

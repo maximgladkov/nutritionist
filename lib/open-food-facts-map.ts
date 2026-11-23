@@ -1,5 +1,6 @@
 import { countryTagsToIsoCodes } from "./off-country.ts";
 import {
+  PRODUCT_NAME_FIELDS,
   pickProductName,
   preferredLanguageForCountry,
 } from "./open-food-facts-name.ts";
@@ -48,6 +49,9 @@ export type Product = {
   imageUrl: string | null;
   images?: readonly CatalogProductImageView[];
   countries: string[];
+  // The product's names in other languages. Search shows one of these when `name` has none of the
+  // words searched for; they never reach API responses.
+  names?: readonly string[];
 };
 
 export class InvalidBarcodeError extends Error {
@@ -159,6 +163,7 @@ export function mapProduct(product: OffApiProduct, fallbackBarcode?: string, cou
     ...fields,
     countries: countries.length > 0 ? countries : stringArray(product.countries_tags),
     name: pickProductName(product, preferredLanguageForCountry(country)),
+    names: productNames(product),
     nutriments: extractProductNutriments(product),
   };
 }
@@ -261,4 +266,13 @@ function stringArray(value: unknown): string[] {
     return [];
   }
   return value.filter((item): item is string => typeof item === "string");
+}
+
+// Every name Open Food Facts has for the product, in any language.
+function productNames(product: Record<string, unknown>): string[] {
+  const names = Object.entries(product)
+    .filter(([key]) => (PRODUCT_NAME_FIELDS as readonly string[]).includes(key) || /^product_name_[a-z]{2}$/.test(key))
+    .map(([, value]) => (typeof value === "string" ? value.trim() : ""))
+    .filter((value) => value.length > 0);
+  return [...new Set(names)];
 }

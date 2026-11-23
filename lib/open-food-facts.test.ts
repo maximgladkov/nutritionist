@@ -133,7 +133,7 @@ describe("searchProductsByName", () => {
     offCatalog.searchByName = async (query, options) => {
       assert.equal(query, "Wasa Vitalité Kaura");
       assert.equal(options.country, "fr");
-      assert.equal(options.pageSize, 10);
+      assert.equal(options.pageSize, 40);
       return [
         {
           allergens: null,
