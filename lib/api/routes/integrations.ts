@@ -124,7 +124,10 @@ export const integrationRoutes: RouteDefinition[] = [
       if (!allowedReturnUrl(body.returnUrl)) {
         throw invalid("returnUrl must be a link back to the app.");
       }
-      const callbackUrl = `${url.origin}/api/v1/integrations/fatsecret/callback`;
+      // FatSecret only redirects to a public https address; FATSECRET_CALLBACK_ORIGIN sets one when
+      // the API is reached some other way (a local server behind a tunnel).
+      const origin = process.env.FATSECRET_CALLBACK_ORIGIN?.trim() || url.origin;
+      const callbackUrl = `${origin.replace(/\/$/, "")}/api/v1/integrations/fatsecret/callback`;
       const request_ = await client.requestToken(callbackUrl);
       const pending = {
         requestSecret: sealSecret(request_.secret),
