@@ -1,3 +1,4 @@
+import { RetryableError } from "workflow";
 import type { MonthImportResult } from "../lib/fatsecret-import.ts";
 
 // Imports a user's FatSecret history in the background, newest month first, one durable step per
@@ -9,11 +10,28 @@ async function beginStep(userId: string): Promise<string> {
   return beginFatSecretImport(userId);
 }
 
+// How long to wait when FatSecret says the user is making too many requests.
+const RATE_LIMIT_WAIT_MS = 2 * 60_000;
+
 async function importMonthStep(userId: string, month: string): Promise<MonthImportResult> {
   "use step";
-  const { importFatSecretMonth } = await import("../lib/fatsecret-import.ts");
-  return importFatSecretMonth(userId, month);
+  const [{ importFatSecretMonth }, { FatSecretError }] = await Promise.all([
+    import("../lib/fatsecret-import.ts"),
+    import("../lib/fatsecret.ts"),
+  ]);
+  try {
+    return await importFatSecretMonth(userId, month);
+  } catch (error) {
+    // Waiting out the limit works; retrying straight away only hits it again. Entries already
+    // imported are skipped on the retry.
+    if (error instanceof FatSecretError && error.rateLimited) {
+      throw new RetryableError(error.message, { retryAfter: RATE_LIMIT_WAIT_MS });
+    }
+    throw error;
+  }
 }
+// A long history can hit the limit more than once.
+importMonthStep.maxRetries = 10;
 
 async function finishStep(userId: string, error?: string): Promise<void> {
   "use step";

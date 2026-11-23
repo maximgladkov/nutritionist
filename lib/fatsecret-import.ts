@@ -129,7 +129,8 @@ export async function importFatSecretMonth(userId: string, month: string): Promi
   const timeZone = profile?.timezone ?? "UTC";
   const monthDate = fatSecretDateInt(`${month}-01`);
 
-  const [days, weights] = await Promise.all([client.monthDays(access, monthDate), client.monthWeights(access, monthDate)]);
+  const days = await client.monthDays(access, monthDate);
+  const weights = await client.monthWeights(access, monthDate);
   const servingsByFood = new Map<string, Promise<FatSecretServing[] | null>>();
   const servingsFor = (foodId: string | undefined) => {
     if (!foodId) return Promise.resolve(null);
@@ -157,7 +158,10 @@ export async function importFatSecretMonth(userId: string, month: string): Promi
 
     const byLabel = new Map<MealLabel, { ids: string[]; items: MealItemInput[] }>();
     for (const entry of fresh) {
-      const { item, label } = fatSecretEntryToItem(entry, await servingsFor(entry.food_id));
+      // Most entries carry their weight in the serving text ("1 porción, 250 ml"); only look the
+      // food up when it doesn't ("2 large eggs"), which saves most of the calls.
+      const servings = parseServingSize(entry.food_entry_description) ? null : await servingsFor(entry.food_id);
+      const { item, label } = fatSecretEntryToItem(entry, servings);
       const group = byLabel.get(label) ?? { ids: [], items: [] };
       group.items.push(item);
       group.ids.push(entry.food_entry_id);

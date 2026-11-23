@@ -10,12 +10,32 @@ const REQUEST_TIMEOUT_MS = 20_000;
 
 export class FatSecretError extends Error {
   readonly code?: number;
+  // FatSecret's per-user limit ("User is performing too many actions"): wait, then try again.
+  readonly rateLimited: boolean;
 
   constructor(message: string, code?: number) {
     super(message);
     this.name = "FatSecretError";
     this.code = code;
+    this.rateLimited = /too many actions/i.test(message);
   }
+}
+
+// FatSecret limits how fast one user's data can be read, so calls go out one at a time with a
+// short gap instead of in bursts.
+const CALL_GAP_MS = 400;
+let queue: Promise<unknown> = Promise.resolve();
+
+function paced<T>(call: () => Promise<T>): Promise<T> {
+  const next = queue.then(async () => {
+    try {
+      return await call();
+    } finally {
+      await new Promise((resolve) => setTimeout(resolve, CALL_GAP_MS));
+    }
+  });
+  queue = next.catch(() => undefined);
+  return next;
 }
 
 export type FatSecretTokens = { token: string; secret: string };
@@ -130,6 +150,10 @@ function tokensFrom(text: string): FatSecretTokens {
 }
 
 async function callApi(method: string, params: Record<string, string>, access?: FatSecretTokens): Promise<Record<string, unknown>> {
+  return paced(() => callApiNow(method, params, access));
+}
+
+async function callApiNow(method: string, params: Record<string, string>, access?: FatSecretTokens): Promise<Record<string, unknown>> {
   const text = await signedPost(
     API_URL,
     { ...params, format: "json", method, ...(access ? { oauth_token: access.token } : {}) },
