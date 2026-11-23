@@ -247,6 +247,16 @@ export const analyzeRoutes: RouteDefinition[] = [
         if (!food) {
           throw new ApiError(404, "food_not_found", "We don't know this barcode yet. Scan the nutrition label to add it.");
         }
+        // Known product, but no nutrition on file (Open Food Facts often has just a name): logging it
+        // would add 0 kcal of everything. Same answer as an unknown barcode, so the app offers to scan
+        // the label, which saves the nutrition for everyone who scans it next.
+        if (!food.hasNutrition) {
+          throw new ApiError(
+            404,
+            "food_not_found",
+            `We know ${food.name} but not its nutrition yet. Scan the nutrition label to add it.`,
+          );
+        }
         const serving = food.servings.find((entry) => entry.label.startsWith("1 serving"));
         const item = await catalogItem(food.id, serving?.amount ?? 100, food.unit, "barcode", [], country);
         return json({ items: [item], note: null, source: body.source });
