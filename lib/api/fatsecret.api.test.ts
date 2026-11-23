@@ -159,6 +159,14 @@ describe("FatSecret import", () => {
     assert.equal((await importedItems()).length, 2);
   });
 
+  it("looks a food up only when its serving text has no weight", async () => {
+    await connect();
+    // The soup's text says 250 ml, so only the eggs ("2 large") and the bar ("1 snack bar") are
+    // looked up.
+    assert.deepEqual([...fatSecretDiary.lookups].sort(), ["3096", "8827497"]);
+    assert.equal(fatSecretDiary.lookups.length, 2);
+  });
+
   it("keeps a weight already logged here", async () => {
     await prisma.weightEntry.create({ data: { date: TODAY, userId: session.userId, weightKg: 87.2 } });
     await connect();

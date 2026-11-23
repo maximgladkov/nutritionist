@@ -39,6 +39,8 @@ export function setMatchPicker(next: MatchPicker): void {
 // A fake FatSecret account: diary entries and weights by day (days since 1970-01-01).
 export const fatSecretDiary = {
   entries: new Map<number, FatSecretFoodEntry[]>(),
+  // Food ids the import looked up, in order.
+  lookups: [] as string[],
   servings: new Map<string, FatSecretServing[]>(),
   weights: new Map<number, number>(),
 };
@@ -57,6 +59,7 @@ export function installFakes(): void {
   emails.length = 0;
   pushes.length = 0;
   fatSecretDiary.entries.clear();
+  fatSecretDiary.lookups.length = 0;
   fatSecretDiary.servings.clear();
   fatSecretDiary.weights.clear();
   blobs.clear();
@@ -104,6 +107,7 @@ export function installFakes(): void {
           .map(([day, weightKg]) => ({ dateInt: day, weightKg }));
       },
       async foodServings(foodId) {
+        fatSecretDiary.lookups.push(foodId);
         return fatSecretDiary.servings.get(foodId) ?? null;
       },
     },
