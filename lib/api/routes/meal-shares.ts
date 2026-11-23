@@ -26,6 +26,8 @@ type SharedItem = {
   brand: string | null;
   name: string;
   nutrimentsPer100g: ProductNutriments;
+  // The serving the sharer picked, if any, so the person adding it can use it too.
+  serving?: { grams: number; label: string } | null;
   unit: "g" | "ml" | "serving";
 };
 
@@ -81,6 +83,7 @@ function toShareView(share: ShareRow) {
     metrics: itemMetrics(item),
     name: item.name,
     nutrimentsPer100g: item.nutrimentsPer100g,
+    serving: item.serving ?? null,
     unit: item.unit,
   }));
   return {
@@ -139,6 +142,8 @@ export const mealShareRoutes: RouteDefinition[] = [
         brand: item.brand,
         name: item.name,
         nutrimentsPer100g: nutrimentsOf(item.nutrimentsPer100g),
+        serving:
+          item.servingLabel && item.servingGrams ? { grams: item.servingGrams, label: item.servingLabel } : null,
         unit: item.unit,
       }));
       const share = await prisma.mealShare.create({
@@ -195,6 +200,7 @@ export const mealShareRoutes: RouteDefinition[] = [
           name: item.name,
           // The nutrition as it was shared, so what's added matches what was shown.
           nutrimentsPer100g: item.nutrimentsPer100g,
+          serving: item.serving ?? null,
           unit: item.unit,
         })),
         label: body.label,

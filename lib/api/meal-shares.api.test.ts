@@ -80,6 +80,45 @@ describe("sharing a meal", () => {
     assert.equal(bad.status, 400);
   });
 
+  it("keeps the serving a food was logged in, through edits, copies and shares", async () => {
+    const logged = await api("POST", "/meals/items", {
+      body: {
+        items: [
+          {
+            amount: 60,
+            name: "Rye bread",
+            nutrimentsPer100g: { energyKcal100g: 250 },
+            serving: { grams: 30, label: "slices (30 g)" },
+            unit: "g",
+          },
+        ],
+        label: "breakfast",
+      },
+      token: kira.accessToken,
+    });
+    assert.equal(logged.status, 201, JSON.stringify(logged.body));
+    const bread = logged.body.meal.items.find((item: { name: string }) => item.name === "Rye bread");
+    assert.deepEqual(bread.serving, { grams: 30, label: "slices (30 g)" });
+
+    const shared = await api("POST", `/meals/${logged.body.meal.id}/share`, { token: kira.accessToken });
+    const seen = await api("GET", `/shared-meals/${shared.body.share.token}`, { token: sam.accessToken });
+    const sharedBread = seen.body.share.items.find((item: { name: string }) => item.name === "Rye bread");
+    assert.deepEqual(sharedBread.serving, { grams: 30, label: "slices (30 g)" });
+    const added = await api("POST", `/shared-meals/${shared.body.share.token}/log`, { body: { label: "lunch" }, token: sam.accessToken });
+    const samBread = added.body.meal.items.find((item: { name: string }) => item.name === "Rye bread");
+    assert.deepEqual(samBread.serving, { grams: 30, label: "slices (30 g)" });
+
+    const today = (await api("GET", "/diary", { token: kira.accessToken })).body.today;
+    const copied = await api("POST", `/meals/${logged.body.meal.id}/copy`, { body: { date: today, label: "dinner" }, token: kira.accessToken });
+    assert.equal(copied.status, 201, JSON.stringify(copied.body));
+    const copiedBread = copied.body.meal.items.find((item: { name: string }) => item.name === "Rye bread");
+    assert.deepEqual(copiedBread.serving, { grams: 30, label: "slices (30 g)" });
+
+    const cleared = await api("PATCH", `/meal-items/${bread.id}`, { body: { serving: null }, token: kira.accessToken });
+    assert.equal(cleared.status, 200, JSON.stringify(cleared.body));
+    assert.equal(cleared.body.meal.items.find((item: { id: string }) => item.id === bread.id).serving, null);
+  });
+
   it("only shares your own meals, and unknown links say so", async () => {
     const other = await api("POST", `/meals/${mealId}/share`, { token: sam.accessToken });
     assert.equal(other.status, 404);

@@ -41,7 +41,15 @@ export type MealItemInput = {
   amount: number;
   unit: AmountUnit;
   nutrimentsPer100g?: ProductNutriments;
+  serving?: MealItemServing | null;
 };
+
+// A serving a food was picked in: its name as shown and its weight in grams or millilitres.
+export type MealItemServing = { label: string; grams: number };
+
+function servingFrom(row: { servingLabel?: string | null; servingGrams?: number | null }): MealItemServing | null {
+  return row.servingLabel && row.servingGrams && row.servingGrams > 0 ? { grams: row.servingGrams, label: row.servingLabel } : null;
+}
 
 export type MealItemView = {
   id: string;
@@ -55,6 +63,7 @@ export type MealItemView = {
   metrics: NutrientValues;
   incomplete: NutrientKey[];
   nutrimentsPer100g: ProductNutriments;
+  serving: MealItemServing | null;
 };
 
 export type MealView = {
@@ -93,6 +102,7 @@ type ResolvedItem = {
   grams: number;
   nutriments: ProductNutriments;
   metrics: NutrientValues;
+  serving: MealItemServing | null;
 };
 
 const MAX_AMOUNT = 10000;
@@ -407,6 +417,8 @@ export function cloneMealItemCreateData(item: {
   proteins: number | null;
   salt: number | null;
   saturatedFat: number | null;
+  servingGrams?: number | null;
+  servingLabel?: string | null;
   sugars: number | null;
   unit: MealItemUnit;
 }): Prisma.MealItemCreateWithoutMealInput {
@@ -425,6 +437,8 @@ export function cloneMealItemCreateData(item: {
     proteins: item.proteins,
     salt: item.salt,
     saturatedFat: item.saturatedFat,
+    servingGrams: item.servingGrams ?? null,
+    servingLabel: item.servingLabel ?? null,
     sugars: item.sugars,
     unit: item.unit,
   };
@@ -555,9 +569,11 @@ export async function updateMealItem(input: {
   itemId: string;
   amount?: number;
   label?: MealLabel;
+  // The serving it's now picked in; null for grams or millilitres, left out to keep it.
+  serving?: MealItemServing | null;
 }): Promise<MealView> {
-  if (input.amount === undefined && input.label === undefined) {
-    throw new MealError("Provide an amount or a meal");
+  if (input.amount === undefined && input.label === undefined && input.serving === undefined) {
+    throw new MealError("Provide an amount, a meal or a serving");
   }
   if (input.amount !== undefined) {
     assertPositiveAmount(input.amount);
@@ -599,6 +615,11 @@ export async function updateMealItem(input: {
       data.salt = scaled.metrics.salt;
       data.saturatedFat = scaled.metrics.saturatedFat;
       data.sugars = scaled.metrics.sugars;
+    }
+
+    if (input.serving !== undefined) {
+      data.servingLabel = input.serving?.label ?? null;
+      data.servingGrams = input.serving?.grams ?? null;
     }
 
     let destMealId = item.mealId;
@@ -821,6 +842,7 @@ async function resolveItem(
       grams: computed.grams,
       nutriments,
       metrics: computed.metrics,
+      serving: item.serving ?? null,
     };
   } catch (error) {
     if (error instanceof ServingSizeError) {
@@ -840,6 +862,8 @@ function toCreateData(item: ResolvedItem): Prisma.MealItemCreateWithoutMealInput
     amount: item.amount,
     unit: item.unit as MealItemUnit,
     grams: item.grams,
+    servingLabel: item.serving?.label ?? null,
+    servingGrams: item.serving?.grams ?? null,
     nutrimentsPer100g: nutrimentsToJson(item.nutriments),
     energyKcal: item.metrics.energyKcal,
     proteins: item.metrics.proteins,
@@ -929,6 +953,8 @@ function toItemView(item: {
   saturatedFat: number | null;
   fiber: number | null;
   salt: number | null;
+  servingLabel?: string | null;
+  servingGrams?: number | null;
 }): MealItemView {
   const metrics: NutrientValues = {
     energyKcal: item.energyKcal,
@@ -952,6 +978,7 @@ function toItemView(item: {
     metrics,
     incomplete: incompleteNutrients([metrics]),
     nutrimentsPer100g: nutrimentsFromJson(item.nutrimentsPer100g),
+    serving: servingFrom(item),
   };
 }
 

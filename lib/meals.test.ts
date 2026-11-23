@@ -278,6 +278,8 @@ describe("cloneMealItemCreateData", () => {
       proteins: 5,
       salt: 0.1,
       saturatedFat: 1,
+      servingGrams: 125,
+      servingLabel: "pots (125 g)",
       sugars: 8,
       unit: "g",
     });
@@ -296,6 +298,8 @@ describe("cloneMealItemCreateData", () => {
       proteins: 5,
       salt: 0.1,
       saturatedFat: 1,
+      servingGrams: 125,
+      servingLabel: "pots (125 g)",
       sugars: 8,
       unit: "g",
     });
