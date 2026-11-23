@@ -44,6 +44,7 @@ type RankedProduct = {
   countries?: readonly string[];
   hasNutrition: boolean;
   name?: string | null;
+  names?: readonly string[];
   nutriments?: { energyKcal100g?: number | null; energyKcal100ml?: number | null } | null;
 };
 
@@ -54,7 +55,9 @@ export function rankSearchProducts<T extends RankedProduct>(
 ): T[] {
   const foldedQueries = [...new Set(queries.map(foldSearchText).filter((query) => query.length > 0))];
   const iso = country?.trim().toLowerCase() || undefined;
+  const words = [...new Set(foldedQueries.flatMap((query) => query.split(/\s+/)).filter((word) => word.length >= 2))];
   return products
+    .map((product) => withMatchingName(product, words))
     .map((product, index) => ({ index, key: searchRankKey(product, foldedQueries, iso), product }))
     .sort((left, right) => {
       for (let i = 0; i < left.key.length; i += 1) {
@@ -67,6 +70,31 @@ export function rankSearchProducts<T extends RankedProduct>(
     })
     .map((item) => item.product)
     .filter(firstUnbrandedOfEachName());
+}
+
+// A product is shown under the name we'd normally pick (the user's language first). When that name
+// has none of the searched words, though, it looks unrelated: Open Food Facts lists a Hacendado
+// "Cheesecake" whose Spanish name is "Cheesecake con arándanos". Then the name with the most of
+// the searched words is shown instead, and ranked by. The other names are dropped either way.
+function withMatchingName<T extends RankedProduct>(product: T, words: readonly string[]): T {
+  const { names, ...rest } = product;
+  const matches = (name: string | null | undefined) => {
+    const folded = foldSearchText(name ?? "");
+    return words.filter((word) => folded.includes(word)).length;
+  };
+  if (!names || names.length === 0 || words.length === 0 || matches(product.name) > 0) {
+    return rest as T;
+  }
+  let best: string | null = null;
+  let bestCount = 0;
+  for (const name of names) {
+    const count = matches(name);
+    if (count > bestCount) {
+      best = name;
+      bestCount = count;
+    }
+  }
+  return (best ? { ...rest, name: best } : rest) as T;
 }
 
 // Open Food Facts holds many entries with just a name and no brand ("Arándanos" dozens of times);

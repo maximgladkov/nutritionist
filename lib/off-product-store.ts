@@ -131,6 +131,9 @@ function offRowToProduct(row: OffProductRow, country?: string): Product {
       { product_name: row.name, ...names },
       preferredLanguageForCountry(country),
     ),
+    names: [row.name, ...Object.values(names)].filter(
+      (value): value is string => typeof value === "string" && value.trim().length > 0,
+    ),
     novaGroup: row.novaGroup,
     nutriments: pickNutriments(asRecord(row.nutriments)),
     nutriscoreGrade: row.nutriscoreGrade,
