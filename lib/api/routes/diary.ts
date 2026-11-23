@@ -24,7 +24,11 @@ export const MAX_RANGE_DAYS = 92;
 
 const ymd = z.string().refine((value) => parseYmd(value) !== null, "Use a YYYY-MM-DD date.");
 
+export type DayActivity = { activeKcal: number | null; steps: number | null };
+
 export type DayBucketView = NutritionDayBucket & {
+  // Active calories burned that day (Apple Health); null when not shared.
+  activeKcal: number | null;
   byLabel: Record<MealLabel, number>;
   future: boolean;
   logged: boolean;
@@ -83,6 +87,12 @@ export async function loadDayBuckets(userId: string, from: string, to: string): 
     }
   }
 
+  const activityRows = await prisma.dailyActivity.findMany({
+    select: { activeKcal: true, date: true },
+    where: { date: { gte: from, lte: to }, userId },
+  });
+  const activeByDate = new Map(activityRows.map((row) => [row.date, row.activeKcal]));
+
   const days: DayBucketView[] = [];
   for (let date = from; date <= to; date = shiftYmd(date, 1)) {
     const bucket = buckets.get(date) ?? {
@@ -94,6 +104,7 @@ export async function loadDayBuckets(userId: string, from: string, to: string): 
     };
     days.push({
       ...bucket,
+      activeKcal: activeByDate.get(date) ?? null,
       byLabel: byLabel.get(date) ?? emptyByLabel(),
       future: date > today,
       logged: bucket.itemCount > 0,
@@ -107,11 +118,18 @@ async function loadStreak(userId: string, timezone: string, today: string): Prom
   return consecutiveRecordedDays(new Set(meals.map((meal) => formatDateInTimeZone(meal.eatenAt, timezone))), today);
 }
 
+export async function loadDayActivity(userId: string, date: string): Promise<DayActivity | null> {
+  const row = await prisma.dailyActivity.findUnique({ where: { userId_date: { date, userId } } });
+  return row ? { activeKcal: row.activeKcal, steps: row.steps } : null;
+}
+
 export async function loadDayView(userId: string, date?: string) {
   const day = date ? await loadNutritionDay({ date, userId }) : await loadTodayNutritionDay({ userId });
-  const meals = await withMealPhotos(sortMeals(day.meals));
+  const [meals, activity] = await Promise.all([withMealPhotos(sortMeals(day.meals)), loadDayActivity(userId, day.date)]);
   return {
     ...day,
+    // Active calories and steps from Apple Health; null until the phone has shared any.
+    activity,
     meals,
     remaining: remainingAgainstGoals(day.totals, day.goals),
   };

@@ -36,6 +36,7 @@ model User {
   pushDevices   PushDevice[]
   savedMeals    SavedMeal[]
   weightEntries WeightEntry[]
+  dailyActivity DailyActivity[]
   fatSecretConnection FatSecretConnection?
   externalImports ExternalImport[]
   progressPhotos ProgressPhoto[]
@@ -654,4 +655,17 @@ model ExternalImport {
   createdAt  DateTime @default(now())
 
   @@id([userId, source, externalId])
+}
+
+// Activity for a day from the user's phone (Apple Health): active calories burned and steps.
+// Either may be missing when the user doesn't share it.
+model DailyActivity {
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date       String
+  activeKcal Float?
+  steps      Int?
+  updatedAt  DateTime @updatedAt
+
+  @@id([userId, date])
 }
