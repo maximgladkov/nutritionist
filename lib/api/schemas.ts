@@ -28,6 +28,11 @@ export const mealLabelSchema = z.enum(["breakfast", "lunch", "dinner", "snack", 
 export const unitSchema = z.enum(["g", "ml", "serving"]);
 export const ymdSchema = z.string().refine((value) => parseYmd(value) !== null, "Use a YYYY-MM-DD date.");
 
+export const servingSchema = z.object({
+  grams: z.number().positive().max(10_000),
+  label: z.string().trim().min(1).max(80),
+});
+
 export const mealItemInputSchema = z
   .object({
     amount: z.number().positive().max(10_000),
@@ -41,6 +46,8 @@ export const mealItemInputSchema = z
       .optional(),
     name: z.string().trim().min(1).max(200).optional(),
     nutrimentsPer100g: nutrimentsInputSchema.optional(),
+    // The serving picked when logging, so the food reopens in it; null or left out for grams/ml.
+    serving: servingSchema.nullable().optional(),
     unit: unitSchema,
   })
   .refine((item) => item.barcode || item.foodId || item.name, "Each item needs a barcode, foodId, or name.");

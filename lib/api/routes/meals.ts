@@ -8,7 +8,7 @@ import { formatDateInTimeZone, localInclusiveDateRange } from "../../timezone.ts
 import { ApiError, invalid, notFound } from "../errors.ts";
 import { noContent, readJson } from "../http.ts";
 import type { RouteDefinition } from "../router.ts";
-import { mealItemInputSchema, mealLabelSchema, ymdSchema, type MealItemInputBody } from "../schemas.ts";
+import { mealItemInputSchema, mealLabelSchema, servingSchema, ymdSchema, type MealItemInputBody } from "../schemas.ts";
 import { mealWithPhotos } from "../views.ts";
 import { userCountry } from "../foods.ts";
 import { requireOwnedAttachments } from "./uploads.ts";
@@ -25,6 +25,7 @@ export async function toMealItemInputs(items: readonly MealItemInputBody[]): Pro
         brand: item.brand,
         name: item.name,
         nutrimentsPer100g: item.nutrimentsPer100g,
+        serving: item.serving,
         unit: item.unit,
       };
       if (!item.foodId) {
@@ -141,10 +142,23 @@ export const mealRoutes: RouteDefinition[] = [
       const body = await readJson(
         request,
         z
-          .object({ amount: z.number().positive().max(10_000).optional(), label: mealLabelSchema.optional() })
-          .refine((value) => value.amount !== undefined || value.label !== undefined, "Send an amount or a label."),
+          .object({
+            amount: z.number().positive().max(10_000).optional(),
+            label: mealLabelSchema.optional(),
+            serving: servingSchema.nullable().optional(),
+          })
+          .refine(
+            (value) => value.amount !== undefined || value.label !== undefined || value.serving !== undefined,
+            "Send an amount, a label or a serving.",
+          ),
       );
-      const meal = await updateMealItem({ amount: body.amount, itemId: params.id ?? "", label: body.label, userId: user.id });
+      const meal = await updateMealItem({
+        amount: body.amount,
+        itemId: params.id ?? "",
+        label: body.label,
+        serving: body.serving,
+        userId: user.id,
+      });
       return { meal: await mealWithPhotos(meal) };
     },
     method: "PATCH",

@@ -35,6 +35,7 @@ model User {
   refreshTokens RefreshToken[]
   pushDevices   PushDevice[]
   savedMeals    SavedMeal[]
+  mealShares    MealShare[]
   weightEntries WeightEntry[]
   dailyActivity DailyActivity[]
   fatSecretConnection FatSecretConnection?
@@ -390,6 +391,10 @@ model MealItem {
   amount            Float
   unit              MealItemUnit
   grams             Float
+  // The serving the person picked when logging ("slices (30 g)"), so the food reopens in it and
+  // a shared copy offers it; null when logged in grams or millilitres.
+  servingLabel      String?
+  servingGrams      Float?
   nutrimentsPer100g Json
   energyKcal        Float?
   proteins          Float?
@@ -561,6 +566,21 @@ model SavedMealItem {
   nutrimentsPer100g Json
 
   @@index([savedMealId, sortOrder])
+}
+
+// A meal someone shared: a copy of its foods at the time, behind an unguessable token, so the
+// person they send the link to can add the same foods to their own diary.
+model MealShare {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label     MealLabel
+  // [{ name, brand, barcode, amount, unit, nutrimentsPer100g }]
+  items     Json
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
 model MealPhoto {
