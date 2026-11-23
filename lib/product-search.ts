@@ -118,8 +118,12 @@ function hasCalories(product: RankedProduct): boolean {
 }
 
 // Real nutrition first (entries without it, or listing 0 kcal, can't be logged usefully), then the
-// exact name, then foods sold where the user lives, then names that start with what was searched
-// ("Arándanos enteros" before "Mermelada de arándanos"), then branded ones, then the shortest.
+// exact name, then how many searched words really appear in the name or brand, then foods sold
+// where the user lives, then names that start with what was searched ("Arándanos enteros" before
+// "Mermelada de arándanos"), then branded ones, then the shortest.
+// The word count keeps typo-tolerant lookalikes below real matches: for "arandanos hac", "Habitas ·
+// Aranca" is let in by fuzzy matching ("aranca" is close to "arandanos") but has neither word, so
+// "Barritas arándanos · Hacendado" comes first even though its name is longer.
 function searchRankKey(
   product: RankedProduct,
   foldedQueries: readonly string[],
@@ -131,5 +135,19 @@ function searchRankKey(
   const nutrition = hasCalories(product) ? 0 : product.hasNutrition ? 1 : 2;
   const leads = foldedQueries.some((query) => query.length > 0 && foldedName.startsWith(query.split(/\s+/)[0] ?? query)) ? 0 : 1;
   const branded = (product.brands ?? "").trim() ? 0 : 1;
-  return [nutrition, exact, local, leads, branded, foldedName.length];
+  const missing = missingWords(`${foldedName} ${foldSearchText(product.brands ?? "")}`, foldedQueries);
+  return [nutrition, exact, missing, local, leads, branded, foldedName.length];
+}
+
+// How many words of the closest query don't appear in `text`. Several queries are the same search
+// in other languages, so the best of them counts. Words appear when they're part of a word, so
+// "hac" counts for "Hacendado".
+function missingWords(text: string, foldedQueries: readonly string[]): number {
+  let best = Number.POSITIVE_INFINITY;
+  for (const query of foldedQueries) {
+    const words = query.split(/\s+/).filter((word) => word.length > 0);
+    if (words.length === 0) continue;
+    best = Math.min(best, words.filter((word) => !text.includes(word)).length);
+  }
+  return Number.isFinite(best) ? best : 0;
 }
