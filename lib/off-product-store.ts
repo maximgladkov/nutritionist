@@ -11,6 +11,7 @@ import {
   productSearchOrderSql,
   searchTokens,
   setWordSimilarityThresholdSql,
+  WORD_SIMILARITY_THRESHOLD,
 } from "./product-search.ts";
 
 type OffProductRow = {
@@ -55,6 +56,11 @@ export async function findOffProductByBarcode(
   return offRowToProduct(row, country);
 }
 
+// Searches run in a transaction only to set the similarity threshold the trigram index needs.
+// Grounding a meal runs many at once, so wait for a free connection instead of Prisma's default
+// 2 s, which failed busy requests outright.
+const SEARCH_TRANSACTION_OPTIONS = { maxWait: 10_000, timeout: 10_000 };
+
 export async function searchOffProductsByName(
   query: string,
   options: { country?: string; pageSize: number },
@@ -76,7 +82,7 @@ export async function searchOffProductsByName(
       ORDER BY ${countryFirstSql(options.country)} ${productSearchOrderSql(query)}
       LIMIT ${options.pageSize}
     `;
-  });
+  }, SEARCH_TRANSACTION_OPTIONS);
   return rows.map((row) => offRowToProduct(row, options.country));
 }
 
@@ -98,7 +104,7 @@ export async function searchCatalogProductsFuzzy(
       ORDER BY ${productSearchOrderSql(query)}
       LIMIT ${pageSize}
     `;
-  });
+  }, SEARCH_TRANSACTION_OPTIONS);
   return rows.map(catalogRowToProduct);
 }
 
@@ -252,17 +258,23 @@ export async function searchGenericFoodsByName(query: string, limit: number): Pr
   if (tokens.length === 0) {
     return [];
   }
-  const rows = await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw(setWordSimilarityThresholdSql());
-    return tx.$queryRaw<GenericFoodRow[]>`
-      SELECT "id", "name", "category", "nutriments", "portions"
-      FROM "GenericFood"
-      WHERE 1=1
-      ${Prisma.join(fuzzyTokenFilters(tokens), " ")}
-      ORDER BY ${productSearchOrderSql(query)}
-      LIMIT ${limit}
-    `;
-  });
+  // The table is small enough to scan, so compare similarity directly instead of setting the
+  // threshold in a transaction: a meal photo runs dozens of these at once, and transactions
+  // waiting for a connection were failing the whole request.
+  const rows = await prisma.$queryRaw<GenericFoodRow[]>`
+    SELECT "id", "name", "category", "nutriments", "portions"
+    FROM "GenericFood"
+    WHERE 1=1
+    ${Prisma.join(
+      tokens.map(
+        (token) =>
+          Prisma.sql`AND word_similarity(immutable_unaccent(lower(${token})), "searchText") >= ${Number(WORD_SIMILARITY_THRESHOLD)}`,
+      ),
+      " ",
+    )}
+    ORDER BY ${productSearchOrderSql(query)}
+    LIMIT ${limit}
+  `;
   return rows.map(genericRowToProduct);
 }
 
