@@ -19,6 +19,7 @@ export async function toMealItemInputs(items: readonly MealItemInputBody[]): Pro
     items.map(async (item): Promise<MealItemInput> => {
       const base: MealItemInput = {
         amount: item.amount,
+        id: item.id,
         barcode: item.barcode,
         brand: item.brand,
         name: item.name,
@@ -85,10 +86,24 @@ export const mealRoutes: RouteDefinition[] = [
         z.object({ date: ymdSchema.optional(), items: z.array(mealItemInputSchema).min(1).max(50), label: mealLabelSchema }),
       );
       await assertNotFuture(user.id, body.date);
+      // Retries of a request that already went through send the same client ids: skip those
+      // items instead of logging them twice.
+      const clientIds = body.items.flatMap((item) => (item.id ? [item.id] : []));
+      const existing = clientIds.length
+        ? await prisma.mealItem.findMany({ select: { id: true, meal: { select: { id: true, userId: true } } }, where: { id: { in: clientIds } } })
+        : [];
+      if (existing.some((row) => row.meal.userId !== user.id)) {
+        throw new ApiError(409, "id_conflict", "That item id is already taken. Try again.");
+      }
+      const known = new Set(existing.map((row) => row.id));
+      const fresh = body.items.filter((item) => !item.id || !known.has(item.id));
+      if (fresh.length === 0 && existing[0]) {
+        return { meal: await mealWithPhotos(await loadMeal(user.id, existing[0].meal.id)) };
+      }
       const meal = await upsertMealItems({
         country: await userCountry(user.id),
         date: body.date,
-        items: await toMealItemInputs(body.items),
+        items: await toMealItemInputs(fresh),
         label: body.label,
         userId: user.id,
       });

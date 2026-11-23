@@ -34,6 +34,11 @@ export const mealItemInputSchema = z
     barcode: z.string().trim().min(1).optional(),
     brand: z.string().trim().max(200).optional(),
     foodId: z.string().trim().min(1).optional(),
+    // Lets an offline client create the item with its own id and retry safely.
+    id: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{16,64}$/, "Use 16-64 letters, digits, dashes or underscores for the id.")
+      .optional(),
     name: z.string().trim().min(1).max(200).optional(),
     nutrimentsPer100g: nutrimentsInputSchema.optional(),
     unit: unitSchema,

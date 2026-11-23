@@ -71,6 +71,22 @@ describe("logging food", () => {
     assert.equal(future.status, 400);
   });
 
+  it("keeps client-chosen item ids and ignores a retried request", async () => {
+    const id = "app_retry_item_000000000001";
+    const body = { date: yesterday, items: [{ amount: 50, id, name: "Retry toast", nutrimentsPer100g: { energyKcal100g: 300 }, unit: "g" }], label: "dinner" };
+    const first = await api("POST", "/meals/items", { body, token: kira.accessToken });
+    assert.equal(first.status, 201, JSON.stringify(first.body));
+    assert.equal(first.body.meal.items[0].id, id);
+    const retry = await api("POST", "/meals/items", { body, token: kira.accessToken });
+    assert.equal(retry.status, 201, JSON.stringify(retry.body));
+    assert.equal(retry.body.meal.items.filter((item: { id: string }) => item.id === id).length, 1, "the retry does not log it twice");
+    const stolen = await api("POST", "/meals/items", { body, token: other.accessToken });
+    assert.equal(stolen.status, 409);
+    const edited = await api("PATCH", `/meal-items/${id}`, { body: { amount: 100 }, token: kira.accessToken });
+    assert.equal(edited.status, 200, JSON.stringify(edited.body));
+    assert.equal((await api("DELETE", `/meal-items/${id}`, { token: kira.accessToken })).status, 200);
+  });
+
   it("validates items", async () => {
     const missing = await api("POST", "/meals/items", { body: { items: [{ amount: 10, unit: "g" }], label: "lunch" }, token: kira.accessToken });
     assert.equal(missing.status, 400);
