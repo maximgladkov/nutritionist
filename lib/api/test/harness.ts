@@ -167,6 +167,20 @@ export async function seedOffProduct(input: {
   });
 }
 
+export async function seedGenericFood(input: { id: string; name: string; nutriments: Record<string, number>; portions?: { grams: number; label: string }[] }): Promise<void> {
+  await prisma.genericFood.create({
+    data: {
+      category: null,
+      id: input.id,
+      name: input.name,
+      nutriments: input.nutriments,
+      portions: input.portions ?? [],
+      source: "usda-sr-legacy",
+      sourceId: input.id.replace("usda:", ""),
+    },
+  });
+}
+
 // A 1x1 PNG, enough for the media-type sniffing done on upload.
 export const PNG_BYTES = Uint8Array.from(
   Buffer.from(

@@ -72,6 +72,7 @@ const HAS_NUTRITION = `(("nutriments" ->> 'energyKcal100g') IS NOT NULL OR ("nut
 const TABLES = [
   { key: "barcode", name: "OffProduct", text: `"searchSource"` },
   { key: "id", name: "CatalogProduct", text: `concat_ws(' ', "name", "brands")` },
+  { key: "id", name: "GenericFood", text: `concat_ws(' · ', "name", "category")` },
 ] as const;
 
 function formatDuration(seconds: number): string {

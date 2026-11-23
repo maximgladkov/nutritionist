@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { findCatalogProductById } from "../../catalog-product.ts";
 import { copyMeal, deleteMeal, deleteMealItem, listMeals, updateMealItem, upsertMealItems, type MealItemInput, type MealView } from "../../meals.ts";
+import { findGenericFood, isGenericFoodId } from "../../off-product-store.ts";
 import { prisma } from "../../prisma.ts";
 import { readSummaryContext } from "../../summary.ts";
 import { formatDateInTimeZone, localInclusiveDateRange } from "../../timezone.ts";
@@ -28,6 +29,14 @@ export async function toMealItemInputs(items: readonly MealItemInputBody[]): Pro
       };
       if (!item.foodId) {
         return base;
+      }
+      if (isGenericFoodId(item.foodId)) {
+        // A generic reference food is logged by name with its reference values.
+        const generic = await findGenericFood(item.foodId);
+        if (!generic) {
+          throw notFound(`Food ${item.foodId} is not in the catalog.`);
+        }
+        return { ...base, name: base.name ?? generic.name ?? undefined, nutrimentsPer100g: base.nutrimentsPer100g ?? generic.nutriments };
       }
       if (!item.foodId.startsWith(CATALOG_PREFIX)) {
         return { ...base, barcode: base.barcode ?? item.foodId };

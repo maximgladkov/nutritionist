@@ -592,3 +592,24 @@ model ProgressPhoto {
 
   @@index([userId, date])
 }
+
+// Generic foods from reference tables (USDA FoodData Central SR Legacy): plain foods such as a
+// fried egg, toast or brewed coffee that the packaged-product catalog doesn't cover.
+model GenericFood {
+  id         String   @id
+  source     String
+  sourceId   String
+  name       String
+  category   String?
+  // Per-100 g values, keyed like product nutriments (energyKcal100g, proteins100g, …).
+  nutriments Json
+  // Household portions: [{ label: "1 large", grams: 46 }].
+  portions   Json
+  searchText String   @default(dbgenerated("lower(immutable_unaccent(TRIM(BOTH FROM COALESCE(\"name\", '') || ' ' || COALESCE(\"category\", ''))))"))
+  // Meaning-based search vector (see lib/product-embeddings.ts); null until embedded.
+  embedding  Unsupported("vector(768)")?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([source, sourceId])
+}

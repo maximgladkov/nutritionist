@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import { prisma } from "../prisma.ts";
-import { api, closeDatabase, installFakes, resetDatabase, flushBackground, seedOffProduct, setDocumentEmbedder, setMatchPicker, setRecognizer, signIn, uploadPng, type Session } from "./test/harness.ts";
+import { api, closeDatabase, installFakes, resetDatabase, flushBackground, seedGenericFood, seedOffProduct, setDocumentEmbedder, setMatchPicker, setRecognizer, signIn, uploadPng, type Session } from "./test/harness.ts";
 
 const CHEESE = "8437000000013";
 const SOY_DRINK = "8437000000020";
@@ -299,6 +299,39 @@ describe("analyze", () => {
       assert.equal(cheese.barcode, CHEESE);
       assert.equal(yogurt.match, "estimate");
       assert.equal(Math.round(yogurt.metrics.energyKcal), 75);
+    } finally {
+      setMatchPicker(async () => {
+        throw new Error("no picker in tests");
+      });
+    }
+  });
+
+  it("grounds plain foods in generic reference foods under the user's own name", async () => {
+    await seedGenericFood({
+      id: "usda:173423",
+      name: "Egg, whole, cooked, fried",
+      nutriments: { energyKcal100g: 196, fat100g: 14.84, proteins100g: 13.6 },
+      portions: [{ grams: 46, label: "1 large" }],
+    });
+    const search = await api("GET", "/foods/search?q=fried egg", { token: other.accessToken });
+    assert.equal(search.status, 200);
+    assert.ok(search.body.foods.some((food: { id: string }) => food.id === "usda:173423"), JSON.stringify(search.body));
+
+    setRecognizer(async () => ({
+      foods: [{ amount: 46, name: "Huevo frito", nutrimentsPer100g: { energyKcal100g: 190 }, searchQueries: ["egg cooked fried"], unit: "g" }],
+    }));
+    setMatchPicker(async (questions) =>
+      questions.map((question) => question.candidates.findIndex((candidate) => candidate.brand === "generic reference food")),
+    );
+    try {
+      const result = await api("POST", "/log/analyze", { body: { source: "text", text: "un huevo frito" }, token: other.accessToken });
+      assert.equal(result.status, 200, JSON.stringify(result.body));
+      const [egg] = result.body.items;
+      assert.equal(egg.match, "catalog");
+      assert.equal(egg.name, "Huevo frito", "keeps the name the user knows");
+      assert.equal(egg.foodId, null, "logged by name and values, not as a product");
+      assert.equal(Math.round(egg.metrics.energyKcal), 90);
+      assert.equal(egg.nutrimentsPer100g.proteins100g, 13.6);
     } finally {
       setMatchPicker(async () => {
         throw new Error("no picker in tests");

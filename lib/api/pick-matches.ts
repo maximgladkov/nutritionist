@@ -40,6 +40,7 @@ const RULES = [
   "Pick the product that is the same food in the same form, so its nutrition can be used instead of the estimate.",
   "The product name must describe that food itself, not a dish, drink or snack that contains it or is flavoured like it.",
   "Prefer plain, generic versions over flavoured, light, sweetened or mixed ones unless the food says so.",
+  "Products marked \"generic reference food\" are standard values for a plain food in the stated form (cooked, fried, brewed, toasted); they are the best choice for unbranded or home-made food. Pick a branded product only when the food is that packaged product.",
   "Examples: black coffee is not an iced mocha or latte; a toasted bread slice is not a rusk, crispbread or bread roll; butter is not a butter cookie; chicken breast is not nuggets.",
   "When unsure, return null: a wrong product is worse than the estimate.",
 ].join(" ");
