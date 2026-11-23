@@ -17,7 +17,9 @@ export {
   type ProductNutriments,
 } from "./open-food-facts-map.ts";
 
-const MAX_SEARCH_PAGE_SIZE = 10;
+// Enough candidates that branded products get a look-in when many unbranded entries share the
+// searched name exactly (Open Food Facts has dozens of plain "Arándanos").
+const MAX_SEARCH_PAGE_SIZE = 40;
 
 export type ProductLookupResult =
   | { found: true; product: Product }
