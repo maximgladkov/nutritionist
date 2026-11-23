@@ -33,3 +33,5 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DATABASE_URL_UNPOOLED: ${{ secrets.DATABASE_URL_UNPOOLED }}
           OFF_IMPORT_COUNTRIES: ${{ vars.OFF_IMPORT_COUNTRIES }}
+          # Embeds new products for meaning-based search; skipped when unset.
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}

@@ -33,6 +33,8 @@ export class MealError extends Error {
 }
 
 export type MealItemInput = {
+  // Optional id chosen by the client (offline apps create items before they reach us).
+  id?: string;
   barcode?: string;
   brand?: string;
   name?: string;
@@ -81,6 +83,7 @@ export type NutritionSummary = {
 };
 
 type ResolvedItem = {
+  id?: string;
   name: string;
   brand: string | null;
   barcode: string | null;
@@ -808,6 +811,7 @@ async function resolveItem(
       nutriments,
     });
     return {
+      ...(item.id ? { id: item.id } : {}),
       name,
       brand,
       barcode,
@@ -828,6 +832,7 @@ async function resolveItem(
 
 function toCreateData(item: ResolvedItem): Prisma.MealItemCreateWithoutMealInput {
   return {
+    ...(item.id ? { id: item.id } : {}),
     name: item.name,
     brand: item.brand,
     barcode: item.barcode,

@@ -8,7 +8,7 @@ URL="postgresql://postgres:test@localhost:${PORT}/nutritionist_test"
 
 if ! docker ps --format '{{.Names}}' | grep -qx "$NAME"; then
   docker rm -f "$NAME" >/dev/null 2>&1 || true
-  docker run -d --name "$NAME" -e POSTGRES_PASSWORD=test -e POSTGRES_DB=nutritionist_test -p "${PORT}:5432" postgres:17 >/dev/null
+  docker run -d --name "$NAME" -e POSTGRES_PASSWORD=test -e POSTGRES_DB=nutritionist_test -p "${PORT}:5432" pgvector/pgvector:pg17 >/dev/null
   until docker exec "$NAME" pg_isready -U postgres >/dev/null 2>&1; do sleep 1; done
 fi
 

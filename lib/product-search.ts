@@ -36,13 +36,15 @@ export function foldSearchText(value: string): string {
     .trim();
 }
 
-export function rankSearchProducts<T extends { hasNutrition: boolean; name?: string | null }>(
+export function rankSearchProducts<T extends { countries?: readonly string[]; hasNutrition: boolean; name?: string | null }>(
   products: readonly T[],
   queries: readonly string[],
+  country?: string,
 ): T[] {
   const foldedQueries = [...new Set(queries.map(foldSearchText).filter((query) => query.length > 0))];
+  const iso = country?.trim().toLowerCase() || undefined;
   return products
-    .map((product, index) => ({ index, key: searchRankKey(product, foldedQueries), product }))
+    .map((product, index) => ({ index, key: searchRankKey(product, foldedQueries, iso), product }))
     .sort((left, right) => {
       for (let i = 0; i < left.key.length; i += 1) {
         const delta = left.key[i]! - right.key[i]!;
@@ -55,12 +57,16 @@ export function rankSearchProducts<T extends { hasNutrition: boolean; name?: str
     .map((item) => item.product);
 }
 
+// Exact name first, then foods sold where the user lives, then ones with nutrition, then the
+// shortest (closest) names.
 function searchRankKey(
-  product: { hasNutrition: boolean; name?: string | null },
+  product: { countries?: readonly string[]; hasNutrition: boolean; name?: string | null },
   foldedQueries: readonly string[],
-): readonly [number, number, number] {
+  country: string | undefined,
+): readonly [number, number, number, number] {
   const foldedName = foldSearchText(product.name ?? "");
   const exact = foldedName.length > 0 && foldedQueries.includes(foldedName) ? 0 : 1;
+  const local = country && product.countries?.includes(country) ? 0 : 1;
   const nutrition = product.hasNutrition ? 0 : 1;
-  return [exact, nutrition, foldedName.length];
+  return [exact, local, nutrition, foldedName.length];
 }

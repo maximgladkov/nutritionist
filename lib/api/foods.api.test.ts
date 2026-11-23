@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
-import { api, closeDatabase, installFakes, resetDatabase, seedOffProduct, setRecognizer, signIn, uploadPng, type Session } from "./test/harness.ts";
+import { prisma } from "../prisma.ts";
+import { api, closeDatabase, installFakes, resetDatabase, seedOffProduct, setMatchPicker, setRecognizer, signIn, uploadPng, type Session } from "./test/harness.ts";
 
 const CHEESE = "8437000000013";
 const SOY_DRINK = "8437000000020";
@@ -31,6 +32,18 @@ before(async () => {
 after(closeDatabase);
 
 describe("foods", () => {
+  it("searches every product, with the user's country first", async () => {
+    await seedOffProduct({ barcode: "5000000000017", brands: "Tesco", countryCodes: ["gb"], name: "Cheddar cheese", nutriments: { energyKcal100g: 416 } });
+    await seedOffProduct({ barcode: "8437000000037", brands: "García Baquero", countryCodes: ["es"], name: "Curado cheese wedge", nutriments: { energyKcal100g: 390 } });
+    await prisma.userProfile.upsert({ create: { country: "es", userId: kira.userId }, update: { country: "es" }, where: { userId: kira.userId } });
+    const result = await api("GET", "/foods/search?q=cheese", { token: kira.accessToken });
+    assert.equal(result.status, 200, JSON.stringify(result.body));
+    const barcodes = result.body.foods.map((food: { barcode: string }) => food.barcode);
+    assert.ok(barcodes.includes("5000000000017"), "products sold elsewhere are found too");
+    assert.equal(barcodes[0], "8437000000037", "the user's country ranks first");
+    await prisma.userProfile.update({ data: { country: null }, where: { userId: kira.userId } });
+  });
+
   it("searches the catalog", async () => {
     const result = await api("GET", "/foods/search?q=cheese", { token: kira.accessToken });
     assert.equal(result.status, 200);
@@ -238,6 +251,35 @@ describe("analyze", () => {
     });
     assert.equal(committed.status, 201, JSON.stringify(committed.body));
     assert.equal(committed.body.meal.items.length, 2);
+  });
+
+  it("lets the AI pick the product, and refuses picks whose calories are far off", async () => {
+    setRecognizer(async () => ({
+      foods: [
+        { amount: 40, name: "Queso en lonchas", nutrimentsPer100g: { energyKcal100g: 290 }, searchQueries: ["cheese slices"], unit: "g" },
+        { amount: 125, name: "Plain yogurt", nutrimentsPer100g: { energyKcal100g: 60 }, searchQueries: ["cheese"], unit: "g" },
+      ],
+    }));
+    const asked: string[] = [];
+    setMatchPicker(async (questions) => {
+      asked.push(...questions.map((question) => `${question.name}: ${question.candidates.map((candidate) => candidate.name).join(", ")}`));
+      // Both point at the cheese; the yogurt's pick is a mix-up the calorie check must stop.
+      return questions.map((question) => question.candidates.findIndex((candidate) => candidate.name === "Processed cheese slices"));
+    });
+    try {
+      const result = await api("POST", "/log/analyze", { body: { source: "text", text: "cheese and a yogurt" }, token: other.accessToken });
+      assert.equal(result.status, 200, JSON.stringify(result.body));
+      const [cheese, yogurt] = result.body.items;
+      assert.match(asked[0] ?? "", /^Queso en lonchas: .*Processed cheese slices/);
+      assert.equal(cheese.match, "catalog");
+      assert.equal(cheese.barcode, CHEESE);
+      assert.equal(yogurt.match, "estimate");
+      assert.equal(Math.round(yogurt.metrics.energyKcal), 75);
+    } finally {
+      setMatchPicker(async () => {
+        throw new Error("no picker in tests");
+      });
+    }
   });
 
   it("reports model failures and empty results", async () => {

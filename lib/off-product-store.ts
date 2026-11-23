@@ -72,9 +72,8 @@ export async function searchOffProductsByName(
         "nutriments", "imageUrl", "countryCodes"
       FROM "OffProduct"
       WHERE 1=1
-      ${countryFilter(options.country)}
       ${Prisma.join(fuzzyTokenFilters(tokens), " ")}
-      ORDER BY ${productSearchOrderSql(query)}
+      ORDER BY ${countryFirstSql(options.country)} ${productSearchOrderSql(query)}
       LIMIT ${options.pageSize}
     `;
   });
@@ -103,15 +102,14 @@ export async function searchCatalogProductsFuzzy(
   return rows.map(catalogRowToProduct);
 }
 
-function countryFilter(country: string | undefined): Prisma.Sql {
-  if (!country) {
+// Search covers every product we have; ones sold in the user's country come first, so
+// imported or travel foods are still found.
+function countryFirstSql(country: string | undefined): Prisma.Sql {
+  const iso = country?.trim().toLowerCase();
+  if (!iso || !/^[a-z]{2}$/.test(iso)) {
     return Prisma.empty;
   }
-  const iso = country.trim().toLowerCase();
-  if (!/^[a-z]{2}$/.test(iso)) {
-    return Prisma.empty;
-  }
-  return Prisma.sql`AND ${iso} = ANY("countryCodes")`;
+  return Prisma.sql`(${iso} = ANY("countryCodes")) DESC,`;
 }
 
 function offRowToProduct(row: OffProductRow, country?: string): Product {
@@ -158,4 +156,47 @@ function asRecord(value: Prisma.JsonValue | Record<string, unknown>): Record<str
     return value as Record<string, unknown>;
   }
   return {};
+}
+
+const HAS_NUTRITION_SQL = Prisma.sql`(("nutriments" ->> 'energyKcal100g') IS NOT NULL OR ("nutriments" ->> 'energyKcal100ml') IS NOT NULL)`;
+// Cosine distance past which a product is about something else (Gemini Embedding: good matches
+// sit around 0.30-0.36, unrelated text from 0.40).
+const MAX_EMBEDDING_DISTANCE = 0.38;
+
+export type EmbeddingMatch = { distance: number; product: Product; source: "custom-catalog" | "open-food-facts" };
+
+// Products closest in meaning to `embedding` (a pgvector literal), from our own catalog and the
+// Open Food Facts import, nearest first. Only products with nutrition are returned.
+export async function searchProductsByEmbedding(
+  embedding: string,
+  options: { country?: string; limit: number },
+): Promise<EmbeddingMatch[]> {
+  const [off, catalog] = await Promise.all([
+    prisma.$queryRaw<(OffProductRow & { distance: number })[]>`
+      SELECT
+        "barcode", "name", "names", "brands", "quantity", "servingSize",
+        "nutriscoreGrade", "novaGroup", "ingredients", "allergens",
+        "nutriments", "imageUrl", "countryCodes",
+        ("embedding" <=> ${embedding}::vector) AS distance
+      FROM "OffProduct"
+      WHERE "embedding" IS NOT NULL AND ${HAS_NUTRITION_SQL}
+      ORDER BY "embedding" <=> ${embedding}::vector
+      LIMIT ${options.limit}
+    `,
+    prisma.$queryRaw<(CatalogProductRow & { distance: number })[]>`
+      SELECT "id", "barcode", "name", "brands", "quantity", "servingSize", "nutriments",
+        ("embedding" <=> ${embedding}::vector) AS distance
+      FROM "CatalogProduct"
+      WHERE "embedding" IS NOT NULL AND ${HAS_NUTRITION_SQL}
+      ORDER BY "embedding" <=> ${embedding}::vector
+      LIMIT ${options.limit}
+    `,
+  ]);
+  return [
+    ...catalog.map((row) => ({ distance: Number(row.distance), product: catalogRowToProduct(row), source: "custom-catalog" as const })),
+    ...off.map((row) => ({ distance: Number(row.distance), product: offRowToProduct(row, options.country), source: "open-food-facts" as const })),
+  ]
+    .filter((match) => match.distance <= MAX_EMBEDDING_DISTANCE)
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, options.limit);
 }

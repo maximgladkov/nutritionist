@@ -8,6 +8,9 @@ import {
 import { hasPer100ml, parseServingSize, scaleNutriments, type NutrientValues } from "../nutrition.ts";
 import { InvalidBarcodeError, isValidBarcode, type Product, type ProductNutriments } from "../open-food-facts.ts";
 import { prisma } from "../prisma.ts";
+import { searchProductsByEmbedding } from "../off-product-store.ts";
+import { toVectorLiteral } from "../product-embeddings.ts";
+import { apiDeps } from "./deps.ts";
 import { notFound } from "./errors.ts";
 
 export type ServingView = { amount: number; label: string; unit: "g" | "ml" | "serving" };
@@ -102,6 +105,42 @@ export async function searchFoods(queries: readonly string[], country?: string, 
   return result.products.slice(0, limit).map((product) =>
     toFoodSummary(product, product.source),
   );
+}
+
+// Foods closest in meaning to an embedded query, in any language.
+export async function searchFoodsByMeaning(embedding: readonly number[], country?: string, limit = 20): Promise<FoodSummary[]> {
+  const matches = await searchProductsByEmbedding(toVectorLiteral(embedding), { country, limit });
+  return matches.map((match) => toFoodSummary(match.product, match.source));
+}
+
+// Spelling matches first (they are the most precise), then meaning matches the spelling search
+// missed, such as the same food named in another language.
+export function mergeFoodResults(...lists: readonly (readonly FoodSummary[])[]): FoodSummary[] {
+  const seen = new Set<string>();
+  const merged: FoodSummary[] = [];
+  for (const list of lists) {
+    for (const food of list) {
+      const key = food.barcode ?? food.id;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(food);
+    }
+  }
+  return merged;
+}
+
+// Typed search: spelling and meaning together. Meaning search is skipped (spelling alone) when
+// embeddings are unavailable or slow, so search never fails because of it.
+export async function searchFoodsHybrid(query: string, country?: string, limit = 20): Promise<FoodSummary[]> {
+  const meaning = apiDeps()
+    .embedTexts([query])
+    .then(([embedding]) => (embedding ? searchFoodsByMeaning(embedding, country, limit) : []))
+    .catch((error: unknown) => {
+      console.warn("api: meaning search unavailable", error);
+      return [] as FoodSummary[];
+    });
+  const [spelling, similar] = await Promise.all([searchFoods([query], country, limit), meaning]);
+  return mergeFoodResults(spelling, similar).slice(0, limit);
 }
 
 export async function findFoodByBarcode(barcode: string, country?: string): Promise<FoodDetail | null> {

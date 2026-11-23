@@ -1,5 +1,6 @@
 import { gateway, generateText, Output, type ModelMessage } from "ai";
 import { z } from "zod";
+import { catalogCountryContextText } from "../clock-context.ts";
 import type { FoodRecognizer } from "./deps.ts";
 
 // Benchmarked 2026-11-22 on text, nutrition-label and meal-photo inputs: Haiku 5.5 read labels
@@ -33,7 +34,7 @@ const resultSchema = z.object({
     .array(
       z.object({
         amount: z.number().positive().describe("Estimated amount eaten, in `unit`."),
-        brand: z.string().optional().describe("Brand, only when printed on the pack or named by the user."),
+        brand: z.string().nullable().optional().describe("Brand, only when printed on the pack or named by the user; null otherwise."),
         name: z.string().min(1).describe("Short food name in the user's language."),
         nutrimentsPer100g: per100Schema.optional(),
         position: z
@@ -47,7 +48,9 @@ const resultSchema = z.object({
           .array(z.string().min(1))
           .min(1)
           .max(4)
-          .describe("Catalog search terms: the food name, its English name, and a generic name."),
+          .describe(
+            "Short product-style search terms for an Open Food Facts lookup, most specific first: the name in the catalog's language, the English name, then a generic one ('pan tostado', 'toast bread', 'bread').",
+          ),
         servingSize: z
           .string()
           .nullable()
@@ -56,14 +59,22 @@ const resultSchema = z.object({
       }),
     )
     .max(20),
-  note: z.string().optional().describe("One short sentence when something was unclear."),
+  note: z.string().nullable().optional().describe("One short sentence when something was unclear; null otherwise."),
 });
 
 const INSTRUCTIONS: Record<"label" | "photo" | "text", string> = {
   label:
     "The image is a packaged food's nutrition table. Return exactly one food. Copy the per-100 g (or per-100 ml) values from the table into nutrimentsPer100g. Use the product name and brand from the pack when visible. Set servingSize to the serving the label states (for example '40 g'), and amount to that serving in grams or ml; when there is no serving, leave servingSize out and use 100.",
-  photo:
-    "The image shows a meal. List each distinct food a person would log separately (a sandwich is one food unless its parts are clearly separate; a side salad is another). Estimate a realistic portion from the plate size. Use unit g, or ml for drinks; never serving. Always fill nutrimentsPer100g with typical values for that food as served. Set position to the centre of each food in the photo.",
+  photo: [
+    "The image shows a meal. Break every prepared or combined dish into its basic ingredients and list each one as its own food: a sandwich becomes bread, butter, ham, cheese and lettuce; a salad becomes each vegetable, the cheese and the dressing; pasta becomes the pasta, the sauce's main parts and the grated cheese.",
+    "Include fats, oils, dressings and sauces that are visible or that the dish normally contains (butter on toast, oil on a salad, mayonnaise in a sandwich), with a realistic amount.",
+    "Keep a food whole only when it is a single ingredient (an apple, a fried or boiled egg, a glass of milk) or a packaged product whose brand or label is visible; never split one ingredient into parts (egg white and yolk).",
+    "List each ingredient once: two slices of toast are one bread entry with their combined weight. Name it plainly as a product you could buy (Olive oil, not 'oil used for frying the egg').",
+    "Leave out garnishes and seasonings with almost no calories (herbs, spices, a lettuce leaf used as decoration); keep drinks even when they have few calories.",
+    "Estimate each ingredient's own weight from the plate size and typical recipes, so the parts add up to a realistic portion. Use unit g, or ml for drinks; never serving.",
+    "Always fill nutrimentsPer100g with typical values for that ingredient as eaten (cooked pasta, not dry).",
+    "Set position to the centre of each ingredient in the photo; for parts hidden inside one dish, use points on that dish spread a little apart so they don't overlap.",
+  ].join(" "),
   text:
     "The user described what they ate. List each food with the amount they said, converted to grams (or ml for drinks): 2 eggs is about 100 g, a slice of bread about 35 g. Use a typical portion when they gave no amount. Use unit g or ml; never serving. Always fill nutrimentsPer100g with typical values for that food as eaten.",
 };
@@ -74,6 +85,7 @@ export const recognizeFoodsWithModel: FoodRecognizer = async (input) => {
       text: [
         INSTRUCTIONS[input.source],
         `Answer in the language with code "${input.locale}".`,
+        catalogCountryContextText(input.country),
         input.text ? `User's description: ${input.text}` : "",
       ]
         .filter(Boolean)
@@ -87,15 +99,19 @@ export const recognizeFoodsWithModel: FoodRecognizer = async (input) => {
     model: gateway(process.env.FOOD_RECOGNITION_MODEL?.trim() || DEFAULT_MODEL_ID),
     abortSignal: AbortSignal.timeout(RECOGNITION_TIMEOUT_MS),
     output: Output.object({ schema: resultSchema }),
-    providerOptions: { gateway: { models: fallbackModels() } },
+    // Recognition is a quick visual judgement; extended thinking roughly doubled the wait without
+    // better results in our photo tests.
+    providerOptions: { anthropic: { thinking: { type: "disabled" } }, gateway: { models: fallbackModels() } },
     system: "You identify foods for a nutrition diary. Never invent barcodes.",
   });
+  // Models often send null for "not there"; the rest of the app expects the field left out.
   return {
-    ...result.output,
-    foods: result.output.foods.map(({ position, servingSize, ...food }) => ({
+    foods: result.output.foods.map(({ brand, position, servingSize, ...food }) => ({
       ...food,
+      brand: brand ?? undefined,
       position: position ?? undefined,
       servingSize: servingSize ?? undefined,
     })),
+    note: result.output.note ?? undefined,
   };
 };
