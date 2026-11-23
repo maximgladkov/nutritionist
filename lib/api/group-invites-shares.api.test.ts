@@ -82,6 +82,18 @@ describe("personal invites", () => {
     assert.equal((await api("DELETE", `/groups/${groupId}/invites/${id}`, { token: coach.accessToken })).status, 404);
   });
 
+  it("can be removed once it's revoked, but not before", async () => {
+    const created = await api("POST", `/groups/${groupId}/invites`, { token: coach.accessToken });
+    const id = created.body.invite.id;
+    const record = `/groups/${groupId}/invites/${id}/record`;
+    assert.equal((await api("DELETE", record, { token: coach.accessToken })).status, 404, "still active");
+    await api("DELETE", `/groups/${groupId}/invites/${id}`, { token: coach.accessToken });
+    assert.equal((await api("DELETE", record, { token: ana.accessToken })).status, 403);
+    assert.equal((await api("DELETE", record, { token: coach.accessToken })).status, 204);
+    const list = await api("GET", `/groups/${groupId}/invites`, { token: coach.accessToken });
+    assert.ok(!list.body.invites.some((invite: { id: string }) => invite.id === id));
+  });
+
   it("keeps working when the group's own code is reset", async () => {
     const created = await api("POST", `/groups/${groupId}/invites`, { token: coach.accessToken });
     const before = (await api("GET", `/groups/${groupId}`, { token: coach.accessToken })).body.group.joinCode;

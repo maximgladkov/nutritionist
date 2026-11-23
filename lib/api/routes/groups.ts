@@ -16,6 +16,7 @@ import {
   listPersonalInvites,
   removeGroupMember,
   requireOwnerCanViewMemberNutrition,
+  removePersonalInvite,
   revokePersonalInvite,
   setMemberShares,
   rotateInviteToken,
@@ -622,5 +623,13 @@ export const groupRoutes: RouteDefinition[] = [
     },
     method: "DELETE",
     path: "/groups/:id/invites/:inviteId",
+  },
+  {
+    async handler({ params, user }) {
+      await removePersonalInvite({ groupId: params.id ?? "", inviteId: params.inviteId ?? "", ownerId: user.id });
+      return noContent();
+    },
+    method: "DELETE",
+    path: "/groups/:id/invites/:inviteId/record",
   },
 ];

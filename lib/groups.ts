@@ -525,6 +525,18 @@ export async function revokePersonalInvite(input: { groupId: string; inviteId: s
   }
 }
 
+// Clears a revoked invite from the owner's list. Unused ones are revoked first and used ones stay,
+// since they record who joined with them.
+export async function removePersonalInvite(input: { groupId: string; inviteId: string; ownerId: string }): Promise<void> {
+  await requireOwnedGroup(input.groupId, input.ownerId);
+  const removed = await prisma.groupInvite.deleteMany({
+    where: { groupId: input.groupId, id: input.inviteId, revokedAt: { not: null } },
+  });
+  if (removed.count === 0) {
+    throw new GroupError("Invite not found.");
+  }
+}
+
 export async function leaveGroup(input: { groupId: string; userId: string }): Promise<void> {
   const member = await prisma.groupMember.findUnique({
     include: { group: { select: { ownerId: true } } },
