@@ -159,13 +159,36 @@ export const mealShareRoutes: RouteDefinition[] = [
   },
   {
     async handler({ params, request, user }) {
-      const body = await readJson(request, z.object({ date: ymdSchema.optional(), label: mealLabelSchema }));
+      const body = await readJson(
+        request,
+        z.object({
+          date: ymdSchema.optional(),
+          // The foods to add and how much of each, by their place in the share; all of them, as
+          // shared, when left out. Lets the person drop foods or change amounts first.
+          items: z
+            .array(z.object({ amount: z.number().positive().max(10_000), index: z.number().int().min(0) }))
+            .min(1)
+            .max(50)
+            .optional(),
+          label: mealLabelSchema,
+        }),
+      );
       await assertNotFuture(user.id, body.date);
       const share = await requireShare(params.token ?? "");
+      const shared = sharedItems(share.items);
+      const picked = body.items
+        ? body.items.map(({ amount, index }) => {
+            const item = shared[index];
+            if (!item) {
+              throw invalid(`There's no food ${index + 1} in this shared meal.`);
+            }
+            return { ...item, amount };
+          })
+        : shared;
       const meal = await upsertMealItems({
         country: await userCountry(user.id),
         date: body.date,
-        items: sharedItems(share.items).map((item) => ({
+        items: picked.map((item) => ({
           amount: item.amount,
           barcode: item.barcode ?? undefined,
           brand: item.brand ?? undefined,

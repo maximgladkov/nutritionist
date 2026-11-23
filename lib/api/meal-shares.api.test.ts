@@ -64,6 +64,22 @@ describe("sharing a meal", () => {
     assert.equal(seen.body.share.items.length, 2);
   });
 
+  it("adds only the foods picked, in the amounts chosen", async () => {
+    const shared = await api("POST", `/meals/${mealId}/share`, { token: kira.accessToken });
+    const token = shared.body.share.token;
+    const added = await api("POST", `/shared-meals/${token}/log`, {
+      body: { items: [{ amount: 300, index: 0 }], label: "snack" },
+      token: sam.accessToken,
+    });
+    assert.equal(added.status, 201, JSON.stringify(added.body));
+    assert.deepEqual(added.body.meal.items.map((item: { name: string; amount: number }) => [item.name, item.amount]), [["Chicken soup", 300]]);
+    const bad = await api("POST", `/shared-meals/${token}/log`, {
+      body: { items: [{ amount: 10, index: 9 }], label: "snack" },
+      token: sam.accessToken,
+    });
+    assert.equal(bad.status, 400);
+  });
+
   it("only shares your own meals, and unknown links say so", async () => {
     const other = await api("POST", `/meals/${mealId}/share`, { token: sam.accessToken });
     assert.equal(other.status, 404);
