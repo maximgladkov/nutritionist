@@ -101,6 +101,32 @@ function escapeHtml(text: string): string {
 }
 
 // The page a shared link opens in a browser: what was shared, and a button into the app.
+// For people who don't have the app yet: where to get it (APP_DOWNLOAD_URL, e.g. a TestFlight or
+// App Store link), and to come back to this link once it's installed, since installing doesn't
+// carry the meal over. Without a link set, only the advice shows.
+function getTheApp(): string {
+  const download = safeHttpUrl(process.env.APP_DOWNLOAD_URL);
+  const button = download
+    ? `<a href="${escapeHtml(download)}" style="display:block;border:1.5px solid #0d0d0d;color:#0d0d0d;text-decoration:none;font-weight:700;padding:14px;border-radius:14px;margin-top:12px">Get the app</a>`
+    : "";
+  return `<section style="margin-top:32px;padding-top:24px;border-top:1px solid #e6e0d6">
+<p style="font-weight:700;margin:0">Don’t have Btr.me yet?</p>
+${button}
+<p style="color:#6b645a;font-size:14px;margin:12px 0 0">Install it, then open this link again to add the meal.</p>
+</section>`;
+}
+
+function safeHttpUrl(value: string | undefined): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  try {
+    const url = new URL(trimmed);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 function sharePage(share: ShareRow | null): Response {
   const view = share ? toShareView(share) : null;
   const title = view
@@ -118,7 +144,8 @@ function sharePage(share: ShareRow | null): Response {
 <p style="color:#6b645a;margin:0 0 20px">${escapeHtml(detail)}</p>
 ${list ? `<ul style="list-style:none;padding:0;margin:0 0 28px;line-height:1.8">${list}</ul>` : ""}
 ${open ? `<a href="${open}" style="display:block;background:#c6a16c;color:#0d0d0d;text-decoration:none;font-weight:700;padding:16px;border-radius:14px">Open in Btr.me</a>
-<p style="color:#6b645a;font-size:14px;margin-top:16px">Opens the app so you can add these foods to your own meal.</p>` : ""}
+<p style="color:#6b645a;font-size:14px;margin-top:16px">Opens the app so you can add these foods to your own meal.</p>
+${getTheApp()}` : ""}
 </main></body></html>`;
   return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" }, status: share ? 200 : 404 });
 }

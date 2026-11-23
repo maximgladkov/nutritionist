@@ -136,4 +136,26 @@ describe("sharing a meal", () => {
     const gone = await api("GET", "/shared/nope");
     assert.equal(gone.status, 404);
   });
+
+  it("tells people without the app how to get it", async () => {
+    const shared = await api("POST", `/meals/${mealId}/share`, { token: kira.accessToken });
+    const token = shared.body.share.token;
+    const previous = process.env.APP_DOWNLOAD_URL;
+    try {
+      delete process.env.APP_DOWNLOAD_URL;
+      const plain = String((await api("GET", `/shared/${token}`)).body);
+      assert.match(plain, /Don’t have Btr.me yet\?/);
+      assert.doesNotMatch(plain, /Get the app/);
+
+      process.env.APP_DOWNLOAD_URL = "https://testflight.apple.com/join/abc123";
+      const linked = String((await api("GET", `/shared/${token}`)).body);
+      assert.match(linked, /href="https:\/\/testflight\.apple\.com\/join\/abc123"[^>]*>Get the app</);
+
+      process.env.APP_DOWNLOAD_URL = "javascript:alert(1)";
+      assert.doesNotMatch(String((await api("GET", `/shared/${token}`)).body), /Get the app/);
+    } finally {
+      if (previous === undefined) delete process.env.APP_DOWNLOAD_URL;
+      else process.env.APP_DOWNLOAD_URL = previous;
+    }
+  });
 });
