@@ -33,6 +33,8 @@ model User {
   groupMessagesSent     GroupMessage[] @relation("GroupMessagesSent")
   groupMessagesReceived GroupMessage[] @relation("GroupMessagesReceived")
   groupNoticesAuthored  GroupNotice[]  @relation("GroupNoticesAuthored")
+  groupInvitesCreated   GroupInvite[]  @relation("GroupInvitesCreated")
+  groupInvitesUsed      GroupInvite[]  @relation("GroupInvitesUsed")
   refreshTokens RefreshToken[]
   pushDevices   PushDevice[]
   savedMeals    SavedMeal[]
@@ -431,6 +433,16 @@ model ChatSdkEntry {
   updatedAt DateTime  @updatedAt
 }
 
+// What a group's owner sees of a sharing member: daily totals and goals, the foods they logged,
+// their meal photos, their weight log, and Apple Health activity.
+enum GroupShareKind {
+  summary
+  meals
+  photos
+  weight
+  activity
+}
+
 enum GroupMemberRole {
   owner
   member
@@ -451,12 +463,15 @@ model Group {
   ownerTitle    String   @default("")
   // When false, members see neither the member list nor each other; only the owner does.
   membersVisible Boolean @default(true)
+  // What members who share their diary show the owner.
+  shares        GroupShareKind[] @default([summary, meals, photos, activity])
   locale        String   @default("en")
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   members       GroupMember[]
   messages      GroupMessage[]
   notices       GroupNotice[]
+  invites       GroupInvite[]
 
   @@index([ownerId])
 }
@@ -500,6 +515,29 @@ model GroupMessage {
   @@index([replyToId])
   @@index([toUserId, createdAt])
   @@index([fromUserId])
+}
+
+// A personal invite: a code and link for one person, which stop working once someone joins with
+// them (or the owner revokes them). The group's own code and link stay reusable.
+model GroupInvite {
+  id          String    @id @default(cuid())
+  groupId     String
+  group       Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdById String
+  createdBy   User      @relation("GroupInvitesCreated", fields: [createdById], references: [id], onDelete: Cascade)
+  code        String    @unique
+  token       String    @unique
+  // Who it's for, as the owner wrote it ("Kira"), so they can tell invites apart.
+  note        String    @default("")
+  usedAt      DateTime?
+  usedById    String?
+  usedBy      User?     @relation("GroupInvitesUsed", fields: [usedById], references: [id], onDelete: SetNull)
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([groupId, createdAt])
+  @@index([createdById])
+  @@index([usedById])
 }
 
 // A post from the group owner that every member sees.

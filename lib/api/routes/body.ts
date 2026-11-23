@@ -14,7 +14,7 @@ function round1(value: number): number {
   return Math.round(value * 10) / 10;
 }
 
-async function weightsView(userId: string, from?: string, to?: string) {
+export async function weightsView(userId: string, from?: string, to?: string) {
   const [profile, entries, first] = await Promise.all([
     prisma.userProfile.findUnique({ select: { goalWeightKg: true, startWeightKg: true }, where: { userId } }),
     prisma.weightEntry.findMany({

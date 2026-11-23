@@ -1,7 +1,10 @@
 import { z } from "zod";
 import {
   createGroup,
+  createPersonalInvite,
   deleteGroup,
+  GROUP_SHARE_KINDS,
+  type GroupShareKind,
   getGroupInvitePreview,
   getJoinedGroupDetail,
   getMembershipForInvite,
@@ -9,8 +12,10 @@ import {
   joinGroupByToken,
   leaveGroup,
   listGroupsForUser,
+  listPersonalInvites,
   removeGroupMember,
   requireOwnerCanViewMemberNutrition,
+  revokePersonalInvite,
   rotateInviteToken,
   sendGroupMessage,
   updateGroup,
@@ -25,7 +30,7 @@ import {
   updateGroupNotice,
   type GroupNoticeView,
 } from "../../group-notices.ts";
-import { GROUP_NOTICE_BODY_MAX, GROUP_NOTICE_TITLE_MAX } from "../../groups-core.ts";
+import { GROUP_INVITE_NOTE_MAX, GROUP_NOTICE_BODY_MAX, GROUP_NOTICE_TITLE_MAX } from "../../groups-core.ts";
 import { formatDateInTimeZone } from "../../timezone.ts";
 import { readSummaryContext } from "../../summary.ts";
 import { requireUser } from "../auth.ts";
@@ -35,6 +40,7 @@ import { noContent, readJson, readQuery } from "../http.ts";
 import { pushToUser } from "../push.ts";
 import type { RouteDefinition } from "../router.ts";
 import { ymdSchema } from "../schemas.ts";
+import { weightsView } from "./body.ts";
 import { loadDayBuckets, loadDayView } from "./diary.ts";
 import { readAttachmentBytes, requireOwnedAttachments } from "./uploads.ts";
 
@@ -161,12 +167,39 @@ async function coverFile(userId: string, uploadId: string | undefined): Promise<
   return new File([Buffer.from(bytes)], row.filename ?? "cover", { type: row.mediaType });
 }
 
-async function requireSharingMember(groupId: string, ownerId: string, memberId: string): Promise<void> {
+// The member shares their diary with this owner; returns what the group lets the owner see.
+async function requireSharingMember(groupId: string, ownerId: string, memberId: string): Promise<GroupShareKind[]> {
   await requireOwnerCanViewMemberNutrition({ groupId, memberId, ownerId });
   const member = await requireMembership(groupId, memberId);
   if (!member.sharing) {
     throw new ApiError(403, "not_sharing", "This member has paused sharing their diary with the group.");
   }
+  const group = await prisma.group.findUnique({ select: { shares: true }, where: { id: groupId } });
+  return group?.shares ?? [];
+}
+
+function requireShare(shares: readonly GroupShareKind[], kind: GroupShareKind): void {
+  if (!shares.includes(kind)) {
+    throw new ApiError(403, "not_shared", "This group doesn't share that with its owner.");
+  }
+}
+
+type DayViewForOwner = Awaited<ReturnType<typeof loadDayView>>;
+
+// Leaves out what the group doesn't share: the day's totals and goals (summary), the foods logged
+// (meals), their photos, and Apple Health activity.
+function dayForOwner(day: DayViewForOwner, shares: readonly GroupShareKind[]) {
+  const has = (kind: GroupShareKind) => shares.includes(kind);
+  const empty = Object.fromEntries(Object.keys(day.totals).map((key) => [key, null])) as typeof day.totals;
+  return {
+    ...day,
+    activity: has("activity") ? day.activity : null,
+    goals: has("summary") ? day.goals : Object.fromEntries(Object.keys(day.goals).map((key) => [key, null])),
+    meals: has("meals") ? day.meals.map((meal) => (has("photos") ? meal : { ...meal, photos: [] })) : [],
+    remaining: has("summary") ? day.remaining : {},
+    shares,
+    totals: has("summary") || has("meals") ? day.totals : empty,
+  };
 }
 
 const groupBodySchema = z.object({
@@ -174,6 +207,7 @@ const groupBodySchema = z.object({
   membersVisible: z.boolean().optional(),
   name: z.string().trim().min(1).max(80).optional(),
   ownerTitle: z.string().max(60).optional(),
+  shares: z.array(z.enum(GROUP_SHARE_KINDS)).min(1, "Choose at least one thing members share.").optional(),
   uploadId: z.string().min(1).optional(),
 });
 
@@ -218,6 +252,7 @@ export const groupRoutes: RouteDefinition[] = [
         name: body.name,
         ownerId: user.id,
         ownerTitle: body.ownerTitle,
+        shares: body.shares,
       });
       return { group: await getOwnedGroupDetail({ groupId: group.id, ownerId: user.id }) };
     },
@@ -257,6 +292,7 @@ export const groupRoutes: RouteDefinition[] = [
         name: body.name,
         ownerId: user.id,
         ownerTitle: body.ownerTitle,
+        shares: body.shares,
       });
       return { group: await getOwnedGroupDetail({ groupId: params.id ?? "", ownerId: user.id }) };
     },
@@ -525,20 +561,54 @@ export const groupRoutes: RouteDefinition[] = [
   },
   {
     async handler({ params, url, user }) {
-      await requireSharingMember(params.id ?? "", user.id, params.memberId ?? "");
+      const shares = await requireSharingMember(params.id ?? "", user.id, params.memberId ?? "");
       const query = readQuery(url, z.object({ date: ymdSchema.optional() }));
-      return loadDayView(params.memberId ?? "", query.date);
+      return dayForOwner(await loadDayView(params.memberId ?? "", query.date), shares);
     },
     method: "GET",
     path: "/groups/:id/members/:memberId/diary",
   },
   {
     async handler({ params, url, user }) {
-      await requireSharingMember(params.id ?? "", user.id, params.memberId ?? "");
+      const shares = await requireSharingMember(params.id ?? "", user.id, params.memberId ?? "");
+      requireShare(shares, "summary");
       const query = readQuery(url, z.object({ from: ymdSchema, to: ymdSchema }));
       return loadDayBuckets(params.memberId ?? "", query.from, query.to);
     },
     method: "GET",
     path: "/groups/:id/members/:memberId/days",
+  },
+  {
+    async handler({ params, url, user }) {
+      const shares = await requireSharingMember(params.id ?? "", user.id, params.memberId ?? "");
+      requireShare(shares, "weight");
+      const query = readQuery(url, z.object({ from: ymdSchema.optional(), to: ymdSchema.optional() }));
+      return weightsView(params.memberId ?? "", query.from, query.to);
+    },
+    method: "GET",
+    path: "/groups/:id/members/:memberId/weights",
+  },
+  {
+    async handler({ params, request, user }) {
+      const body = await readJson(request, z.object({ note: z.string().max(GROUP_INVITE_NOTE_MAX).optional() }));
+      return { invite: await createPersonalInvite({ groupId: params.id ?? "", note: body.note, ownerId: user.id }) };
+    },
+    method: "POST",
+    path: "/groups/:id/invites",
+  },
+  {
+    async handler({ params, user }) {
+      return { invites: await listPersonalInvites({ groupId: params.id ?? "", ownerId: user.id }) };
+    },
+    method: "GET",
+    path: "/groups/:id/invites",
+  },
+  {
+    async handler({ params, user }) {
+      await revokePersonalInvite({ groupId: params.id ?? "", inviteId: params.inviteId ?? "", ownerId: user.id });
+      return noContent();
+    },
+    method: "DELETE",
+    path: "/groups/:id/invites/:inviteId",
   },
 ];
