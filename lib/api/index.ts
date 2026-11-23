@@ -11,6 +11,7 @@ import { meRoutes } from "./routes/me.ts";
 import { notificationRoutes } from "./routes/notifications.ts";
 import { savedMealRoutes } from "./routes/saved-meals.ts";
 import { uploadRoutes } from "./routes/uploads.ts";
+import { voiceRoutes } from "./routes/voice.ts";
 
 export const apiRoutes: readonly RouteDefinition[] = [
   ...authRoutes,
@@ -23,6 +24,7 @@ export const apiRoutes: readonly RouteDefinition[] = [
   ...savedMealRoutes,
   ...analyzeRoutes,
   ...uploadRoutes,
+  ...voiceRoutes,
   ...groupRoutes,
   ...notificationRoutes,
   ...integrationRoutes,

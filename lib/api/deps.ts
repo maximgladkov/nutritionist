@@ -49,6 +49,12 @@ export type MatchQuestion = {
 // For each question, the index of the chosen candidate, or null when none is that food.
 export type MatchPicker = (questions: readonly MatchQuestion[]) => Promise<(number | null)[]>;
 
+// Speech to text; the language is detected from the audio.
+export type AudioTranscriber = (input: { bytes: Uint8Array; mediaType: string }) => Promise<{
+  language: string | null;
+  text: string;
+}>;
+
 export type ApiDeps = {
   // Runs work after the response is sent (embedding a saved food), so requests don't wait on it.
   background: (task: () => Promise<void>) => void;
@@ -65,6 +71,7 @@ export type ApiDeps = {
   sendPush: (messages: readonly PushMessage[]) => Promise<void>;
   // Queues the FatSecret history import as a background workflow.
   startFatSecretImport: (userId: string) => Promise<void>;
+  transcribe: AudioTranscriber;
   verifyAppleToken: (identityToken: string) => Promise<AppleIdentity>;
 };
 
@@ -163,6 +170,11 @@ async function startFatSecretImportWorkflow(userId: string): Promise<void> {
   await start(fatSecretImportWorkflow, [userId]);
 }
 
+async function transcribeWithModel(input: Parameters<AudioTranscriber>[0]) {
+  const { transcribeWithGateway } = await import("./transcribe-audio.ts");
+  return transcribeWithGateway(input);
+}
+
 async function pickWithModel(questions: readonly MatchQuestion[]) {
   const { pickMatchesWithModel } = await import("./pick-matches.ts");
   return pickMatchesWithModel(questions);
@@ -180,6 +192,7 @@ const defaults: ApiDeps = {
   sendEmailCode: sendEmailCodeWithResend,
   sendPush: sendExpoPush,
   startFatSecretImport: startFatSecretImportWorkflow,
+  transcribe: transcribeWithModel,
   verifyAppleToken: verifyAppleIdentityToken,
 };
 

@@ -55,7 +55,11 @@ export function appleToken(identity: Partial<AppleIdentity> & { sub: string }): 
   return `apple:${JSON.stringify({ email: null, emailVerified: false, isPrivateEmail: false, ...identity })}`;
 }
 
+// Media types the fake transcriber was asked to read, in order.
+export const transcriptions: string[] = [];
+
 export function installFakes(): void {
+  transcriptions.length = 0;
   emails.length = 0;
   pushes.length = 0;
   fatSecretDiary.entries.clear();
@@ -114,6 +118,12 @@ export function installFakes(): void {
     embedTexts: async () => [],
     pickMatches: (questions) => picker(questions),
     recognizeFoods: (input) => recognizer(input),
+    // Reads the "spoken" text straight out of the test recording.
+    async transcribe({ bytes, mediaType }) {
+      transcriptions.push(mediaType);
+      const spoken = new TextDecoder().decode(bytes.subarray(44));
+      return { language: spoken.startsWith("Dos") ? "spanish" : "english", text: spoken };
+    },
     async sendEmailCode(message) {
       emails.push(message);
     },
