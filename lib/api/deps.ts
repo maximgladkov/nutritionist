@@ -36,9 +36,24 @@ export type FoodRecognizer = (input: {
   text?: string;
 }) => Promise<{ foods: RecognizedFood[]; note?: string }>;
 
+// One recognized food and the catalog products that might be it, for the AI to choose between.
+export type MatchQuestion = {
+  amount: number;
+  candidates: { brand: string | null; kcalPer100: number | null; name: string; per100: Record<string, number> }[];
+  estimate: Record<string, number>;
+  name: string;
+  unit: "g" | "ml" | "serving";
+};
+
+// For each question, the index of the chosen candidate, or null when none is that food.
+export type MatchPicker = (questions: readonly MatchQuestion[]) => Promise<(number | null)[]>;
+
 export type ApiDeps = {
   blobs: BlobStore;
+  // Query embeddings for meaning-based search; an empty array when embeddings are unavailable.
+  embedTexts: (texts: readonly string[]) => Promise<number[][]>;
   now: () => Date;
+  pickMatches: MatchPicker;
   recognizeFoods: FoodRecognizer;
   sendEmailCode: (message: EmailCodeMessage) => Promise<void>;
   sendPush: (messages: readonly PushMessage[]) => Promise<void>;
@@ -108,9 +123,21 @@ async function recognizeWithModel(input: Parameters<FoodRecognizer>[0]) {
   return recognizeFoodsWithModel(input);
 }
 
+async function embedWithGateway(texts: readonly string[]): Promise<number[][]> {
+  const { canEmbed, embedTexts } = await import("../product-embeddings.ts");
+  return canEmbed() ? embedTexts(texts, { purpose: "query", signal: AbortSignal.timeout(5_000) }) : [];
+}
+
+async function pickWithModel(questions: readonly MatchQuestion[]) {
+  const { pickMatchesWithModel } = await import("./pick-matches.ts");
+  return pickMatchesWithModel(questions);
+}
+
 const defaults: ApiDeps = {
   blobs: vercelBlobStore,
+  embedTexts: embedWithGateway,
   now: () => new Date(),
+  pickMatches: pickWithModel,
   recognizeFoods: recognizeWithModel,
   sendEmailCode: sendEmailCodeWithResend,
   sendPush: sendExpoPush,

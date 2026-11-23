@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import { prisma } from "../prisma.ts";
-import { api, closeDatabase, installFakes, resetDatabase, seedOffProduct, setRecognizer, signIn, uploadPng, type Session } from "./test/harness.ts";
+import { api, closeDatabase, installFakes, resetDatabase, seedOffProduct, setMatchPicker, setRecognizer, signIn, uploadPng, type Session } from "./test/harness.ts";
 
 const CHEESE = "8437000000013";
 const SOY_DRINK = "8437000000020";
@@ -251,6 +251,35 @@ describe("analyze", () => {
     });
     assert.equal(committed.status, 201, JSON.stringify(committed.body));
     assert.equal(committed.body.meal.items.length, 2);
+  });
+
+  it("lets the AI pick the product, and refuses picks whose calories are far off", async () => {
+    setRecognizer(async () => ({
+      foods: [
+        { amount: 40, name: "Queso en lonchas", nutrimentsPer100g: { energyKcal100g: 290 }, searchQueries: ["cheese slices"], unit: "g" },
+        { amount: 125, name: "Plain yogurt", nutrimentsPer100g: { energyKcal100g: 60 }, searchQueries: ["cheese"], unit: "g" },
+      ],
+    }));
+    const asked: string[] = [];
+    setMatchPicker(async (questions) => {
+      asked.push(...questions.map((question) => `${question.name}: ${question.candidates.map((candidate) => candidate.name).join(", ")}`));
+      // Both point at the cheese; the yogurt's pick is a mix-up the calorie check must stop.
+      return questions.map((question) => question.candidates.findIndex((candidate) => candidate.name === "Processed cheese slices"));
+    });
+    try {
+      const result = await api("POST", "/log/analyze", { body: { source: "text", text: "cheese and a yogurt" }, token: other.accessToken });
+      assert.equal(result.status, 200, JSON.stringify(result.body));
+      const [cheese, yogurt] = result.body.items;
+      assert.match(asked[0] ?? "", /^Queso en lonchas: .*Processed cheese slices/);
+      assert.equal(cheese.match, "catalog");
+      assert.equal(cheese.barcode, CHEESE);
+      assert.equal(yogurt.match, "estimate");
+      assert.equal(Math.round(yogurt.metrics.energyKcal), 75);
+    } finally {
+      setMatchPicker(async () => {
+        throw new Error("no picker in tests");
+      });
+    }
   });
 
   it("reports model failures and empty results", async () => {

@@ -119,6 +119,8 @@ model CatalogProduct {
   servingSize     String?
   nutriments      Json
   searchText      String   @default(dbgenerated("lower(immutable_unaccent(TRIM(BOTH FROM COALESCE(\"name\", '') || ' ' || COALESCE(\"brands\", ''))))"))
+  // Meaning-based search vector (see lib/product-embeddings.ts); null until embedded.
+  embedding       Unsupported("vector(768)")?
   createdByUserId String?
   createdBy       User?    @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
   images          CatalogProductImage[]
@@ -186,6 +188,8 @@ model OffProduct {
   countryCodes    String[]
   searchSource    String    @db.Text
   searchText      String    @default(dbgenerated("lower(immutable_unaccent(COALESCE(\"searchSource\", '')))"))
+  // Meaning-based search vector (see lib/product-embeddings.ts); null until embedded.
+  embedding       Unsupported("vector(768)")?
   lastModifiedAt  DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt

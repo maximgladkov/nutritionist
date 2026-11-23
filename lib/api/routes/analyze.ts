@@ -4,12 +4,23 @@ import { resolveLocale } from "../../i18n/locales.ts";
 import { computeItemNutrition, scaleNutriments, type NutrientValues } from "../../nutrition.ts";
 import type { ProductNutriments } from "../../open-food-facts.ts";
 import { prisma } from "../../prisma.ts";
-import { chooseCatalogMatch } from "../../food-grounding.ts";
+import { chooseCatalogMatch, kcalPlausible } from "../../food-grounding.ts";
 import { apiDeps, type RecognizedFood } from "../deps.ts";
 import { ApiError, invalid } from "../errors.ts";
 import { json, readJson } from "../http.ts";
 import type { RouteDefinition } from "../router.ts";
-import { findFoodByBarcode, foodBasis, getFood, searchFoods, servingsFor, userCountry, type FoodSummary, type ServingView } from "../foods.ts";
+import {
+  findFoodByBarcode,
+  foodBasis,
+  getFood,
+  mergeFoodResults,
+  searchFoods,
+  searchFoodsByMeaning,
+  servingsFor,
+  userCountry,
+  type FoodSummary,
+  type ServingView,
+} from "../foods.ts";
 import { readAttachmentBytes, requireOwnedAttachments } from "./uploads.ts";
 
 export type DraftMatch = "barcode" | "catalog" | "label" | "estimate";
@@ -110,32 +121,91 @@ async function catalogItem(foodId: string, amount: number, unit: DraftItem["unit
   };
 }
 
-// How many catalog products to weigh for each recognized food.
-const GROUNDING_CANDIDATES = 15;
+// How many catalog products each search contributes, and how many the AI chooses between.
+const SPELLING_CANDIDATES = 15;
+const MEANING_CANDIDATES = 10;
+const PICK_CANDIDATES = 8;
 const MAX_ALTERNATIVES = 3;
 
-// Grounds a recognized food in the catalog: a product is used only when its name matches and its
-// calories agree with the model's estimate (see food-grounding.ts). Otherwise the estimate stays,
-// with the closest products offered as alternatives to swap in.
-async function groundFood(food: RecognizedFood, country?: string): Promise<DraftItem> {
-  const queries = [...new Set([food.brand ? `${food.brand} ${food.name}` : "", ...food.searchQueries, food.name].filter(Boolean))];
-  const results = (await searchFoods(queries, country, GROUNDING_CANDIDATES)).filter((entry) => entry.hasNutrition);
+function kcalEstimate(food: RecognizedFood): number | undefined {
   const estimate = nutrimentsFromRecognized(food);
-  const { alternatives, match } = chooseCatalogMatch(
-    {
-      kcalPer100: estimate.energyKcal100g ?? estimate.energyKcal100ml,
-      name: food.brand ? `${food.brand} ${food.name}` : food.name,
-      searchQueries: food.searchQueries,
-    },
-    results,
-  );
-  const others = alternatives.slice(0, MAX_ALTERNATIVES);
-  if (!match) {
-    return estimateItem(food, "estimate", others);
+  return estimate.energyKcal100g ?? estimate.energyKcal100ml;
+}
+
+function groundingQueries(food: RecognizedFood): string[] {
+  return [...new Set([food.brand ? `${food.brand} ${food.name}` : "", ...food.searchQueries, food.name].filter(Boolean))];
+}
+
+// Products that might be this food: spelling matches first, then products close in meaning (the
+// same food named in another language, or worded differently).
+async function candidatesFor(food: RecognizedFood, embedding: number[] | undefined, country?: string): Promise<FoodSummary[]> {
+  const [spelling, meaning] = await Promise.all([
+    searchFoods(groundingQueries(food), country, SPELLING_CANDIDATES),
+    embedding ? searchFoodsByMeaning(embedding, country, MEANING_CANDIDATES).catch(() => []) : Promise.resolve([]),
+  ]);
+  return mergeFoodResults(spelling, meaning).filter((entry) => entry.hasNutrition);
+}
+
+// Which candidate each food is: the AI decides (one call for the whole meal), guarded by a calorie
+// check; when the AI step is unavailable, name-and-calorie rules decide instead.
+async function chooseProducts(foods: readonly RecognizedFood[], candidates: readonly FoodSummary[][]): Promise<(FoodSummary | null)[]> {
+  const shortlists = candidates.map((list) => list.slice(0, PICK_CANDIDATES));
+  try {
+    const picks = await apiDeps().pickMatches(
+      foods.map((food, index) => ({
+        amount: food.amount,
+        candidates: shortlists[index]!.map((entry) => ({
+          brand: entry.brand,
+          kcalPer100: entry.kcalPer100,
+          name: entry.name,
+          per100: entry.nutrimentsPer100g as Record<string, number>,
+        })),
+        estimate: nutrimentsFromRecognized(food) as Record<string, number>,
+        name: food.name,
+        unit: food.unit,
+      })),
+    );
+    return foods.map((food, index) => {
+      const pick = picks[index];
+      const chosen = pick === null || pick === undefined ? null : (shortlists[index]![pick] ?? null);
+      return chosen && kcalPlausible(kcalEstimate(food), chosen.kcalPer100) ? chosen : null;
+    });
+  } catch (error) {
+    console.warn("api: AI product matching unavailable, using rules", error);
+    return foods.map(
+      (food, index) =>
+        chooseCatalogMatch(
+          { kcalPer100: kcalEstimate(food), name: food.brand ? `${food.brand} ${food.name}` : food.name, searchQueries: food.searchQueries },
+          candidates[index]!,
+        ).match,
+    );
   }
-  const unit = food.unit === "serving" ? match.unit : food.unit;
-  const item = await catalogItem(match.id, food.amount, unit, "catalog", others, country);
-  return { ...item, position: food.position ?? null };
+}
+
+// Grounds recognized foods in the catalog so logged nutrition comes from real product data where
+// a product matches; the AI's estimate stays for foods no product matches (with the closest
+// products offered as alternatives to swap in).
+async function groundFoods(foods: readonly RecognizedFood[], country?: string): Promise<DraftItem[]> {
+  const embeddings = await apiDeps()
+    .embedTexts(foods.map((food) => [food.name, ...food.searchQueries].join(" · ")))
+    .catch((error: unknown) => {
+      console.warn("api: embeddings unavailable for grounding", error);
+      return [] as number[][];
+    });
+  const candidates = await Promise.all(foods.map((food, index) => candidatesFor(food, embeddings[index], country)));
+  const chosen = await chooseProducts(foods, candidates);
+  return Promise.all(
+    foods.map(async (food, index) => {
+      const match = chosen[index];
+      const others = candidates[index]!.filter((entry) => entry.id !== match?.id).slice(0, MAX_ALTERNATIVES);
+      if (!match) {
+        return estimateItem(food, "estimate", others);
+      }
+      const unit = food.unit === "serving" ? match.unit : food.unit;
+      const item = await catalogItem(match.id, food.amount, unit, "catalog", others, country);
+      return { ...item, position: food.position ?? null };
+    }),
+  );
 }
 
 async function loadImages(userId: string, uploadIds: readonly string[]) {
@@ -179,7 +249,7 @@ export const analyzeRoutes: RouteDefinition[] = [
       const items =
         body.source === "label"
           ? recognized.foods.slice(0, 1).map((food) => estimateItem(food, "label", []))
-          : await Promise.all(recognized.foods.map((food) => groundFood(food, country)));
+          : await groundFoods(recognized.foods, country);
       return json({ items, note: recognized.note ?? null, source: body.source });
     },
     method: "POST",

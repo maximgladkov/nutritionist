@@ -7,6 +7,7 @@ import { APP_NAME } from "./brand.ts";
 import { normalizeCountryCode } from "./countries.ts";
 import { parseCountryList } from "./off-country.ts";
 import { slimOffDocument, type SlimOffProduct } from "./off-import.ts";
+import { canEmbed, embedMissingProducts } from "./product-embeddings.ts";
 import { resolveDirectDatabaseUrl } from "./prisma-url.ts";
 
 config({ path: ".env.local" });
@@ -191,6 +192,12 @@ export async function importOffProducts(mode: ImportMode): Promise<ImportStats> 
       log("Full dump finished. Applying daily deltas...");
     }
     await importDeltas(client, countryCodes, stats);
+    if (canEmbed()) {
+      log("Embedding new and changed products...");
+      await embedMissingProducts((sql, params) => client.query(sql, params), log);
+    } else {
+      log("Skipping embeddings: set AI_GATEWAY_API_KEY to enable meaning-based search.");
+    }
     return stats;
   } finally {
     await client.end();
@@ -320,6 +327,8 @@ async function upsertBatch(client: Client, rows: SlimOffProduct[]): Promise<numb
        "nutriments" = EXCLUDED."nutriments",
        "imageUrl" = EXCLUDED."imageUrl",
        "countryCodes" = EXCLUDED."countryCodes",
+       -- Names changed: drop the embedding so the next embedding pass redoes it.
+       "embedding" = CASE WHEN "OffProduct"."searchSource" IS DISTINCT FROM EXCLUDED."searchSource" THEN NULL ELSE "OffProduct"."embedding" END,
        "searchSource" = EXCLUDED."searchSource",
        "lastModifiedAt" = EXCLUDED."lastModifiedAt",
        "updatedAt" = EXCLUDED."updatedAt"`,

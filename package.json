@@ -24,6 +24,7 @@
     "db:backfill-images": "node --experimental-strip-types scripts/backfill-meal-item-images.ts",
     "db:backfill-attachments": "node --experimental-strip-types scripts/backfill-user-attachments.ts",
     "db:import-off": "node --experimental-strip-types scripts/import-off-products.ts",
+    "db:embed-products": "node --experimental-strip-types scripts/embed-products.ts",
     "postinstall": "prisma generate && node node_modules/@heroui-pro/react/dist/postinstall/index.js",
     "build:eve": "eve build",
     "dev:eve": "eve dev",

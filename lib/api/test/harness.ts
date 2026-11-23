@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { handleApiRequest } from "../index.ts";
-import { resetApiDeps, setApiDeps, type EmailCodeMessage, type FoodRecognizer, type PushMessage } from "../deps.ts";
+import { resetApiDeps, setApiDeps, type EmailCodeMessage, type FoodRecognizer, type MatchPicker, type PushMessage } from "../deps.ts";
 import type { AppleIdentity } from "../apple.ts";
 import { prisma } from "../../prisma.ts";
 
@@ -12,6 +12,14 @@ let recognizer: FoodRecognizer = async () => ({ foods: [] });
 
 export function setRecognizer(next: FoodRecognizer): void {
   recognizer = next;
+}
+
+let picker: MatchPicker = async () => {
+  throw new Error("no picker in tests");
+};
+
+export function setMatchPicker(next: MatchPicker): void {
+  picker = next;
 }
 
 // Identity tokens in tests are `apple:<json identity>`; anything else fails verification.
@@ -36,6 +44,10 @@ export function installFakes(): void {
         return entry ? { body: new Response(Buffer.from(entry.bytes)).body!, contentType: entry.contentType } : null;
       },
     },
+    // No embeddings or AI picks in tests unless a test sets them: grounding falls back to its
+    // name-and-calorie rules.
+    embedTexts: async () => [],
+    pickMatches: (questions) => picker(questions),
     recognizeFoods: (input) => recognizer(input),
     async sendEmailCode(message) {
       emails.push(message);

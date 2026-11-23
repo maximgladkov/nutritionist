@@ -10,7 +10,7 @@ import { sumNutrients, type NutrientValues } from "../../nutrition.ts";
 import { ApiError, invalid } from "../errors.ts";
 import { noContent, readJson, readQuery } from "../http.ts";
 import type { RouteDefinition } from "../router.ts";
-import { findFoodByBarcode, getFood, searchFoods, toFoodDetail, userCountry } from "../foods.ts";
+import { findFoodByBarcode, getFood, searchFoodsHybrid, toFoodDetail, userCountry } from "../foods.ts";
 import { nutrimentsInputSchema } from "../schemas.ts";
 import { requireOwnedAttachments } from "./uploads.ts";
 
@@ -158,7 +158,7 @@ export const foodRoutes: RouteDefinition[] = [
           q: z.string().trim().min(2, "Type at least two letters.").max(100),
         }),
       );
-      return { foods: await searchFoods([query.q], await userCountry(user.id), query.limit), query: query.q };
+      return { foods: await searchFoodsHybrid(query.q, await userCountry(user.id), query.limit), query: query.q };
     },
     method: "GET",
     path: "/foods/search",

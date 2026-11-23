@@ -55,6 +55,18 @@ export function kcalAgrees(estimate: number | undefined, actual: number | null):
   return difference <= KCAL_ABSOLUTE_TOLERANCE || difference <= estimate * KCAL_RATIO_TOLERANCE;
 }
 
+// Looser check for a product the AI chose as the same food: it only rules out a clear mix-up
+// (the estimate is a guess; the label is usually closer to the truth).
+const PICK_RATIO_TOLERANCE = 0.35;
+const PICK_ABSOLUTE_TOLERANCE = 60;
+
+export function kcalPlausible(estimate: number | undefined, actual: number | null): boolean {
+  if (actual === null) return false;
+  if (estimate === undefined) return true;
+  const difference = Math.abs(actual - estimate);
+  return difference <= PICK_ABSOLUTE_TOLERANCE || difference <= estimate * PICK_RATIO_TOLERANCE;
+}
+
 export type GroundingResult<T> = { alternatives: T[]; match: T | null };
 
 export function chooseCatalogMatch<T extends GroundingCandidate>(target: GroundingTarget, candidates: readonly T[]): GroundingResult<T> {

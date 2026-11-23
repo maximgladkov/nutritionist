@@ -68,7 +68,7 @@ const INSTRUCTIONS: Record<"label" | "photo" | "text", string> = {
   photo: [
     "The image shows a meal. Break every prepared or combined dish into its basic ingredients and list each one as its own food: a sandwich becomes bread, butter, ham, cheese and lettuce; a salad becomes each vegetable, the cheese and the dressing; pasta becomes the pasta, the sauce's main parts and the grated cheese.",
     "Include fats, oils, dressings and sauces that are visible or that the dish normally contains (butter on toast, oil on a salad, mayonnaise in a sandwich), with a realistic amount.",
-    "Keep a food whole only when it is a single ingredient (an apple, a boiled egg, a glass of milk) or a packaged product whose brand or label is visible.",
+    "Keep a food whole only when it is a single ingredient (an apple, a fried or boiled egg, a glass of milk) or a packaged product whose brand or label is visible; never split one ingredient into parts (egg white and yolk).",
     "List each ingredient once: two slices of toast are one bread entry with their combined weight. Name it plainly as a product you could buy (Olive oil, not 'oil used for frying the egg').",
     "Leave out garnishes and seasonings with almost no calories (herbs, spices, a lettuce leaf used as decoration); keep drinks even when they have few calories.",
     "Estimate each ingredient's own weight from the plate size and typical recipes, so the parts add up to a realistic portion. Use unit g, or ml for drinks; never serving.",
@@ -99,7 +99,9 @@ export const recognizeFoodsWithModel: FoodRecognizer = async (input) => {
     model: gateway(process.env.FOOD_RECOGNITION_MODEL?.trim() || DEFAULT_MODEL_ID),
     abortSignal: AbortSignal.timeout(RECOGNITION_TIMEOUT_MS),
     output: Output.object({ schema: resultSchema }),
-    providerOptions: { gateway: { models: fallbackModels() } },
+    // Recognition is a quick visual judgement; extended thinking roughly doubled the wait without
+    // better results in our photo tests.
+    providerOptions: { anthropic: { thinking: { type: "disabled" } }, gateway: { models: fallbackModels() } },
     system: "You identify foods for a nutrition diary. Never invent barcodes.",
   });
   // Models often send null for "not there"; the rest of the app expects the field left out.
