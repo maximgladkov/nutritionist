@@ -117,6 +117,7 @@ export async function signIn(email: string, profile: { timezone?: string } = { t
 export async function seedOffProduct(input: {
   barcode: string;
   brands?: string;
+  countryCodes?: string[];
   name: string;
   nutriments: Record<string, number>;
   quantity?: string;
@@ -126,7 +127,7 @@ export async function seedOffProduct(input: {
     data: {
       barcode: input.barcode,
       brands: input.brands ?? null,
-      countryCodes: [],
+      countryCodes: input.countryCodes ?? [],
       name: input.name,
       names: {},
       nutriments: input.nutriments,

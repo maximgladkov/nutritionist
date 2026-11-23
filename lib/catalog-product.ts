@@ -106,7 +106,7 @@ export async function searchCatalogAndOpenFoodFacts(
   const merged = mergeProductSearch(local, remote);
   return {
     ...merged,
-    products: rankSearchProducts(merged.products, [query]),
+    products: rankSearchProducts(merged.products, [query], options.country),
   };
 }
 
@@ -122,7 +122,7 @@ export async function searchCatalogAndOpenFoodFactsMany(
   const merged = mergeCatalogSearchResults(results);
   return {
     ...merged,
-    products: rankSearchProducts(merged.products, unique),
+    products: rankSearchProducts(merged.products, unique, options.country),
   };
 }
 

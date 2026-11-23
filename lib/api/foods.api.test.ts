@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
+import { prisma } from "../prisma.ts";
 import { api, closeDatabase, installFakes, resetDatabase, seedOffProduct, setRecognizer, signIn, uploadPng, type Session } from "./test/harness.ts";
 
 const CHEESE = "8437000000013";
@@ -31,6 +32,18 @@ before(async () => {
 after(closeDatabase);
 
 describe("foods", () => {
+  it("searches every product, with the user's country first", async () => {
+    await seedOffProduct({ barcode: "5000000000017", brands: "Tesco", countryCodes: ["gb"], name: "Cheddar cheese", nutriments: { energyKcal100g: 416 } });
+    await seedOffProduct({ barcode: "8437000000037", brands: "García Baquero", countryCodes: ["es"], name: "Curado cheese wedge", nutriments: { energyKcal100g: 390 } });
+    await prisma.userProfile.upsert({ create: { country: "es", userId: kira.userId }, update: { country: "es" }, where: { userId: kira.userId } });
+    const result = await api("GET", "/foods/search?q=cheese", { token: kira.accessToken });
+    assert.equal(result.status, 200, JSON.stringify(result.body));
+    const barcodes = result.body.foods.map((food: { barcode: string }) => food.barcode);
+    assert.ok(barcodes.includes("5000000000017"), "products sold elsewhere are found too");
+    assert.equal(barcodes[0], "8437000000037", "the user's country ranks first");
+    await prisma.userProfile.update({ data: { country: null }, where: { userId: kira.userId } });
+  });
+
   it("searches the catalog", async () => {
     const result = await api("GET", "/foods/search?q=cheese", { token: kira.accessToken });
     assert.equal(result.status, 200);

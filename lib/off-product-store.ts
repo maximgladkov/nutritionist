@@ -72,9 +72,8 @@ export async function searchOffProductsByName(
         "nutriments", "imageUrl", "countryCodes"
       FROM "OffProduct"
       WHERE 1=1
-      ${countryFilter(options.country)}
       ${Prisma.join(fuzzyTokenFilters(tokens), " ")}
-      ORDER BY ${productSearchOrderSql(query)}
+      ORDER BY ${countryFirstSql(options.country)} ${productSearchOrderSql(query)}
       LIMIT ${options.pageSize}
     `;
   });
@@ -103,15 +102,14 @@ export async function searchCatalogProductsFuzzy(
   return rows.map(catalogRowToProduct);
 }
 
-function countryFilter(country: string | undefined): Prisma.Sql {
-  if (!country) {
+// Search covers every product we have; ones sold in the user's country come first, so
+// imported or travel foods are still found.
+function countryFirstSql(country: string | undefined): Prisma.Sql {
+  const iso = country?.trim().toLowerCase();
+  if (!iso || !/^[a-z]{2}$/.test(iso)) {
     return Prisma.empty;
   }
-  const iso = country.trim().toLowerCase();
-  if (!/^[a-z]{2}$/.test(iso)) {
-    return Prisma.empty;
-  }
-  return Prisma.sql`AND ${iso} = ANY("countryCodes")`;
+  return Prisma.sql`(${iso} = ANY("countryCodes")) DESC,`;
 }
 
 function offRowToProduct(row: OffProductRow, country?: string): Product {
