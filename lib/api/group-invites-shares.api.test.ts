@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
-import { api, closeDatabase, installFakes, resetDatabase, signIn, type Session } from "./test/harness.ts";
+import { api, closeDatabase, installFakes, pushes, resetDatabase, signIn, type Session } from "./test/harness.ts";
 
 // Personal one-time invites next to the group's reusable code, and the owner choosing what sharing
 // members show them.
@@ -119,11 +119,41 @@ describe("what members share", () => {
     assert.equal(weights.status, 200);
     assert.equal(weights.body.currentKg, 61.5);
 
-    await api("PATCH", `/groups/${groupId}`, { body: { shares: ["meals", "photos"] }, token: coach.accessToken });
+  });
+
+  it("asks members before showing what the owner adds later", async () => {
+    pushes.length = 0;
+    await api("POST", "/me/devices", { body: { platform: "ios", token: "ExponentPushToken[ana]" }, token: ana.accessToken });
+    await api("PATCH", `/groups/${groupId}`, { body: { shares: ["summary", "meals", "photos"] }, token: coach.accessToken });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    assert.ok(pushes.some((push) => push.to === "ExponentPushToken[ana]" && /meal items, meal photos/u.test(push.body)));
+
+    const detail = await api("GET", `/groups/${groupId}`, { token: ana.accessToken });
+    assert.deepEqual(detail.body.group.allowedShares, ["summary"], "weight left the list; summary stays agreed");
+    assert.deepEqual(detail.body.group.pendingShares, ["meals", "photos"]);
+    assert.deepEqual((await api("GET", "/groups", { token: ana.accessToken })).body.groups[0].pendingShares, ["meals", "photos"]);
+    const owner = await api("GET", `/groups/${groupId}`, { token: coach.accessToken });
+    const row = owner.body.group.members.find((member: { userId: string }) => member.userId === ana.userId);
+    assert.deepEqual(row.shares, ["summary"]);
+    assert.deepEqual(row.pendingShares, ["meals", "photos"]);
+
+    const before = await api("GET", `/groups/${groupId}/members/${ana.userId}/diary`, { token: coach.accessToken });
+    assert.deepEqual(before.body.meals, [], "not until she says yes");
+
+    const answer = await api("PATCH", `/groups/${groupId}/membership`, { body: { allowedShares: ["summary", "meals"] }, token: ana.accessToken });
+    assert.equal(answer.status, 200, JSON.stringify(answer.body));
+    assert.deepEqual(answer.body.allowedShares, ["summary", "meals"]);
+    const after = await api("GET", `/groups/${groupId}`, { token: ana.accessToken });
+    assert.deepEqual(after.body.group.pendingShares, [], "photos counts as declined");
+
     const meals = await api("GET", `/groups/${groupId}/members/${ana.userId}/diary`, { token: coach.accessToken });
     assert.equal(meals.body.meals[0].items[0].name, "Oats");
-    assert.equal(meals.body.goals.caloriesPerDay, null, "goals are part of the summary");
+    assert.deepEqual(meals.body.shares, ["summary", "meals"]);
     assert.equal((await api("GET", `/groups/${groupId}/members/${ana.userId}/weights`, { token: coach.accessToken })).status, 403);
+
+    await api("PATCH", `/groups/${groupId}`, { body: { shares: ["meals"] }, token: coach.accessToken });
+    const removed = await api("GET", `/groups/${groupId}/members/${ana.userId}/diary`, { token: coach.accessToken });
+    assert.equal(removed.body.goals.caloriesPerDay, null, "removing an item applies at once");
     const range = await api("GET", `/groups/${groupId}/members/${ana.userId}/days?from=2026-11-01&to=2026-11-07`, { token: coach.accessToken });
     assert.equal(range.status, 403);
   });

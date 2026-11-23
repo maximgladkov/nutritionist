@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   createGroup,
   createPersonalInvite,
+  effectiveShares,
   deleteGroup,
   GROUP_SHARE_KINDS,
   type GroupShareKind,
@@ -16,6 +17,7 @@ import {
   removeGroupMember,
   requireOwnerCanViewMemberNutrition,
   revokePersonalInvite,
+  setMemberShares,
   rotateInviteToken,
   sendGroupMessage,
   updateGroup,
@@ -45,6 +47,7 @@ import { loadDayBuckets, loadDayView } from "./diary.ts";
 import { readAttachmentBytes, requireOwnedAttachments } from "./uploads.ts";
 
 type Membership = {
+  allowedShares: GroupShareKind[];
   groupId: string;
   lastReadAt: Date | null;
   noticesReadAt: Date | null;
@@ -175,7 +178,7 @@ async function requireSharingMember(groupId: string, ownerId: string, memberId: 
     throw new ApiError(403, "not_sharing", "This member has paused sharing their diary with the group.");
   }
   const group = await prisma.group.findUnique({ select: { shares: true }, where: { id: groupId } });
-  return group?.shares ?? [];
+  return effectiveShares(group?.shares ?? [], member.allowedShares);
 }
 
 function requireShare(shares: readonly GroupShareKind[], kind: GroupShareKind): void {
@@ -352,17 +355,26 @@ export const groupRoutes: RouteDefinition[] = [
     path: "/groups/:id/members/:userId",
   },
   {
+    // Members pause or resume sharing, and answer what the group asks them to share.
     async handler({ params, request, user }) {
-      const body = await readJson(request, z.object({ sharing: z.boolean() }));
+      const body = await readJson(
+        request,
+        z.object({ allowedShares: z.array(z.enum(GROUP_SHARE_KINDS)).optional(), sharing: z.boolean().optional() }),
+      );
       const member = await requireMembership(params.id ?? "", user.id);
       if (member.role === "owner") {
         throw forbidden("Owners don't share a diary with their own group.");
       }
-      await prisma.groupMember.update({
-        data: { sharing: body.sharing },
-        where: { groupId_userId: { groupId: member.groupId, userId: user.id } },
-      });
-      return { sharing: body.sharing };
+      if (body.sharing !== undefined) {
+        await prisma.groupMember.update({
+          data: { sharing: body.sharing },
+          where: { groupId_userId: { groupId: member.groupId, userId: user.id } },
+        });
+      }
+      const shares = body.allowedShares
+        ? await setMemberShares({ allowed: body.allowedShares, groupId: member.groupId, userId: user.id })
+        : null;
+      return { sharing: body.sharing ?? member.sharing, ...(shares ?? {}) };
     },
     method: "PATCH",
     path: "/groups/:id/membership",

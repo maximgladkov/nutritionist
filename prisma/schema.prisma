@@ -486,6 +486,11 @@ model GroupMember {
   sharing  Boolean         @default(true)
   lastReadAt DateTime?
   noticesReadAt DateTime?
+  // What this member agreed to show the owner, from the group's list. The owner sees the overlap
+  // of the two, so adding to the group's list needs each member's yes.
+  allowedShares  GroupShareKind[] @default([])
+  // Items the member has answered (allowed or declined); the rest of the group's list is an ask.
+  answeredShares GroupShareKind[] @default([])
   joinedAt DateTime        @default(now())
 
   @@unique([groupId, userId])

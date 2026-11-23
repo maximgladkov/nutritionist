@@ -16,6 +16,7 @@ import {
   planMembershipMerge,
 } from "./groups-invite.ts";
 import { generateJoinCode, normalizeJoinCode } from "./groups-join-code.ts";
+import { pushToUser } from "./api/push.ts";
 import { resolveLocale, type Locale } from "./i18n/locales.ts";
 import { prisma } from "./prisma.ts";
 import { resolveReachTarget } from "./reminders.ts";
@@ -44,6 +45,8 @@ export type GroupListItem = {
   readonly name: string;
   readonly ownerName: string | null;
   readonly ownerTitle: string;
+  // Items the owner added to the list that this member hasn't answered yet.
+  readonly pendingShares: readonly GroupShareKind[];
   readonly role: GroupRole;
 };
 
@@ -102,7 +105,13 @@ export type GroupOwnerDetail = {
   readonly inviteToken: string;
   readonly joinCode: string | null;
   // Members only (not the owner), with whether each shares their diary.
-  readonly members: readonly (GroupMemberView & { readonly sharing: boolean })[];
+  // Members only (not the owner): whether each shares their diary, what of the group's list they
+  // agreed to, and what they haven't answered yet.
+  readonly members: readonly (GroupMemberView & {
+    readonly pendingShares: readonly GroupShareKind[];
+    readonly shares: readonly GroupShareKind[];
+    readonly sharing: boolean;
+  })[];
   readonly membersVisible: boolean;
   // What sharing members show the owner.
   readonly shares: readonly GroupShareKind[];
@@ -129,6 +138,9 @@ export type GroupMemberDetail = {
   readonly ownerName: string | null;
   readonly ownerTitle: string;
   readonly role: "member";
+  // What you agreed to show the owner (from the group's list), and what they've asked for since.
+  readonly allowedShares: readonly GroupShareKind[];
+  readonly pendingShares: readonly GroupShareKind[];
 };
 
 export type JoinGroupResult = {
@@ -160,8 +172,40 @@ export async function listGroupsForUser(userId: string): Promise<GroupListItem[]
     name: row.group.name,
     ownerName: row.group.owner.name,
     ownerTitle: row.group.ownerTitle,
+    pendingShares: row.role === "member" ? pendingShares(row.group.shares, row.answeredShares) : [],
     role: row.role,
   }));
+}
+
+// What the owner sees of a member: the group's list, limited to what the member agreed to.
+export function effectiveShares(groupShares: readonly GroupShareKind[], allowed: readonly GroupShareKind[]): GroupShareKind[] {
+  return groupShares.filter((kind) => allowed.includes(kind));
+}
+
+export function pendingShares(groupShares: readonly GroupShareKind[], answered: readonly GroupShareKind[]): GroupShareKind[] {
+  return groupShares.filter((kind) => !answered.includes(kind));
+}
+
+// The member answers the group's current list: they allow `allowed` (within it), and every item on
+// it counts as answered, so the rest are declined until they change their mind.
+export async function setMemberShares(input: {
+  allowed: readonly GroupShareKind[];
+  groupId: string;
+  userId: string;
+}): Promise<{ allowedShares: GroupShareKind[]; pendingShares: GroupShareKind[] }> {
+  const member = await prisma.groupMember.findUnique({
+    include: { group: { select: { shares: true } } },
+    where: { groupId_userId: { groupId: input.groupId, userId: input.userId } },
+  });
+  if (!member || member.role !== "member") {
+    throw new GroupError("You are not a member of that group.");
+  }
+  const allowedShares = GROUP_SHARE_KINDS.filter(
+    (kind) => input.allowed.includes(kind) || (member.allowedShares.includes(kind) && !member.group.shares.includes(kind)),
+  );
+  const answeredShares = GROUP_SHARE_KINDS.filter((kind) => member.answeredShares.includes(kind) || member.group.shares.includes(kind));
+  await prisma.groupMember.update({ data: { allowedShares, answeredShares }, where: { id: member.id } });
+  return { allowedShares: effectiveShares(member.group.shares, allowedShares), pendingShares: [] };
 }
 
 // An invite is a group's own link token or typed code (reusable until the owner resets them), or a
@@ -281,6 +325,7 @@ export async function createGroup(input: {
       shares: group.shares,
       name: group.name,
       ownerName: null,
+      pendingShares: [],
       ownerTitle: group.ownerTitle,
       role: "owner",
     };
@@ -300,6 +345,7 @@ export async function createGroup(input: {
       shares: updated.shares,
       name: updated.name,
       ownerName: null,
+      pendingShares: [],
       ownerTitle: updated.ownerTitle,
       role: "owner",
     };
@@ -344,7 +390,12 @@ export async function updateGroup(input: {
   if (Object.keys(data).length === 0) {
     throw new GroupError("Choose a name, description, or image to update.");
   }
+  const before = await prisma.group.findUnique({ select: { name: true, shares: true }, where: { id: input.groupId } });
   await prisma.group.update({ data, where: { id: input.groupId } });
+  const added = (data.shares as GroupShareKind[] | undefined)?.filter((kind) => !before?.shares.includes(kind)) ?? [];
+  if (added.length > 0) {
+    void notifyShareAsk({ added, groupId: input.groupId, groupName: before?.name ?? "", ownerId: input.ownerId });
+  }
 }
 
 export async function deleteGroup(input: { groupId: string; ownerId: string }): Promise<void> {
@@ -390,7 +441,15 @@ export async function joinGroupByToken(input: {
       }
     }
     await tx.groupMember.create({
-      data: { groupId: group.id, role: "member", sharing: input.sharing ?? true, userId: input.userId },
+      // Joining agrees to everything the group lists right now.
+      data: {
+        allowedShares: group.shares,
+        answeredShares: group.shares,
+        groupId: group.id,
+        role: "member",
+        sharing: input.sharing ?? true,
+        userId: input.userId,
+      },
     });
   });
   return { alreadyMember: false, groupId: group.id, role: "member" };
@@ -522,6 +581,8 @@ export async function getOwnedGroupDetail(input: {
       .map((row) => ({
         joinedAt: row.joinedAt.toISOString(),
         name: row.user.name,
+        pendingShares: pendingShares(group.shares, row.answeredShares),
+        shares: effectiveShares(group.shares, row.allowedShares),
         sharing: row.sharing,
         userId: row.userId,
       })),
@@ -585,6 +646,8 @@ export async function getJoinedGroupDetail(input: {
     ownerId: member.group.ownerId,
     ownerName: member.group.owner.name,
     ownerTitle: member.group.ownerTitle,
+    allowedShares: effectiveShares(member.group.shares, member.allowedShares),
+    pendingShares: pendingShares(member.group.shares, member.answeredShares),
     role: "member",
   };
 }
@@ -717,6 +780,36 @@ function normalizeMessage(value: string): string {
     throw new GroupError("Choose a shorter message.");
   }
   return body;
+}
+
+const SHARE_NAMES: Record<GroupShareKind, string> = {
+  activity: "activity",
+  meals: "meal items",
+  photos: "meal photos",
+  summary: "daily summary",
+  weight: "weight",
+};
+
+// Tells members who haven't answered the new items that the owner asks for them.
+async function notifyShareAsk(input: { added: GroupShareKind[]; groupId: string; groupName: string; ownerId: string }): Promise<void> {
+  const [owner, members] = await Promise.all([
+    prisma.user.findUnique({ select: { name: true }, where: { id: input.ownerId } }),
+    prisma.groupMember.findMany({ select: { answeredShares: true, userId: true }, where: { groupId: input.groupId, role: "member" } }),
+  ]);
+  const who = owner?.name?.trim().split(/\s+/u)[0] || "Your coach";
+  await Promise.all(
+    members.map((member) => {
+      const asked = input.added.filter((kind) => !member.answeredShares.includes(kind));
+      if (asked.length === 0) {
+        return Promise.resolve(0);
+      }
+      return pushToUser(member.userId, {
+        body: `${who} also asks to see your ${asked.map((kind) => SHARE_NAMES[kind]).join(", ")}. Open the group to allow it.`,
+        data: { groupId: input.groupId, type: "group_share_ask" },
+        title: input.groupName,
+      });
+    }),
+  ).catch((error: unknown) => console.error("group share ask notify failed", error));
 }
 
 function normalizeShares(value: readonly GroupShareKind[]): GroupShareKind[] {
