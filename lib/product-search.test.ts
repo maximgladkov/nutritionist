@@ -10,6 +10,42 @@ describe("foldSearchText", () => {
 });
 
 describe("rankSearchProducts", () => {
+  it("shows a name that has the searched words when the usual one has none", () => {
+    const ranked = rankSearchProducts(
+      [
+        {
+          brands: "Hacendado",
+          hasNutrition: true,
+          name: "Cheesecake",
+          names: ["Cheesecake", "Cheesecake con arándanos"],
+          nutriments: { energyKcal100g: 236 },
+        },
+        {
+          brands: "Hacendado",
+          hasNutrition: true,
+          name: "Arándanos enteros",
+          names: ["Arándanos enteros", "Whole blueberries"],
+          nutriments: { energyKcal100g: 52 },
+        },
+      ],
+      ["arandanos hac"],
+    );
+    assert.deepEqual(
+      ranked.map((product) => product.name),
+      ["Arándanos enteros", "Cheesecake con arándanos"],
+    );
+    // The other names stay out of what's returned.
+    assert.equal(ranked.some((product) => "names" in product), false);
+  });
+
+  it("keeps the usual name when it already has one of the searched words", () => {
+    const [product] = rankSearchProducts(
+      [{ hasNutrition: true, name: "Blueberry yogurt", names: ["Blueberry yogurt", "Yogur de arándanos"] }],
+      ["blueberry"],
+    );
+    assert.equal(product?.name, "Blueberry yogurt");
+  });
+
   it("ranks an exact banana with nutrition above parfait and empty produce", () => {
     const ranked = rankSearchProducts(
       [
