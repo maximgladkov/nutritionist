@@ -70,6 +70,29 @@ describe("foods", () => {
     assert.deepEqual(drink.body.servings.map((serving: { amount: number }) => serving.amount), [100, 1000]);
   });
 
+  it("asks for a label scan when the product is known but has no nutrition", async () => {
+    await seedOffProduct({ barcode: "8437005015326", brands: "Berries Delight", name: "Arándano", nutriments: {} });
+    const result = await api("POST", "/log/analyze", { body: { barcode: "8437005015326", source: "barcode" }, token: kira.accessToken });
+    assert.equal(result.status, 404, JSON.stringify(result.body));
+    assert.equal(result.body.error.code, "food_not_found");
+    assert.match(result.body.error.message, /Arándano/);
+
+    // Scanning its label saves the nutrition under that barcode, and from then on it scans fine.
+    const saved = await api("POST", "/foods", {
+      body: {
+        barcode: "8437005015326",
+        brand: "Berries Delight",
+        name: "Arándano",
+        nutrimentsPer100g: { carbohydrates100g: 12, energyKcal100g: 57, fat100g: 0.3, proteins100g: 0.7 },
+      },
+      token: kira.accessToken,
+    });
+    assert.equal(saved.status, 201, JSON.stringify(saved.body));
+    const rescan = await api("POST", "/log/analyze", { body: { barcode: "8437005015326", source: "barcode" }, token: kira.accessToken });
+    assert.equal(rescan.status, 200, JSON.stringify(rescan.body));
+    assert.equal(Math.round(rescan.body.items[0].nutrimentsPer100g.energyKcal100g), 57);
+  });
+
   it("explains an unknown barcode so the app can offer a label scan", async () => {
     const result = await api("GET", "/foods/barcode/4000000000006", { token: kira.accessToken });
     assert.equal(result.status, 404);
