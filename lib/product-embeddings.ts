@@ -92,3 +92,16 @@ export async function embedMissingProducts(query: Query, log: (message: string) 
   }
   return total;
 }
+
+// Gives one of our own catalog products (a food a user saved) its embedding right away, instead
+// of waiting for the next import's embedding pass.
+export async function embedCatalogProduct(
+  product: { brands: string | null; id: string; name: string },
+  embedDocuments: (texts: readonly string[]) => Promise<number[][]>,
+  execute: (sql: string, ...params: unknown[]) => Promise<unknown>,
+): Promise<boolean> {
+  const [embedding] = await embedDocuments([productEmbeddingText({ brands: product.brands, name: product.name })]);
+  if (!embedding) return false;
+  await execute(`UPDATE "CatalogProduct" SET "embedding" = $1::vector WHERE "id" = $2`, toVectorLiteral(embedding), product.id);
+  return true;
+}

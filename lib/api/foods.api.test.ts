@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import { prisma } from "../prisma.ts";
-import { api, closeDatabase, installFakes, resetDatabase, seedOffProduct, setMatchPicker, setRecognizer, signIn, uploadPng, type Session } from "./test/harness.ts";
+import { api, closeDatabase, installFakes, resetDatabase, flushBackground, seedOffProduct, setDocumentEmbedder, setMatchPicker, setRecognizer, signIn, uploadPng, type Session } from "./test/harness.ts";
 
 const CHEESE = "8437000000013";
 const SOY_DRINK = "8437000000020";
@@ -74,6 +74,30 @@ describe("foods", () => {
     const result = await api("GET", "/foods/barcode/4000000000006", { token: kira.accessToken });
     assert.equal(result.status, 404);
     assert.equal(result.body.error.code, "food_not_found");
+  });
+
+  it("embeds a saved food right away, without making the save wait for it", async () => {
+    const embedded: string[] = [];
+    setDocumentEmbedder(async (texts) => {
+      embedded.push(...texts);
+      return texts.map(() => Array.from({ length: 768 }, (_, index) => (index === 0 ? 1 : 0)));
+    });
+    try {
+      const saved = await api("POST", "/foods", {
+        body: { brand: "Casa Pepe", name: "Tortilla de patatas", nutrimentsPer100g: { energyKcal100g: 190 } },
+        token: kira.accessToken,
+      });
+      assert.equal(saved.status, 201, JSON.stringify(saved.body));
+      await flushBackground();
+      assert.deepEqual(embedded, ["Tortilla de patatas Casa Pepe"]);
+      const [row] = await prisma.$queryRawUnsafe<{ embedded: boolean }[]>(
+        `SELECT "embedding" IS NOT NULL AS embedded FROM "CatalogProduct" WHERE "id" = $1`,
+        saved.body.food.id.replace("catalog:", ""),
+      );
+      assert.equal(row?.embedded, true);
+    } finally {
+      setDocumentEmbedder(async () => []);
+    }
   });
 
   it("saves a custom food from a label with photos and finds it by id and barcode", async () => {

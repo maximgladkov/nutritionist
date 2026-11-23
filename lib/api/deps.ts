@@ -1,4 +1,5 @@
 import { get, put } from "@vercel/blob";
+import { after } from "next/server";
 import { APP_NAME } from "../brand.ts";
 import { verifyAppleIdentityToken, type AppleIdentity } from "./apple.ts";
 
@@ -49,7 +50,11 @@ export type MatchQuestion = {
 export type MatchPicker = (questions: readonly MatchQuestion[]) => Promise<(number | null)[]>;
 
 export type ApiDeps = {
+  // Runs work after the response is sent (embedding a saved food), so requests don't wait on it.
+  background: (task: () => Promise<void>) => void;
   blobs: BlobStore;
+  // Document embeddings for products; an empty array when embeddings are unavailable.
+  embedDocuments: (texts: readonly string[]) => Promise<number[][]>;
   // Query embeddings for meaning-based search; an empty array when embeddings are unavailable.
   embedTexts: (texts: readonly string[]) => Promise<number[][]>;
   now: () => Date;
@@ -128,13 +133,34 @@ async function embedWithGateway(texts: readonly string[]): Promise<number[][]> {
   return canEmbed() ? embedTexts(texts, { purpose: "query", signal: AbortSignal.timeout(5_000) }) : [];
 }
 
+async function embedDocumentsWithGateway(texts: readonly string[]): Promise<number[][]> {
+  const { canEmbed, embedTexts } = await import("../product-embeddings.ts");
+  return canEmbed() ? embedTexts(texts, { purpose: "document", signal: AbortSignal.timeout(15_000) }) : [];
+}
+
+function logBackgroundFailure(error: unknown): void {
+  console.warn("api: background task failed", error);
+}
+
+// Next's after() keeps the serverless function alive until the task is done. Outside a request
+// (scripts) it throws, and the task simply runs now.
+function runAfterResponse(task: () => Promise<void>): void {
+  try {
+    after(() => task().catch(logBackgroundFailure));
+  } catch {
+    void task().catch(logBackgroundFailure);
+  }
+}
+
 async function pickWithModel(questions: readonly MatchQuestion[]) {
   const { pickMatchesWithModel } = await import("./pick-matches.ts");
   return pickMatchesWithModel(questions);
 }
 
 const defaults: ApiDeps = {
+  background: runAfterResponse,
   blobs: vercelBlobStore,
+  embedDocuments: embedDocumentsWithGateway,
   embedTexts: embedWithGateway,
   now: () => new Date(),
   pickMatches: pickWithModel,
