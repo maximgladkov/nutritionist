@@ -38,7 +38,8 @@ export type GroupListItem = {
   readonly description: string;
   readonly id: string;
   readonly imageUrl: string;
-  readonly memberCount: number;
+  // Null for members when the owner hides the member list, so the size stays private too.
+  readonly memberCount: number | null;
   readonly membersVisible: boolean;
   // What sharing members show the owner.
   readonly shares: readonly GroupShareKind[];
@@ -58,7 +59,8 @@ export type GroupInvitePreview = {
   readonly description: string;
   readonly imageUrl: string;
   readonly locale: Locale;
-  readonly memberCount: number;
+  // Null for members when the owner hides the member list, so the size stays private too.
+  readonly memberCount: number | null;
   readonly membersVisible: boolean;
   // What sharing members show the owner.
   readonly shares: readonly GroupShareKind[];
@@ -126,7 +128,8 @@ export type GroupMemberDetail = {
   readonly description: string;
   readonly id: string;
   readonly imageUrl: string;
-  readonly memberCount: number;
+  // Null for members when the owner hides the member list, so the size stays private too.
+  readonly memberCount: number | null;
   // Everyone in the group, owner first (the enum orders owner before member); null when the owner hides the member list.
   readonly members: readonly GroupMemberView[] | null;
   readonly membersVisible: boolean;
@@ -166,7 +169,7 @@ export async function listGroupsForUser(userId: string): Promise<GroupListItem[]
     description: row.group.description,
     id: row.group.id,
     imageUrl: row.group.imageUrl,
-    memberCount: row.group._count.members,
+    memberCount: row.role === "member" && !row.group.membersVisible ? null : row.group._count.members,
     membersVisible: row.group.membersVisible,
     shares: row.group.shares,
     name: row.group.name,
@@ -251,7 +254,7 @@ export async function getGroupInvitePreview(tokenOrCode: string): Promise<GroupI
     description: group.description,
     imageUrl: group.imageUrl,
     locale: resolveLocale(group.locale),
-    memberCount: group._count.members,
+    memberCount: group.membersVisible ? group._count.members : null,
     membersVisible: group.membersVisible,
     name: group.name,
     ownerName: group.owner.name,
@@ -630,7 +633,7 @@ export async function getJoinedGroupDetail(input: {
     description: member.group.description,
     id: member.group.id,
     imageUrl: member.group.imageUrl,
-    memberCount: member.group._count.members,
+    memberCount: member.group.membersVisible ? member.group._count.members : null,
     members:
       members?.map((row) => ({ joinedAt: row.joinedAt.toISOString(), name: row.user.name, userId: row.userId })) ?? null,
     membersVisible: member.group.membersVisible,

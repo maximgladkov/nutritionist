@@ -117,7 +117,7 @@ describe("member list visibility", () => {
     const detail = await api("GET", `/groups/${groupId}`, { token: kira.accessToken });
     assert.equal(detail.body.group.membersVisible, false);
     assert.equal(detail.body.group.members, null);
-    assert.equal(detail.body.group.memberCount, 3);
+    assert.equal(detail.body.group.memberCount, null, "the size is private too");
     const owner = await api("GET", `/groups/${groupId}`, { token: coach.accessToken });
     assert.equal(owner.body.group.members.length, 2, "the owner still sees everyone");
     assert.deepEqual(
@@ -126,6 +126,9 @@ describe("member list visibility", () => {
     );
     const preview = await api("GET", `/invites/${joinCode}`);
     assert.equal(preview.body.invite.membersVisible, false);
+    assert.equal(preview.body.invite.memberCount, null);
+    const list = await api("GET", "/groups", { token: kira.accessToken });
+    assert.equal(list.body.groups.find((group: { id: string }) => group.id === groupId).memberCount, null);
     await api("PATCH", `/groups/${groupId}`, { body: { membersVisible: true }, token: coach.accessToken });
   });
 });

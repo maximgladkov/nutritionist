@@ -248,8 +248,7 @@ function GroupsList({
                   <span className="text-foreground truncate font-medium">{group.name}</span>
                   <span className="text-muted truncate text-sm">
                     {group.role === "owner" ? t`Owner` : (group.ownerName ?? t`Member`)}
-                    {" · "}
-                    {group.memberCount}
+                    {group.memberCount === null ? null : ` · ${group.memberCount}`}
                   </span>
                 </span>
               </button>
