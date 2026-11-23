@@ -163,7 +163,7 @@ const HAS_NUTRITION_SQL = Prisma.sql`(("nutriments" ->> 'energyKcal100g') IS NOT
 // sit around 0.30-0.36, unrelated text from 0.40).
 const MAX_EMBEDDING_DISTANCE = 0.38;
 
-export type EmbeddingMatch = { distance: number; product: Product; source: "custom-catalog" | "open-food-facts" };
+export type EmbeddingMatch = { distance: number; product: Product; source: "custom-catalog" | "generic" | "open-food-facts" };
 
 // Products closest in meaning to `embedding` (a pgvector literal), from our own catalog and the
 // Open Food Facts import, nearest first. Only products with nutrition are returned.
@@ -171,7 +171,7 @@ export async function searchProductsByEmbedding(
   embedding: string,
   options: { country?: string; limit: number },
 ): Promise<EmbeddingMatch[]> {
-  const [off, catalog] = await Promise.all([
+  const [off, catalog, generic] = await Promise.all([
     prisma.$queryRaw<(OffProductRow & { distance: number })[]>`
       SELECT
         "barcode", "name", "names", "brands", "quantity", "servingSize",
@@ -191,12 +191,89 @@ export async function searchProductsByEmbedding(
       ORDER BY "embedding" <=> ${embedding}::vector
       LIMIT ${options.limit}
     `,
+    genericByEmbedding(embedding, options.limit),
   ]);
   return [
+    ...generic,
     ...catalog.map((row) => ({ distance: Number(row.distance), product: catalogRowToProduct(row), source: "custom-catalog" as const })),
     ...off.map((row) => ({ distance: Number(row.distance), product: offRowToProduct(row, options.country), source: "open-food-facts" as const })),
   ]
     .filter((match) => match.distance <= MAX_EMBEDDING_DISTANCE)
     .sort((a, b) => a.distance - b.distance)
     .slice(0, options.limit);
+}
+
+type GenericFoodRow = {
+  category: string | null;
+  id: string;
+  name: string;
+  nutriments: Prisma.JsonValue;
+  portions: Prisma.JsonValue;
+};
+
+export const GENERIC_ID_PREFIX = "usda:";
+
+export function isGenericFoodId(id: string): boolean {
+  return id.startsWith(GENERIC_ID_PREFIX);
+}
+
+// A generic food in the shape of a product: no brand or barcode, its first household portion
+// as the serving (so "1 large egg" becomes a one-tap amount).
+function genericRowToProduct(row: GenericFoodRow): Product {
+  const portions = Array.isArray(row.portions) ? (row.portions as { grams?: number; label?: string }[]) : [];
+  const first = portions.find((portion) => typeof portion.grams === "number" && portion.grams > 0);
+  return {
+    allergens: null,
+    barcode: null,
+    brands: null,
+    countries: [],
+    id: row.id,
+    imageUrl: null,
+    ingredients: null,
+    name: row.name,
+    novaGroup: null,
+    nutriments: pickNutriments(asRecord(row.nutriments)),
+    nutriscoreGrade: null,
+    quantity: null,
+    servingSize: first ? `${first.grams} g` : null,
+  };
+}
+
+export async function findGenericFood(id: string): Promise<Product | null> {
+  const [row] = await prisma.$queryRaw<GenericFoodRow[]>`
+    SELECT "id", "name", "category", "nutriments", "portions" FROM "GenericFood" WHERE "id" = ${id}
+  `;
+  return row ? genericRowToProduct(row) : null;
+}
+
+// Generic foods by spelling, closest first.
+export async function searchGenericFoodsByName(query: string, limit: number): Promise<Product[]> {
+  const tokens = searchTokens(query);
+  if (tokens.length === 0) {
+    return [];
+  }
+  const rows = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw(setWordSimilarityThresholdSql());
+    return tx.$queryRaw<GenericFoodRow[]>`
+      SELECT "id", "name", "category", "nutriments", "portions"
+      FROM "GenericFood"
+      WHERE 1=1
+      ${Prisma.join(fuzzyTokenFilters(tokens), " ")}
+      ORDER BY ${productSearchOrderSql(query)}
+      LIMIT ${limit}
+    `;
+  });
+  return rows.map(genericRowToProduct);
+}
+
+export async function genericByEmbedding(embedding: string, limit: number): Promise<EmbeddingMatch[]> {
+  const rows = await prisma.$queryRaw<(GenericFoodRow & { distance: number })[]>`
+    SELECT "id", "name", "category", "nutriments", "portions",
+      ("embedding" <=> ${embedding}::vector) AS distance
+    FROM "GenericFood"
+    WHERE "embedding" IS NOT NULL
+    ORDER BY "embedding" <=> ${embedding}::vector
+    LIMIT ${limit}
+  `;
+  return rows.map((row) => ({ distance: Number(row.distance), product: genericRowToProduct(row), source: "generic" as const }));
 }

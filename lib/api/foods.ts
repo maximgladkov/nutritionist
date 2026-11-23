@@ -8,7 +8,7 @@ import {
 import { hasPer100ml, parseServingSize, scaleNutriments, type NutrientValues } from "../nutrition.ts";
 import { InvalidBarcodeError, isValidBarcode, type Product, type ProductNutriments } from "../open-food-facts.ts";
 import { prisma } from "../prisma.ts";
-import { searchProductsByEmbedding } from "../off-product-store.ts";
+import { findGenericFood, genericByEmbedding, isGenericFoodId, searchGenericFoodsByName, searchProductsByEmbedding } from "../off-product-store.ts";
 import { toVectorLiteral } from "../product-embeddings.ts";
 import { apiDeps } from "./deps.ts";
 import { notFound } from "./errors.ts";
@@ -41,6 +41,9 @@ const CATALOG_PREFIX = "catalog:";
 export function foodId(product: Pick<Product, "barcode" | "id">): string {
   if (product.barcode) {
     return product.barcode;
+  }
+  if (product.id && isGenericFoodId(product.id)) {
+    return product.id;
   }
   return `${CATALOG_PREFIX}${product.id ?? ""}`;
 }
@@ -107,6 +110,24 @@ export async function searchFoods(queries: readonly string[], country?: string, 
   );
 }
 
+// Generic reference foods (USDA) by spelling: plain foods like "fried egg" or "brewed coffee".
+export async function searchGenericFoods(queries: readonly string[], limit = 10): Promise<FoodSummary[]> {
+  const lists = await Promise.all([...new Set(queries)].slice(0, 4).map((query) => searchGenericFoodsByName(query, limit)));
+  const seen = new Set<string>();
+  return lists
+    .flat()
+    .filter((product) => (seen.has(product.id ?? "") ? false : (seen.add(product.id ?? ""), true)))
+    .slice(0, limit)
+    .map((product) => toFoodSummary(product, "generic"));
+}
+
+// Generic reference foods closest in meaning: "black coffee" finds "coffee, brewed", which shares
+// too few letters for the spelling search.
+export async function searchGenericFoodsByMeaning(embedding: readonly number[], limit = 4): Promise<FoodSummary[]> {
+  const matches = await genericByEmbedding(toVectorLiteral(embedding), limit);
+  return matches.map((match) => toFoodSummary(match.product, "generic"));
+}
+
 // Foods closest in meaning to an embedded query, in any language.
 export async function searchFoodsByMeaning(embedding: readonly number[], country?: string, limit = 20): Promise<FoodSummary[]> {
   const matches = await searchProductsByEmbedding(toVectorLiteral(embedding), { country, limit });
@@ -139,8 +160,12 @@ export async function searchFoodsHybrid(query: string, country?: string, limit =
       console.warn("api: meaning search unavailable", error);
       return [] as FoodSummary[];
     });
-  const [spelling, similar] = await Promise.all([searchFoods([query], country, limit), meaning]);
-  return mergeFoodResults(spelling, similar).slice(0, limit);
+  const [spelling, generic, similar] = await Promise.all([
+    searchFoods([query], country, limit),
+    searchGenericFoods([query], 5).catch(() => [] as FoodSummary[]),
+    meaning,
+  ]);
+  return mergeFoodResults(spelling, generic, similar).slice(0, limit);
 }
 
 export async function findFoodByBarcode(barcode: string, country?: string): Promise<FoodDetail | null> {
@@ -159,6 +184,13 @@ export async function findFoodByBarcode(barcode: string, country?: string): Prom
 }
 
 export async function getFood(id: string, country?: string): Promise<FoodDetail> {
+  if (isGenericFoodId(id)) {
+    const generic = await findGenericFood(id);
+    if (!generic) {
+      throw notFound("That food is not in the catalog.");
+    }
+    return toFoodDetail(generic, "generic");
+  }
   if (id.startsWith(CATALOG_PREFIX)) {
     const product = await findCatalogProductById(id.slice(CATALOG_PREFIX.length));
     if (!product) {

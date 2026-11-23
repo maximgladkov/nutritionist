@@ -16,6 +16,8 @@ import {
   mergeFoodResults,
   searchFoods,
   searchFoodsByMeaning,
+  searchGenericFoods,
+  searchGenericFoodsByMeaning,
   servingsFor,
   userCountry,
   type FoodSummary,
@@ -124,7 +126,17 @@ async function catalogItem(foodId: string, amount: number, unit: DraftItem["unit
 // How many catalog products each search contributes, and how many the AI chooses between.
 const SPELLING_CANDIDATES = 15;
 const MEANING_CANDIDATES = 10;
-const PICK_CANDIDATES = 8;
+const GENERIC_CANDIDATES = 4;
+const PICK_CANDIDATES = 10;
+
+function interleave<T>(first: readonly T[], second: readonly T[]): T[] {
+  const out: T[] = [];
+  for (let index = 0; index < Math.max(first.length, second.length); index += 1) {
+    if (index < first.length) out.push(first[index]!);
+    if (index < second.length) out.push(second[index]!);
+  }
+  return out;
+}
 const MAX_ALTERNATIVES = 3;
 
 function kcalEstimate(food: RecognizedFood): number | undefined {
@@ -139,11 +151,18 @@ function groundingQueries(food: RecognizedFood): string[] {
 // Products that might be this food: spelling matches first, then products close in meaning (the
 // same food named in another language, or worded differently).
 async function candidatesFor(food: RecognizedFood, embedding: number[] | undefined, country?: string): Promise<FoodSummary[]> {
-  const [spelling, meaning] = await Promise.all([
-    searchFoods(groundingQueries(food), country, SPELLING_CANDIDATES),
+  const queries = groundingQueries(food);
+  const [spelling, genericByName, genericByMeaning, meaning] = await Promise.all([
+    searchFoods(queries, country, SPELLING_CANDIDATES),
+    // Plain foods (a fried egg, toast, brewed coffee) live in the generic reference table.
+    searchGenericFoods(queries, GENERIC_CANDIDATES).catch(() => []),
+    embedding ? searchGenericFoodsByMeaning(embedding, GENERIC_CANDIDATES).catch(() => []) : Promise.resolve([]),
     embedding ? searchFoodsByMeaning(embedding, country, MEANING_CANDIDATES).catch(() => []) : Promise.resolve([]),
   ]);
-  return mergeFoodResults(spelling, meaning).filter((entry) => entry.hasNutrition);
+  // Meaning finds generic foods more reliably than spelling; interleave so the shortlist always
+  // holds both packaged products and generic foods.
+  const generic = mergeFoodResults(genericByMeaning, genericByName);
+  return mergeFoodResults(interleave(spelling, generic), meaning).filter((entry) => entry.hasNutrition);
 }
 
 // Which candidate each food is: the AI decides (one call for the whole meal), guarded by a calorie
@@ -155,7 +174,7 @@ async function chooseProducts(foods: readonly RecognizedFood[], candidates: read
       foods.map((food, index) => ({
         amount: food.amount,
         candidates: shortlists[index]!.map((entry) => ({
-          brand: entry.brand,
+          brand: entry.source === "generic" ? "generic reference food" : entry.brand,
           kcalPer100: entry.kcalPer100,
           name: entry.name,
           per100: entry.nutrimentsPer100g as Record<string, number>,
@@ -203,6 +222,11 @@ async function groundFoods(foods: readonly RecognizedFood[], country?: string): 
       }
       const unit = food.unit === "serving" ? match.unit : food.unit;
       const item = await catalogItem(match.id, food.amount, unit, "catalog", others, country);
+      if (match.source === "generic") {
+        // Reference values under the name the user knows ("Huevo frito", not "Egg, whole, cooked,
+        // fried"), logged by name and nutrition rather than as a product.
+        return { ...item, brand: null, foodId: null, name: food.name, position: food.position ?? null };
+      }
       return { ...item, position: food.position ?? null };
     }),
   );

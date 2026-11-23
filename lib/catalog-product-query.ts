@@ -21,7 +21,8 @@ const NUTRIMENT_KEYS = [
 
 export { NUTRIMENT_KEYS };
 
-export type ProductSource = "custom-catalog" | "open-food-facts";
+// "generic": a reference food (USDA) rather than a packaged product.
+export type ProductSource = "custom-catalog" | "open-food-facts" | "generic";
 
 export type CatalogSearchProduct = Product & {
   hasNutrition: boolean;
