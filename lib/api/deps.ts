@@ -1,5 +1,4 @@
 import { get, put } from "@vercel/blob";
-import { after } from "next/server";
 import { APP_NAME } from "../brand.ts";
 import { verifyAppleIdentityToken, type AppleIdentity } from "./apple.ts";
 
@@ -143,13 +142,13 @@ function logBackgroundFailure(error: unknown): void {
 }
 
 // Next's after() keeps the serverless function alive until the task is done. Outside a request
-// (scripts) it throws, and the task simply runs now.
+// (scripts, the agent service) it throws, and the task simply runs now. Loaded lazily, with the
+// explicit .js path, because this module is also loaded by plain Node, which can't resolve
+// "next/server".
 function runAfterResponse(task: () => Promise<void>): void {
-  try {
-    after(() => task().catch(logBackgroundFailure));
-  } catch {
-    void task().catch(logBackgroundFailure);
-  }
+  void import("next/server.js")
+    .then(({ after }) => after(() => task().catch(logBackgroundFailure)))
+    .catch(() => task().catch(logBackgroundFailure));
 }
 
 async function pickWithModel(questions: readonly MatchQuestion[]) {
