@@ -4,6 +4,8 @@ import type { MealLabel } from "../../../generated/prisma/client.ts";
 import { productKey, PRODUCT_SEGMENTS } from "../../user-products.ts";
 import { listUserProducts, setProductFavorite } from "../../user-products-store.ts";
 import { prisma } from "../../prisma.ts";
+import { embedCatalogProduct } from "../../product-embeddings.ts";
+import { apiDeps } from "../deps.ts";
 import { formatDateInTimeZone, localInclusiveDateRange, parseYmd, shiftYmd } from "../../timezone.ts";
 import { readSummaryContext } from "../../summary.ts";
 import { sumNutrients, type NutrientValues } from "../../nutrition.ts";
@@ -198,6 +200,14 @@ export const foodRoutes: RouteDefinition[] = [
         throw invalid(result.error);
       }
       const productId = result.product.id;
+      if (productId && result.status !== "exists") {
+        // Findable by meaning (any language) straight away; the save itself doesn't wait for it.
+        const product = { brands: result.product.brands ?? null, id: productId, name: result.product.name ?? body.name };
+        const deps = apiDeps();
+        deps.background(async () => {
+          await embedCatalogProduct(product, deps.embedDocuments, (sql, ...params) => prisma.$executeRawUnsafe(sql, ...params));
+        });
+      }
       if (productId && body.photos && attachments.length > 0) {
         const existing = await prisma.catalogProductImage.count({ where: { productId } });
         await prisma.catalogProductImage.createMany({

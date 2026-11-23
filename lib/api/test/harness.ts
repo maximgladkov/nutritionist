@@ -14,6 +14,18 @@ export function setRecognizer(next: FoodRecognizer): void {
   recognizer = next;
 }
 
+const backgroundTasks: Promise<void>[] = [];
+
+export async function flushBackground(): Promise<void> {
+  await Promise.all(backgroundTasks.splice(0));
+}
+
+let documentEmbedder: (texts: readonly string[]) => Promise<number[][]> = async () => [];
+
+export function setDocumentEmbedder(next: (texts: readonly string[]) => Promise<number[][]>): void {
+  documentEmbedder = next;
+}
+
 let picker: MatchPicker = async () => {
   throw new Error("no picker in tests");
 };
@@ -46,6 +58,11 @@ export function installFakes(): void {
     },
     // No embeddings or AI picks in tests unless a test sets them: grounding falls back to its
     // name-and-calorie rules.
+    // Background work runs at once in tests; flushBackground() waits for it.
+    background: (task) => {
+      backgroundTasks.push(task());
+    },
+    embedDocuments: (texts) => documentEmbedder(texts),
     embedTexts: async () => [],
     pickMatches: (questions) => picker(questions),
     recognizeFoods: (input) => recognizer(input),
