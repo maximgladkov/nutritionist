@@ -15,6 +15,26 @@ import { issueTokens } from "../tokens.ts";
 import { ApiError } from "../errors.ts";
 import { apiDeps } from "../deps.ts";
 
+// Known preferences and their allowed values; anything else is rejected, so stored preferences
+// stay well-formed for every client.
+const NUTRIENT_KEYS = ["kcal", "protein", "carbs", "fat"] as const;
+export const preferencesSchema = z
+  .object({
+    // Order nutrients appear in across the app; must list each nutrient exactly once.
+    nutrientOrder: z
+      .array(z.enum(NUTRIENT_KEYS))
+      .length(NUTRIENT_KEYS.length)
+      .refine((order) => new Set(order).size === order.length, "List each nutrient once."),
+  })
+  .partial()
+  .strict();
+export type Preferences = z.infer<typeof preferencesSchema>;
+
+function readPreferences(value: unknown): Preferences {
+  const parsed = preferencesSchema.safeParse(value ?? {});
+  return parsed.success ? parsed.data : {};
+}
+
 export type MeView = {
   country: string | null;
   email: string | null;
@@ -23,6 +43,7 @@ export type MeView = {
   locale: string;
   name: string | null;
   plan: "free";
+  preferences: Preferences;
   timezone: string | null;
 };
 
@@ -42,6 +63,7 @@ export async function toMeView(userId: string): Promise<MeView> {
     locale: resolveLocale(user.profile?.locale),
     name: user.name,
     plan: "free",
+    preferences: readPreferences(user.profile?.preferences),
     timezone: user.profile?.timezone ?? null,
   };
 }
@@ -110,11 +132,17 @@ export const meRoutes: RouteDefinition[] = [
             country: z.string().trim().nullable().optional(),
             locale: z.string().optional(),
             name: z.string().trim().min(1).max(80).optional(),
+            // Merged into what's stored: sending one preference leaves the others as they are.
+            preferences: preferencesSchema.optional(),
             timezone: z.string().trim().nullable().optional(),
           })
           .strict(),
       );
-      const profile: { country?: string | null; locale?: string; timezone?: string | null } = {};
+      const profile: { country?: string | null; locale?: string; preferences?: Preferences; timezone?: string | null } = {};
+      if (body.preferences !== undefined) {
+        const current = await prisma.userProfile.findUnique({ select: { preferences: true }, where: { userId: user.id } });
+        profile.preferences = { ...readPreferences(current?.preferences), ...body.preferences };
+      }
       if (body.locale !== undefined) {
         if (!isLocale(body.locale)) {
           throw invalid(`Choose one of: ${locales.join(", ")}.`);
