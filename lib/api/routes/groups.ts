@@ -214,8 +214,10 @@ export const groupRoutes: RouteDefinition[] = [
       const group = await createGroup({
         description: body.description ?? "",
         image: await coverFile(user.id, body.uploadId),
+        membersVisible: body.membersVisible,
         name: body.name,
         ownerId: user.id,
+        ownerTitle: body.ownerTitle,
       });
       return { group: await getOwnedGroupDetail({ groupId: group.id, ownerId: user.id }) };
     },

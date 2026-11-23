@@ -84,6 +84,22 @@ describe("joining with a code", () => {
   });
 });
 
+describe("creating a group in the app", () => {
+  it("sets the owner title and member-list visibility at creation", async () => {
+    const created = await api("POST", "/groups", {
+      body: { membersVisible: false, name: "Morning Run Club", ownerTitle: "Running coach" },
+      token: kira.accessToken,
+    });
+    assert.equal(created.status, 201, JSON.stringify(created.body));
+    assert.equal(created.body.group.ownerTitle, "Running coach");
+    assert.equal(created.body.group.membersVisible, false);
+    const list = await api("GET", "/groups", { token: kira.accessToken });
+    const roles = Object.fromEntries(list.body.groups.map((group: { name: string; role: string }) => [group.name, group.role]));
+    assert.deepEqual(roles, { "Lean by Spring": "member", "Morning Run Club": "owner" }, "one account can run groups and be in others");
+    assert.equal((await api("DELETE", `/groups/${created.body.group.id}`, { token: kira.accessToken })).status, 204);
+  });
+});
+
 describe("member list visibility", () => {
   it("shows members the whole group, owner first", async () => {
     const detail = await api("GET", `/groups/${groupId}`, { token: kira.accessToken });
@@ -104,6 +120,10 @@ describe("member list visibility", () => {
     assert.equal(detail.body.group.memberCount, 3);
     const owner = await api("GET", `/groups/${groupId}`, { token: coach.accessToken });
     assert.equal(owner.body.group.members.length, 2, "the owner still sees everyone");
+    assert.deepEqual(
+      owner.body.group.members.map((member: { name: string; sharing: boolean }) => [member.name, member.sharing]),
+      [["Kira", true], ["Laura", true]],
+    );
     const preview = await api("GET", `/invites/${joinCode}`);
     assert.equal(preview.body.invite.membersVisible, false);
     await api("PATCH", `/groups/${groupId}`, { body: { membersVisible: true }, token: coach.accessToken });

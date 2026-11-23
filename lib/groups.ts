@@ -77,7 +77,8 @@ export type GroupOwnerDetail = {
   readonly imageUrl: string;
   readonly inviteToken: string;
   readonly joinCode: string | null;
-  readonly members: readonly GroupMemberView[];
+  // Members only (not the owner), with whether each shares their diary.
+  readonly members: readonly (GroupMemberView & { readonly sharing: boolean })[];
   readonly membersVisible: boolean;
   readonly name: string;
   readonly ownerTitle: string;
@@ -191,11 +192,14 @@ export async function getMembershipForInvite(input: {
 export async function createGroup(input: {
   description: string;
   image?: File;
+  membersVisible?: boolean;
   name: string;
   ownerId: string;
+  ownerTitle?: string;
 }): Promise<GroupListItem> {
   const name = normalizeName(input.name);
   const description = normalizeDescription(input.description);
+  const ownerTitle = normalizeOwnerTitle(input.ownerTitle ?? "");
   const inviteToken = await uniqueInviteToken();
   const joinCode = await uniqueJoinCode(name);
   const profile = await prisma.userProfile.findUnique({
@@ -213,6 +217,8 @@ export async function createGroup(input: {
       members: {
         create: { role: "owner", userId: input.ownerId },
       },
+      membersVisible: input.membersVisible ?? true,
+      ownerTitle,
       name,
       ownerId: input.ownerId,
     },
@@ -382,6 +388,7 @@ export async function getOwnedGroupDetail(input: {
       .map((row) => ({
         joinedAt: row.joinedAt.toISOString(),
         name: row.user.name,
+        sharing: row.sharing,
         userId: row.userId,
       })),
     membersVisible: group.membersVisible,
