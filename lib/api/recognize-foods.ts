@@ -1,5 +1,6 @@
 import { gateway, generateText, Output, type ModelMessage } from "ai";
 import { z } from "zod";
+import { catalogCountryContextText } from "../clock-context.ts";
 import type { FoodRecognizer } from "./deps.ts";
 
 // Benchmarked 2026-11-22 on text, nutrition-label and meal-photo inputs: Haiku 5.5 read labels
@@ -47,7 +48,9 @@ const resultSchema = z.object({
           .array(z.string().min(1))
           .min(1)
           .max(4)
-          .describe("Catalog search terms: the food name, its English name, and a generic name."),
+          .describe(
+            "Short product-style search terms for an Open Food Facts lookup, most specific first: the name in the catalog's language, the English name, then a generic one ('pan tostado', 'toast bread', 'bread').",
+          ),
         servingSize: z
           .string()
           .nullable()
@@ -82,6 +85,7 @@ export const recognizeFoodsWithModel: FoodRecognizer = async (input) => {
       text: [
         INSTRUCTIONS[input.source],
         `Answer in the language with code "${input.locale}".`,
+        catalogCountryContextText(input.country),
         input.text ? `User's description: ${input.text}` : "",
       ]
         .filter(Boolean)

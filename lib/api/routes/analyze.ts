@@ -4,6 +4,7 @@ import { resolveLocale } from "../../i18n/locales.ts";
 import { computeItemNutrition, scaleNutriments, type NutrientValues } from "../../nutrition.ts";
 import type { ProductNutriments } from "../../open-food-facts.ts";
 import { prisma } from "../../prisma.ts";
+import { chooseCatalogMatch } from "../../food-grounding.ts";
 import { apiDeps, type RecognizedFood } from "../deps.ts";
 import { ApiError, invalid } from "../errors.ts";
 import { json, readJson } from "../http.ts";
@@ -109,17 +110,31 @@ async function catalogItem(foodId: string, amount: number, unit: DraftItem["unit
   };
 }
 
-// Grounds a recognized food in the catalog when a product with nutrition matches; otherwise
-// keeps the model's estimate so the user can still review and log it.
+// How many catalog products to weigh for each recognized food.
+const GROUNDING_CANDIDATES = 15;
+const MAX_ALTERNATIVES = 3;
+
+// Grounds a recognized food in the catalog: a product is used only when its name matches and its
+// calories agree with the model's estimate (see food-grounding.ts). Otherwise the estimate stays,
+// with the closest products offered as alternatives to swap in.
 async function groundFood(food: RecognizedFood, country?: string): Promise<DraftItem> {
-  const queries = [...new Set([food.brand ? `${food.brand} ${food.name}` : "", food.name, ...food.searchQueries].filter(Boolean))];
-  const results = (await searchFoods(queries, country, 4)).filter((entry) => entry.hasNutrition);
-  const [best, ...rest] = results;
-  if (!best) {
-    return estimateItem(food, "estimate", []);
+  const queries = [...new Set([food.brand ? `${food.brand} ${food.name}` : "", ...food.searchQueries, food.name].filter(Boolean))];
+  const results = (await searchFoods(queries, country, GROUNDING_CANDIDATES)).filter((entry) => entry.hasNutrition);
+  const estimate = nutrimentsFromRecognized(food);
+  const { alternatives, match } = chooseCatalogMatch(
+    {
+      kcalPer100: estimate.energyKcal100g ?? estimate.energyKcal100ml,
+      name: food.brand ? `${food.brand} ${food.name}` : food.name,
+      searchQueries: food.searchQueries,
+    },
+    results,
+  );
+  const others = alternatives.slice(0, MAX_ALTERNATIVES);
+  if (!match) {
+    return estimateItem(food, "estimate", others);
   }
-  const unit = food.unit === "serving" ? best.unit : food.unit;
-  const item = await catalogItem(best.id, food.amount, unit, "catalog", rest.slice(0, 3), country);
+  const unit = food.unit === "serving" ? match.unit : food.unit;
+  const item = await catalogItem(match.id, food.amount, unit, "catalog", others, country);
   return { ...item, position: food.position ?? null };
 }
 
@@ -149,6 +164,7 @@ export const analyzeRoutes: RouteDefinition[] = [
       try {
         recognized = await apiDeps().recognizeFoods({
           images,
+          country,
           locale: resolveLocale(profile?.locale),
           source: body.source,
           text: "text" in body ? body.text : undefined,

@@ -28,6 +28,8 @@ export type RecognizedFood = {
 };
 
 export type FoodRecognizer = (input: {
+  // The user's catalog country, so search terms come in the language its products are named in.
+  country?: string;
   images: readonly { bytes: Uint8Array; mediaType: string }[];
   locale: string;
   source: "label" | "photo" | "text";
