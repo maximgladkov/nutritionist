@@ -20,12 +20,30 @@ describe("rankSearchProducts", () => {
       ],
       ["banana"],
     );
+    // The two unbranded "Banana" entries collapse into the one with nutrition.
     assert.deepEqual(
       ranked.map((product) => product.name),
-      ["Banana", "Banana", "Banana chips", "Banana parfait"],
+      ["Banana", "Banana chips", "Banana parfait"],
     );
     assert.equal(ranked[0]?.hasNutrition, true);
-    assert.equal(ranked[1]?.hasNutrition, false);
+  });
+
+  it("keeps one of many unbranded same-name entries and lifts branded ones that start with the search", () => {
+    const ranked = rankSearchProducts(
+      [
+        { hasNutrition: true, name: "Arandanos", nutriments: { energyKcal100g: 57 } },
+        { hasNutrition: true, name: "Arándanos", nutriments: { energyKcal100g: 342 } },
+        { hasNutrition: true, name: "Arandanos", nutriments: { energyKcal100g: 0 } },
+        { brands: "Hacendado", countries: ["es"], hasNutrition: true, name: "Mermelada Arándanos", nutriments: { energyKcal100g: 88 } },
+        { brands: "Hacendado", countries: ["es"], hasNutrition: true, name: "Arándanos enteros", nutriments: { energyKcal100g: 52 } },
+      ],
+      ["arandanos"],
+      "es",
+    );
+    assert.deepEqual(
+      ranked.map((product) => `${product.name}|${product.brands ?? ""}`),
+      ["Arandanos|", "Arándanos enteros|Hacendado", "Mermelada Arándanos|Hacendado"],
+    );
   });
 
   it("ranks exact banana above mineral water after a multilingual merge", () => {
