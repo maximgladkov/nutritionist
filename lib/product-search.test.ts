@@ -10,6 +10,22 @@ describe("foldSearchText", () => {
 });
 
 describe("rankSearchProducts", () => {
+  it("puts products with the searched words above fuzzy lookalikes with shorter names", () => {
+    const ranked = rankSearchProducts(
+      [
+        { brands: "Aranca", hasNutrition: true, name: "Habitas", nutriments: { energyKcal100g: 257 } },
+        { brands: "aranca", hasNutrition: true, name: "Habas baby", nutriments: { energyKcal100g: 71 } },
+        { brands: "Hacendado", hasNutrition: true, name: "Barritas arándanos", nutriments: { energyKcal100g: 345 } },
+        { brands: "Hacendado", hasNutrition: true, name: "Arándanos enteros", nutriments: { energyKcal100g: 52 } },
+      ],
+      ["arandanos hac"],
+    );
+    assert.deepEqual(
+      ranked.map((product) => product.name),
+      ["Arándanos enteros", "Barritas arándanos", "Habitas", "Habas baby"],
+    );
+  });
+
   it("shows a name that has the searched words when the usual one has none", () => {
     const ranked = rankSearchProducts(
       [
