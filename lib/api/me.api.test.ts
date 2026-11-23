@@ -25,6 +25,33 @@ describe("profile", () => {
     assert.equal(result.body.plan, "free");
   });
 
+  it("saves preferences in the account and merges updates", async () => {
+    const empty = await api("GET", "/me", { token: session.accessToken });
+    assert.deepEqual(empty.body.preferences, {});
+
+    const order = ["protein", "kcal", "fat", "carbs"];
+    const saved = await api("PATCH", "/me", { body: { preferences: { nutrientOrder: order } }, token: session.accessToken });
+    assert.equal(saved.status, 200, JSON.stringify(saved.body));
+    assert.deepEqual(saved.body.preferences, { nutrientOrder: order });
+
+    // Another field changes without touching preferences.
+    await api("PATCH", "/me", { body: { name: "Kira" }, token: session.accessToken });
+    const again = await api("GET", "/me", { token: session.accessToken });
+    assert.deepEqual(again.body.preferences, { nutrientOrder: order });
+  });
+
+  it("rejects malformed preferences", async () => {
+    for (const preferences of [
+      { nutrientOrder: ["protein", "kcal"] },
+      { nutrientOrder: ["protein", "protein", "fat", "carbs"] },
+      { nutrientOrder: ["protein", "kcal", "fat", "sugar"] },
+      { theme: "dark" },
+    ]) {
+      const result = await api("PATCH", "/me", { body: { preferences }, token: session.accessToken });
+      assert.equal(result.status, 400, JSON.stringify(preferences));
+    }
+  });
+
   it("rejects unknown locales, countries, time zones and fields", async () => {
     for (const body of [{ locale: "xx" }, { country: "Atlantis" }, { timezone: "Mars/Olympus" }, { email: "x@y.z" }]) {
       const result = await api("PATCH", "/me", { body, token: session.accessToken });

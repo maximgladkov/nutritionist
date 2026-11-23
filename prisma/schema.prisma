@@ -300,6 +300,8 @@ model UserProfile {
   startWeightKg Float?
   goalWeightKg  Float?
   notificationsReadAt DateTime?
+  // App preferences that follow the person across devices (nutrient order, ...).
+  preferences Json @default("{}")
   updatedAt DateTime @updatedAt
 }
 
