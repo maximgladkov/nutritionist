@@ -66,6 +66,8 @@ export type GroupMessageView = {
   readonly body: string;
   readonly createdAt: string;
   readonly fromName: string | null;
+  // The member marked this comment helpful.
+  readonly helpful: boolean;
   readonly id: string;
 };
 
@@ -433,6 +435,7 @@ export async function getJoinedGroupDetail(input: {
       body: row.body,
       createdAt: row.createdAt.toISOString(),
       fromName: row.fromUser.name,
+      helpful: row.helpfulAt !== null,
       id: row.id,
     })),
     name: member.group.name,
@@ -458,6 +461,7 @@ export async function listMessagesForMember(input: {
     body: row.body,
     createdAt: row.createdAt.toISOString(),
     fromName: row.fromUser.name,
+    helpful: row.helpfulAt !== null,
     id: row.id,
   }));
 }
@@ -490,6 +494,7 @@ export async function sendGroupMessage(input: {
     body: created.body,
     createdAt: created.createdAt.toISOString(),
     fromName: created.fromUser.name,
+    helpful: false,
     id: created.id,
   };
 }

@@ -28,6 +28,13 @@ import {
   type GroupOwnerDetail,
   type JoinGroupResult,
 } from "@/lib/groups";
+import {
+  createGroupNotice,
+  deleteGroupNotice,
+  listGroupNotices,
+  updateGroupNotice,
+  type GroupNoticeView,
+} from "@/lib/group-notices";
 import { getRequestI18n } from "@/lib/i18n/request-locale";
 import { parseYmd } from "@/lib/timezone";
 import {
@@ -75,6 +82,14 @@ export type GroupMessagesResult =
 
 export type SendGroupMessageResult =
   | { ok: true; data: GroupMessageView }
+  | { ok: false; error: string; reason: GroupsAuthReason };
+
+export type GroupNoticesResult =
+  | { ok: true; data: GroupNoticeView[] }
+  | { ok: false; error: string; reason: GroupsAuthReason };
+
+export type GroupNoticeResult =
+  | { ok: true; data: GroupNoticeView }
   | { ok: false; error: string; reason: GroupsAuthReason };
 
 export type RotateInviteResult =
@@ -164,12 +179,84 @@ export async function updateGroupAction(formData: FormData): Promise<GroupsMutat
       description: optionalField(formData, "description"),
       groupId,
       image: readImageFile(formData),
+      membersVisible: formData.has("membersVisible") ? stringField(formData, "membersVisible") === "true" : undefined,
       name: optionalField(formData, "name"),
       ownerId: user.userId,
+      ownerTitle: optionalField(formData, "ownerTitle"),
     });
     return { ok: true };
   } catch (error) {
     return { error: groupErrorMessage(i18n, error, t(i18n)`Could not update that group.`), ok: false, reason: "invalid" };
+  }
+}
+
+export async function listGroupNoticesAction(input: { groupId: string; initData?: string }): Promise<GroupNoticesResult> {
+  const user = await resolveGroupsUser(input.initData);
+  if (!user.ok) {
+    return user;
+  }
+  const i18n = await getRequestI18n(user.userId);
+  try {
+    // Only the owner manages notices here; members read them in the app.
+    await getOwnedGroupDetail({ groupId: input.groupId.trim(), ownerId: user.userId });
+    const data = await listGroupNotices(input.groupId.trim(), null);
+    return { data, ok: true };
+  } catch (error) {
+    return { error: groupErrorMessage(i18n, error, t(i18n)`Could not load that group.`), ok: false, reason: "invalid" };
+  }
+}
+
+export async function saveGroupNoticeAction(input: {
+  body?: string;
+  groupId: string;
+  initData?: string;
+  noticeId?: string;
+  pinned?: boolean;
+  title?: string;
+}): Promise<GroupNoticeResult> {
+  const user = await resolveGroupsUser(input.initData);
+  if (!user.ok) {
+    return user;
+  }
+  const i18n = await getRequestI18n(user.userId);
+  try {
+    const data = input.noticeId
+      ? await updateGroupNotice({
+          body: input.body,
+          groupId: input.groupId,
+          noticeId: input.noticeId,
+          ownerId: user.userId,
+          pinned: input.pinned,
+          title: input.title,
+        })
+      : await createGroupNotice({
+          body: input.body ?? "",
+          groupId: input.groupId,
+          ownerId: user.userId,
+          pinned: input.pinned,
+          title: input.title ?? "",
+        });
+    return { data, ok: true };
+  } catch (error) {
+    return { error: groupErrorMessage(i18n, error, t(i18n)`Could not save that notice.`), ok: false, reason: "invalid" };
+  }
+}
+
+export async function deleteGroupNoticeAction(input: {
+  groupId: string;
+  initData?: string;
+  noticeId: string;
+}): Promise<GroupsMutationResult> {
+  const user = await resolveGroupsUser(input.initData);
+  if (!user.ok) {
+    return user;
+  }
+  const i18n = await getRequestI18n(user.userId);
+  try {
+    await deleteGroupNotice({ groupId: input.groupId, noticeId: input.noticeId, ownerId: user.userId });
+    return { ok: true };
+  } catch (error) {
+    return { error: groupErrorMessage(i18n, error, t(i18n)`Could not delete that notice.`), ok: false, reason: "invalid" };
   }
 }
 
@@ -510,6 +597,16 @@ function localizeGroupError(i18n: I18n, message: string): string {
       return t(i18n)`Choose a name, description, or image to update.`;
     case "Could not create that group.":
       return t(i18n)`Could not create that group.`;
+    case "Give the notice a title.":
+      return t(i18n)`Give the notice a title.`;
+    case "Write the notice.":
+      return t(i18n)`Write the notice.`;
+    case "Choose a shorter title.":
+      return t(i18n)`Choose a shorter title.`;
+    case "Choose a shorter notice.":
+      return t(i18n)`Choose a shorter notice.`;
+    case "Notice not found.":
+      return t(i18n)`Notice not found.`;
     default:
       return message;
   }

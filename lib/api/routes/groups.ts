@@ -17,6 +17,14 @@ import {
 } from "../../groups.ts";
 import { groupInviteLinks } from "../../app-url.ts";
 import { prisma } from "../../prisma.ts";
+import {
+  countUnreadNotices,
+  createGroupNotice,
+  deleteGroupNotice,
+  listGroupNotices,
+  updateGroupNotice,
+  type GroupNoticeView,
+} from "../../group-notices.ts";
 import { GROUP_NOTICE_BODY_MAX, GROUP_NOTICE_TITLE_MAX } from "../../groups-core.ts";
 import { formatDateInTimeZone } from "../../timezone.ts";
 import { readSummaryContext } from "../../summary.ts";
@@ -60,38 +68,11 @@ async function unreadCount(member: Membership): Promise<number> {
 }
 
 async function unreadNoticeCount(member: Membership): Promise<number> {
-  if (member.role === "owner") {
-    return 0;
-  }
-  return prisma.groupNotice.count({
-    where: { createdAt: member.noticesReadAt ? { gt: member.noticesReadAt } : undefined, groupId: member.groupId },
-  });
+  return countUnreadNotices(member.groupId, member);
 }
 
-async function loadNotices(member: Membership) {
-  const rows = await prisma.groupNotice.findMany({
-    include: { author: { select: { name: true } } },
-    orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
-    take: 50,
-    where: { groupId: member.groupId },
-  });
-  return rows.map((row) => noticeView(row, member));
-}
-
-function noticeView(
-  row: { author: { name: string | null }; body: string; createdAt: Date; id: string; pinned: boolean; title: string; updatedAt: Date },
-  member: Membership | null,
-) {
-  return {
-    authorName: row.author.name,
-    body: row.body,
-    createdAt: row.createdAt.toISOString(),
-    id: row.id,
-    pinned: row.pinned,
-    title: row.title,
-    unread: member?.role === "member" && (member.noticesReadAt === null || row.createdAt > member.noticesReadAt),
-    updatedAt: row.updatedAt.toISOString(),
-  };
+async function loadNotices(member: Membership): Promise<GroupNoticeView[]> {
+  return listGroupNotices(member.groupId, member);
 }
 
 type MessageRow = {
@@ -197,26 +178,10 @@ const groupBodySchema = z.object({
 });
 
 const noticeBodySchema = z.object({
-  body: z.string().trim().min(1, "Write the notice.").max(GROUP_NOTICE_BODY_MAX),
+  body: z.string().max(GROUP_NOTICE_BODY_MAX),
   pinned: z.boolean().optional(),
-  title: z.string().trim().min(1, "Give the notice a title.").max(GROUP_NOTICE_TITLE_MAX),
+  title: z.string().max(GROUP_NOTICE_TITLE_MAX),
 });
-
-async function requireOwner(groupId: string, userId: string): Promise<Membership> {
-  const member = await requireMembership(groupId, userId);
-  if (member.role !== "owner") {
-    throw forbidden("Only the group owner can do that.");
-  }
-  return member;
-}
-
-async function requireNotice(groupId: string, noticeId: string) {
-  const notice = await prisma.groupNotice.findFirst({ where: { groupId, id: noticeId } });
-  if (!notice) {
-    throw notFound("Notice not found.");
-  }
-  return notice;
-}
 
 export const groupRoutes: RouteDefinition[] = [
   {
@@ -516,21 +481,9 @@ export const groupRoutes: RouteDefinition[] = [
   {
     async handler({ params, request, user }) {
       const groupId = params.id ?? "";
-      await requireOwner(groupId, user.id);
+      await requireMembership(groupId, user.id);
       const body = await readJson(request, noticeBodySchema);
-      const row = await prisma.groupNotice.create({
-        data: { authorId: user.id, body: body.body, groupId, pinned: body.pinned ?? false, title: body.title },
-        include: { author: { select: { name: true } }, group: { select: { name: true } } },
-      });
-      const members = await prisma.groupMember.findMany({ select: { userId: true }, where: { groupId, role: "member" } });
-      for (const member of members) {
-        void pushToUser(member.userId, {
-          body: row.title,
-          data: { groupId, noticeId: row.id, type: "group_notice" },
-          title: row.group.name,
-        });
-      }
-      return { notice: noticeView(row, null) };
+      return { notice: await createGroupNotice({ ...body, groupId, ownerId: user.id }) };
     },
     method: "POST",
     path: "/groups/:id/notices",
@@ -538,15 +491,9 @@ export const groupRoutes: RouteDefinition[] = [
   {
     async handler({ params, request, user }) {
       const groupId = params.id ?? "";
-      await requireOwner(groupId, user.id);
-      const notice = await requireNotice(groupId, params.noticeId ?? "");
+      await requireMembership(groupId, user.id);
       const body = await readJson(request, noticeBodySchema.partial());
-      const row = await prisma.groupNotice.update({
-        data: { body: body.body, pinned: body.pinned, title: body.title },
-        include: { author: { select: { name: true } } },
-        where: { id: notice.id },
-      });
-      return { notice: noticeView(row, null) };
+      return { notice: await updateGroupNotice({ ...body, groupId, noticeId: params.noticeId ?? "", ownerId: user.id }) };
     },
     method: "PATCH",
     path: "/groups/:id/notices/:noticeId",
@@ -554,9 +501,8 @@ export const groupRoutes: RouteDefinition[] = [
   {
     async handler({ params, user }) {
       const groupId = params.id ?? "";
-      await requireOwner(groupId, user.id);
-      const notice = await requireNotice(groupId, params.noticeId ?? "");
-      await prisma.groupNotice.delete({ where: { id: notice.id } });
+      await requireMembership(groupId, user.id);
+      await deleteGroupNotice({ groupId, noticeId: params.noticeId ?? "", ownerId: user.id });
       return noContent();
     },
     method: "DELETE",
