@@ -194,7 +194,7 @@ export async function importOffProducts(mode: ImportMode): Promise<ImportStats> 
     await importDeltas(client, countryCodes, stats);
     if (canEmbed()) {
       log("Embedding new and changed products...");
-      await embedMissingProducts((sql, params) => client.query(sql, params), log);
+      await embedMissingProducts((sql, params) => client.query(sql, params), { log });
     } else {
       log("Skipping embeddings: set AI_GATEWAY_API_KEY to enable meaning-based search.");
     }
