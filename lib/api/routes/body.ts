@@ -53,6 +53,25 @@ async function todayFor(userId: string): Promise<string> {
   return (await readSummaryContext(userId)).today;
 }
 
+// Up to a year of days per sync, so a first sync from Apple Health can fill recent history.
+const MAX_SYNC_DAYS = 400;
+
+const activitySchema = z.object({
+  days: z
+    .array(
+      z.object({
+        activeKcal: z.number().min(0).max(20_000).nullable().optional(),
+        date: ymdSchema,
+        steps: z.number().int().min(0).max(300_000).nullable().optional(),
+      }),
+    )
+    .max(MAX_SYNC_DAYS),
+});
+
+const weightImportSchema = z.object({
+  entries: z.array(z.object({ date: ymdSchema, weightKg: weightSchema })).max(MAX_SYNC_DAYS * 3),
+});
+
 export const bodyRoutes: RouteDefinition[] = [
   {
     async handler({ url, user }) {
@@ -95,6 +114,49 @@ export const bodyRoutes: RouteDefinition[] = [
     },
     method: "PATCH",
     path: "/me/weights",
+  },
+  {
+    // Weigh-ins from Apple Health: fills days with no weight here, never overwrites one.
+    async handler({ request, user }) {
+      const body = await readJson(request, weightImportSchema);
+      const today = await todayFor(user.id);
+      const byDate = new Map<string, number>();
+      for (const entry of body.entries) {
+        if (entry.date <= today) byDate.set(entry.date, round1(entry.weightKg));
+      }
+      const created = await prisma.weightEntry.createMany({
+        data: [...byDate].map(([date, weightKg]) => ({ date, userId: user.id, weightKg })),
+        skipDuplicates: true,
+      });
+      return { ...(await weightsView(user.id)), imported: created.count };
+    },
+    method: "POST",
+    path: "/me/weights/import",
+  },
+  {
+    // Daily totals from Apple Health. A field left out keeps what's stored; null clears it (the
+    // user stopped sharing it).
+    async handler({ request, user }) {
+      const body = await readJson(request, activitySchema);
+      const today = await todayFor(user.id);
+      const days = body.days.filter((day) => day.date <= today);
+      await prisma.$transaction(
+        days.map((day) => {
+          const values = {
+            ...(day.activeKcal !== undefined ? { activeKcal: day.activeKcal === null ? null : Math.round(day.activeKcal) } : {}),
+            ...(day.steps !== undefined ? { steps: day.steps } : {}),
+          };
+          return prisma.dailyActivity.upsert({
+            create: { date: day.date, userId: user.id, ...values },
+            update: values,
+            where: { userId_date: { date: day.date, userId: user.id } },
+          });
+        }),
+      );
+      return { saved: days.length };
+    },
+    method: "PUT",
+    path: "/me/activity",
   },
   {
     async handler({ params, user }) {
