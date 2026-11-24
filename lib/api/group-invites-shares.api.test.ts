@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
-import { api, closeDatabase, installFakes, pushes, resetDatabase, signIn, type Session } from "./test/harness.ts";
+import { api, closeDatabase, installFakes, pushes, resetDatabase, signIn, type Session, uploadPng } from "./test/harness.ts";
 
 // Personal one-time invites next to the group's reusable code, and the owner choosing what sharing
 // members show them.
@@ -168,5 +168,45 @@ describe("what members share", () => {
     assert.equal(removed.body.goals.caloriesPerDay, null, "removing an item applies at once");
     const range = await api("GET", `/groups/${groupId}/members/${ana.userId}/days?from=2026-11-01&to=2026-11-07`, { token: coach.accessToken });
     assert.equal(range.status, 403);
+  });
+});
+
+describe("a member's meal photos", () => {
+  it("open for the owner only while the member shares them", async () => {
+    const dana = await signIn("dana3@example.com");
+    const created = await api("POST", "/groups", { body: { name: "Photo Club", shares: ["meals", "photos"] }, token: coach.accessToken });
+    const { id, joinCode } = created.body.group;
+    assert.equal((await api("POST", `/invites/${joinCode}/join`, { token: dana.accessToken })).status, 201);
+    assert.equal((await api("POST", `/invites/${joinCode}/join`, { token: ben.accessToken })).status, 201);
+    const added = await api("POST", "/meals/items", {
+      body: { items: [{ amount: 100, name: "Oats", nutrimentsPer100g: { energyKcal100g: 380 }, unit: "g" }], label: "breakfast" },
+      token: dana.accessToken,
+    });
+    const mealId = added.body.meal?.id ?? (await api("GET", "/diary", { token: dana.accessToken })).body.day.meals[0].id;
+    const uploadId = await uploadPng(dana.accessToken);
+    const loose = await uploadPng(dana.accessToken);
+    await api("POST", `/meals/${mealId}/photos`, { body: { uploadId }, token: dana.accessToken });
+    const path = `/uploads/${uploadId}/content`;
+    const status = async (session: Session, at = path) => (await api("GET", at, { token: session.accessToken })).status;
+
+    const day = await api("GET", `/groups/${id}/members/${dana.userId}/diary`, { token: coach.accessToken });
+    assert.equal(day.body.meals[0].photos.length, 1);
+    const shown = await api("GET", path, { token: coach.accessToken });
+    assert.equal(shown.status, 200);
+    assert.equal(shown.headers.get("cache-control"), "private, no-store");
+    assert.equal(await status(ben), 404, "other members can't");
+    assert.equal(await status(coach, `/uploads/${loose}/content`), 404, "only photos on a meal");
+
+    const set = (body: object) => api("PATCH", `/groups/${id}/membership`, { body, token: dana.accessToken });
+    await set({ sharing: false });
+    assert.equal(await status(coach), 404, "sharing paused");
+    await set({ sharing: true });
+    assert.equal(await status(coach), 200);
+    await set({ allowedShares: ["meals"] });
+    assert.equal(await status(coach), 404, "photos not allowed");
+    await set({ allowedShares: ["meals", "photos"] });
+    await api("POST", `/groups/${id}/leave`, { token: dana.accessToken });
+    assert.equal(await status(coach), 404, "left the group");
+    assert.equal(await status(dana), 200);
   });
 });

@@ -46,6 +46,29 @@ export async function readAttachmentBytes(row: { blobUrl: string; mediaType: str
   return new Uint8Array(await new Response(stored.body).arrayBuffer());
 }
 
+// A meal photo, opened by the owner of a group its member shares their diary with. The same rule as
+// the member's day: sharing is on, and both the group and the member include meals and photos.
+async function isSharedMealPhoto(attachmentId: string, ownerId: string): Promise<boolean> {
+  const photo = await prisma.mealPhoto.findFirst({
+    select: { id: true },
+    where: {
+      attachmentId,
+      meal: {
+        user: {
+          groupMemberships: {
+            some: {
+              allowedShares: { hasEvery: ["meals", "photos"] },
+              group: { ownerId, shares: { hasEvery: ["meals", "photos"] } },
+              sharing: true,
+            },
+          },
+        },
+      },
+    },
+  });
+  return photo !== null;
+}
+
 export const uploadRoutes: RouteDefinition[] = [
   {
     async handler({ request, user }) {
@@ -83,8 +106,9 @@ export const uploadRoutes: RouteDefinition[] = [
   },
   {
     async handler({ params, user }) {
-      const row = await prisma.userAttachment.findFirst({ where: { id: params.id, userId: user.id } });
-      if (!row) {
+      const row = await prisma.userAttachment.findUnique({ where: { id: params.id } });
+      const own = row?.userId === user.id;
+      if (!row || !(own || (await isSharedMealPhoto(row.id, user.id)))) {
         throw notFound("Upload not found.");
       }
       const stored = await apiDeps().blobs.read(row.blobUrl);
@@ -92,7 +116,8 @@ export const uploadRoutes: RouteDefinition[] = [
         throw notFound("Upload not found.");
       }
       return new Response(stored.body, {
-        headers: { "Cache-Control": "private, max-age=3600", "Content-Type": row.mediaType || stored.contentType },
+        // A member's photo isn't kept, so it's gone for the owner once they stop sharing.
+        headers: { "Cache-Control": own ? "private, max-age=3600" : "private, no-store", "Content-Type": row.mediaType || stored.contentType },
       });
     },
     method: "GET",
