@@ -4,11 +4,12 @@ import { turnChannel } from "../agent-turn-model.ts";
 import { recordIdea, recordLogged, withItemIds } from "../assistant/actions.ts";
 import { ASSISTANT_BURST, assistantLimit } from "../assistant/limits.ts";
 import { coverage } from "../assistant/home-card.ts";
+import { TALK_HOURLY_CALLS } from "../assistant/talk.ts";
 import { copyMeal, upsertMealItems } from "../meals.ts";
 import { prisma } from "../prisma.ts";
 import { resolveReachTarget } from "../reminders.ts";
 import { setApiDeps } from "./deps.ts";
-import { api, closeDatabase, installFakes, resetDatabase, signIn, type Session } from "./test/harness.ts";
+import { api, closeDatabase, installFakes, resetDatabase, signIn, talkSetup, type Session } from "./test/harness.ts";
 
 const CHICKEN = { amount: 150, name: "Chicken", nutrimentsPer100g: { energyKcal100g: 200, proteins100g: 30 }, unit: "g" as const };
 const POTATO = { amount: 100, name: "Potatoes", nutrimentsPer100g: { energyKcal100g: 80, proteins100g: 2 }, unit: "g" as const };
@@ -202,6 +203,43 @@ describe("assistant limits and channels", () => {
     assert.equal(turnChannel("http", { channel: "app" }), "app");
     assert.equal(turnChannel("http", { channel: "web" }), "web");
     assert.equal(turnChannel("channel:telegram", { channel: "app" }), "telegram");
+  });
+});
+
+describe("talking", () => {
+  const start = (token = session.accessToken) => api("POST", "/assistant/talk", { token });
+
+  it("hands out a one-time key and never the server's own", async () => {
+    process.env.ASSISTANT_TALK_GATEWAY_KEY = "server-secret";
+    const { body, headers, status } = await start();
+    delete process.env.ASSISTANT_TALK_GATEWAY_KEY;
+    assert.equal(status, 200, JSON.stringify(body));
+    assert.equal(body.token, "one-time");
+    assert.equal(headers.get("cache-control"), "no-store");
+    assert.ok(!JSON.stringify(body).includes("server-secret"));
+    assert.equal((await api("POST", "/assistant/talk")).status, 401);
+  });
+
+  it("limits calls per person, even when started together", async () => {
+    const started = await Promise.all(Array.from({ length: TALK_HOURLY_CALLS + 2 }, () => start()));
+    assert.equal(started.filter((row) => row.status === 200).length, TALK_HOURLY_CALLS);
+    assert.equal(started.filter((row) => row.status === 429).length, 2);
+    assert.equal((await start(other.accessToken)).status, 200);
+  });
+
+  it("doesn't count a call that couldn't start", async () => {
+    talkSetup.fails = true;
+    for (let index = 0; index < TALK_HOURLY_CALLS + 1; index += 1) assert.equal((await start()).status, 502);
+    talkSetup.fails = false;
+    assert.equal((await start()).status, 200);
+  });
+
+  it("is off, and says so, until it's set up", async () => {
+    talkSetup.available = false;
+    assert.equal((await start()).status, 503);
+    assert.equal((await api("GET", "/assistant/card", { token: session.accessToken })).body.talk, false);
+    talkSetup.available = true;
+    assert.equal((await api("GET", "/assistant/conversation", { token: session.accessToken })).body.talk, true);
   });
 });
 

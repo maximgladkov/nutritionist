@@ -1,5 +1,6 @@
 import { del, get, put } from "@vercel/blob";
 import { APP_NAME } from "../brand.ts";
+import { mintTalkSecret, talkKey } from "../assistant/talk.ts";
 import { fatSecretClient, type FatSecretClient } from "../fatsecret.ts";
 import { telegramProfileClient, type TelegramProfileClient } from "../telegram-profile.ts";
 import { verifyAppleIdentityToken, type AppleIdentity } from "./apple.ts";
@@ -71,6 +72,8 @@ export type ApiDeps = {
   recognizeFoods: FoodRecognizer;
   sendEmailCode: (message: EmailCodeMessage) => Promise<void>;
   sendPush: (messages: readonly PushMessage[]) => Promise<void>;
+  // A one-time key for the phone to open a live voice session; null when talking isn't set up.
+  talk: { available: () => boolean; mintSecret: () => Promise<{ expiresAt: number; token: string }> };
   // Queues the FatSecret history import as a background workflow.
   startFatSecretImport: (userId: string) => Promise<void>;
   telegram: TelegramProfileClient;
@@ -198,6 +201,7 @@ const defaults: ApiDeps = {
   sendEmailCode: sendEmailCodeWithResend,
   sendPush: sendExpoPush,
   startFatSecretImport: startFatSecretImportWorkflow,
+  talk: { available: () => talkKey() !== null, mintSecret: mintTalkSecret },
   telegram: telegramProfileClient,
   transcribe: transcribeWithModel,
   verifyAppleToken: verifyAppleIdentityToken,

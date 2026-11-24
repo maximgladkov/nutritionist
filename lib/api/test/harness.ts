@@ -63,6 +63,8 @@ export const transcriptions: string[] = [];
 export const telegramPeople = new Map<string, { birthDate: string | null; name: string | null; photoFileId: string | null }>();
 export const fatSecretProfile: { heightCm: number | null } = { heightCm: null };
 
+export const talkSetup = { available: true, fails: false };
+
 export function storedBlobCount(): number {
   return blobs.size;
 }
@@ -76,6 +78,8 @@ export function installFakes(): void {
   fatSecretDiary.servings.clear();
   fatSecretDiary.weights.clear();
   blobs.clear();
+  talkSetup.available = true;
+  talkSetup.fails = false;
   telegramPeople.clear();
   fatSecretProfile.heightCm = null;
   resetApiDeps();
@@ -135,6 +139,13 @@ export function installFakes(): void {
     embedTexts: async () => [],
     pickMatches: (questions) => picker(questions),
     recognizeFoods: (input) => recognizer(input),
+    talk: {
+      available: () => talkSetup.available,
+      async mintSecret() {
+        if (talkSetup.fails) throw new Error("gateway down");
+        return { expiresAt: 2_000_000_000, token: "one-time" };
+      },
+    },
     telegram: {
       async profile(id) {
         return telegramPeople.get(id) ?? null;
