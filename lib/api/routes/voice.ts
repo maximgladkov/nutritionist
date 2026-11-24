@@ -1,4 +1,5 @@
 import { APICallError } from "ai";
+import { recordAchievementEvent } from "../../achievements/events.ts";
 import { apiDeps } from "../deps.ts";
 import { ApiError, invalid } from "../errors.ts";
 import { json } from "../http.ts";
@@ -47,7 +48,7 @@ function rejectedAudio(error: unknown): boolean {
 export const voiceRoutes: RouteDefinition[] = [
   {
     // Turns a voice recording into text, in whatever language was spoken. The audio is not kept.
-    async handler({ request }) {
+    async handler({ request, user }) {
       const bytes = await readAudio(request);
       if (bytes.byteLength === 0) {
         throw invalid("The recording is empty.");
@@ -61,6 +62,9 @@ export const voiceRoutes: RouteDefinition[] = [
       }
       try {
         const { language, text } = await apiDeps().transcribe({ bytes, mediaType });
+        if (text.trim()) {
+          apiDeps().background(() => recordAchievementEvent(user.id, "voice_note"));
+        }
         return json({ language, text });
       } catch (error) {
         // The model refuses recordings it can't read (cut off, silent, damaged): say so plainly

@@ -44,6 +44,8 @@ model User {
   fatSecretConnection FatSecretConnection?
   externalImports ExternalImport[]
   progressPhotos ProgressPhoto[]
+  achievements  UserAchievement[]
+  achievementEvents AchievementEvent[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -779,4 +781,27 @@ model DailyActivity {
   updatedAt  DateTime @updatedAt
 
   @@id([userId, date])
+}
+
+// A badge earned, with the day it was earned on. Kept for good, even when the numbers behind it
+// change later (a meal is deleted, a goal is raised). Ids come from lib/achievements/catalog.ts.
+model UserAchievement {
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievementId String
+  earnedOn      String
+  createdAt     DateTime @default(now())
+
+  @@id([userId, achievementId])
+}
+
+// The first time someone did something that leaves no other trace (a barcode scan, a voice note),
+// for the "Firsts" badges. See lib/achievements/events.ts.
+model AchievementEvent {
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      String
+  createdAt DateTime @default(now())
+
+  @@id([userId, kind])
 }

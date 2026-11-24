@@ -182,6 +182,18 @@ POST   /me/progress-photos     { uploadId, date }
 DELETE /me/progress-photos/{id}
 ```
 
+**Achievements**
+
+```
+GET    /me/achievements   → { closest: Badge[≤3], latest: Badge[≤3], families: [{ id, title, rule, earned, activeId, badges: Badge[] }],
+                              streak: { days, best, loggedToday, message, next, week }, earnedCount, totalCount }
+```
+
+`Badge` = `{ id, title, name, tier, icon, color, description, progress (0–1), progressText, value, target, earnedOn, familyContext }`.
+Badges are defined in `lib/achievements/catalog.ts`; clients draw whatever comes back, with a fallback for an icon or colour they
+don't know. Loading this stores newly earned badges (dated by the day they were reached), which are never taken back. `activeId` is
+the badge being worked on (null once the family is done); earned badges come before it.
+
 **Groups**
 
 ```
