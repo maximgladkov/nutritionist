@@ -1,5 +1,5 @@
 import { defineHook } from "eve/hooks";
-import { normalizeChannelKind } from "../../lib/agent-turn-model";
+import { turnChannel } from "../../lib/agent-turn-model";
 import { resolveAuthenticatedUserId } from "../../lib/identity";
 import { prisma } from "../../lib/prisma";
 
@@ -22,7 +22,8 @@ export default defineHook({
           if (!userId) {
             return;
           }
-          const channelKind = normalizeChannelKind(ctx.channel.kind);
+          const caller = ctx.session.auth.initiator ?? ctx.session.auth.current;
+          const channelKind = turnChannel(ctx.channel.kind, caller?.attributes);
           await prisma.agentSession.upsert({
             where: { eveSessionId: ctx.session.id },
             create: {

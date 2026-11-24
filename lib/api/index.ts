@@ -1,6 +1,7 @@
 import { createRouter, type RouteDefinition } from "./router.ts";
 import { achievementRoutes } from "./routes/achievements.ts";
 import { analyzeRoutes } from "./routes/analyze.ts";
+import { assistantRoutes } from "./routes/assistant.ts";
 import { authRoutes } from "./routes/auth.ts";
 import { bodyRoutes } from "./routes/body.ts";
 import { diaryRoutes } from "./routes/diary.ts";
@@ -31,6 +32,7 @@ export const apiRoutes: readonly RouteDefinition[] = [
   ...analyzeRoutes,
   ...uploadRoutes,
   ...voiceRoutes,
+  ...assistantRoutes,
   ...groupRoutes,
   ...notificationRoutes,
   ...integrationRoutes,

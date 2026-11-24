@@ -18,6 +18,7 @@ model User {
   identities    ChannelIdentity[]
   linkCodes     LinkCode[]
   agentSessions AgentSession[]
+  assistantActions AssistantAction[]
   profile       UserProfile?
   meals         Meal[]
   reminders     MealReminder[]
@@ -117,6 +118,26 @@ model AgentSession {
   updatedAt    DateTime @updatedAt
 
   @@index([userId])
+}
+
+// Something the app's assistant showed or did in a conversation, kept beside the transcript: a meal
+// it logged (which can be undone), a meal idea waiting for a tap, a voice note, the day's greeting.
+model AssistantAction {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId   String?
+  // The tool call it belongs to; for a greeting or voice note, its own key.
+  callId      String
+  kind        String
+  state       String   @default("open")
+  payload     Json
+  mealItemIds String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, callId])
+  @@index([userId, createdAt])
 }
 
 model CatalogProduct {

@@ -15,13 +15,13 @@ import {
   drainAgentTurnPersist,
   enqueueAgentTurnPersist,
   finalizeAgentTurn,
-  normalizeChannelKind,
   patchAgentTurnTranscript,
   peekAgentTurnModel,
   rememberAgentTurnModel,
   startAgentTurn,
   toolCallsFromActions,
   toolResultFromAction,
+  turnChannel,
   type AgentTurnUserPart,
 } from "../../lib/agent-turns";
 import { filesForTurnMediaPersist, schedulePersistTurnMedia } from "../../lib/persist-turn-media";
@@ -228,7 +228,10 @@ async function turnScope(
 ): Promise<TurnScope> {
   return {
     at: new Date(at),
-    channel: normalizeChannelKind(ctx.channel.kind),
+    channel: turnChannel(
+      ctx.channel.kind,
+      (ctx.session.auth.current ?? ctx.session.auth.initiator)?.attributes,
+    ),
     sessionId: ctx.session.id,
     turnId,
     turnSequence: ctx.session.turn.sequence,

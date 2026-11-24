@@ -202,6 +202,12 @@ export async function mergeUsers(survivorId: string, absorbedId: string): Promis
       where: { userId: absorbedId },
       data: { userId: survivorId },
     });
+    // Both accounts may have a greeting for the same day, and those aren't worth keeping twice.
+    await tx.assistantAction.deleteMany({ where: { kind: "greeting", userId: absorbedId } });
+    await tx.assistantAction.updateMany({
+      where: { userId: absorbedId },
+      data: { userId: survivorId },
+    });
     await tx.agentTurn.updateMany({
       where: { userId: absorbedId },
       data: { userId: survivorId },

@@ -1,4 +1,4 @@
-export type ChannelName = "web" | "telegram" | "whatsapp";
+export type ChannelName = "app" | "web" | "telegram" | "whatsapp";
 
 export type ChannelProvider = "telegram" | "whatsapp" | "email" | "apple";
 
