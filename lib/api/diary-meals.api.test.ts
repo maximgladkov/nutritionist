@@ -204,6 +204,33 @@ describe("editing meals", () => {
     const after = await api("GET", `/meals/${meal.id}`, { token: kira.accessToken });
     assert.equal(after.body.meal.photos.length, 0);
   });
+
+  it("keeps meal photos in the order they were added, and in any order you set", async () => {
+    const diary = await api("GET", "/diary", { token: kira.accessToken });
+    const [meal] = diary.body.day.meals;
+    const ids: string[] = [];
+    for (let index = 0; index < 3; index += 1) {
+      const uploadId = await uploadPng(kira.accessToken);
+      const added = await api("POST", `/meals/${meal.id}/photos`, { body: { uploadId }, token: kira.accessToken });
+      ids.push(added.body.meal.photos.at(-1).id);
+    }
+    const listed = await api("GET", `/meals/${meal.id}`, { token: kira.accessToken });
+    assert.deepEqual(listed.body.meal.photos.map((photo: { id: string }) => photo.id), ids, "added at the end");
+
+    const reversed = [...ids].reverse();
+    const ordered = await api("PUT", `/meals/${meal.id}/photos/order`, { body: { photoIds: reversed }, token: kira.accessToken });
+    assert.equal(ordered.status, 200);
+    assert.deepEqual(ordered.body.meal.photos.map((photo: { id: string }) => photo.id), reversed);
+    const day = await api("GET", "/diary", { token: kira.accessToken });
+    const sameMeal = day.body.day.meals.find((entry: { id: string }) => entry.id === meal.id);
+    assert.deepEqual(sameMeal.photos.map((photo: { id: string }) => photo.id), reversed, "the diary shows the new order");
+
+    assert.equal((await api("PUT", `/meals/${meal.id}/photos/order`, { body: { photoIds: reversed.slice(1) }, token: kira.accessToken })).status, 400, "every photo must be listed");
+    assert.equal((await api("PUT", `/meals/${meal.id}/photos/order`, { body: { photoIds: [ids[0], ids[0], ids[1]] }, token: kira.accessToken })).status, 400, "no repeats");
+    assert.equal((await api("PUT", `/meals/${meal.id}/photos/order`, { body: { photoIds: reversed }, token: other.accessToken })).status, 404, "only your own meals");
+
+    for (const id of ids) await api("DELETE", `/meals/${meal.id}/photos/${id}`, { token: kira.accessToken });
+  });
 });
 
 describe("log food helpers", () => {

@@ -17,7 +17,7 @@ export async function withMealPhotos(meals: readonly MealView[]): Promise<ApiMea
     return [];
   }
   const photos = await prisma.mealPhoto.findMany({
-    orderBy: { createdAt: "asc" },
+    orderBy: [{ position: "asc" }, { createdAt: "asc" }],
     select: { attachmentId: true, id: true, mealId: true },
     where: { mealId: { in: meals.map((meal) => meal.id) } },
   });
