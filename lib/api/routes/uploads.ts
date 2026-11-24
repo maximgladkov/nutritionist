@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { sniffImageMediaType } from "../../image-bytes.ts";
 import { prisma } from "../../prisma.ts";
+import { canSeeAvatar } from "../../profile.ts";
 import { apiDeps } from "../deps.ts";
 import { ApiError, invalid, notFound } from "../errors.ts";
 import type { RouteDefinition } from "../router.ts";
@@ -108,7 +109,8 @@ export const uploadRoutes: RouteDefinition[] = [
     async handler({ params, user }) {
       const row = await prisma.userAttachment.findUnique({ where: { id: params.id } });
       const own = row?.userId === user.id;
-      if (!row || !(own || (await isSharedMealPhoto(row.id, user.id)))) {
+      const shared = row && !own ? await isSharedMealPhoto(row.id, user.id) : false;
+      if (!row || !(own || shared || (await canSeeAvatar(row.id, user.id)))) {
         throw notFound("Upload not found.");
       }
       const stored = await apiDeps().blobs.read(row.blobUrl);
@@ -116,8 +118,12 @@ export const uploadRoutes: RouteDefinition[] = [
         throw notFound("Upload not found.");
       }
       return new Response(stored.body, {
-        // A member's photo isn't kept, so it's gone for the owner once they stop sharing.
-        headers: { "Cache-Control": own ? "private, max-age=3600" : "private, no-store", "Content-Type": row.mediaType || stored.contentType },
+        // A member's meal photo isn't kept, so it's gone for the owner once they stop sharing. A
+        // profile photo is kept a few minutes: it's shown all over a group's screens.
+        headers: {
+          "Cache-Control": own ? "private, max-age=3600" : shared ? "private, no-store" : "private, max-age=300",
+          "Content-Type": row.mediaType || stored.contentType,
+        },
       });
     },
     method: "GET",

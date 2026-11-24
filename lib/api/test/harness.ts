@@ -59,6 +59,14 @@ export function appleToken(identity: Partial<AppleIdentity> & { sub: string }): 
 // Media types the fake transcriber was asked to read, in order.
 export const transcriptions: string[] = [];
 
+// Fake Telegram accounts, by Telegram user id.
+export const telegramPeople = new Map<string, { birthDate: string | null; name: string | null; photoFileId: string | null }>();
+export const fatSecretProfile: { heightCm: number | null } = { heightCm: null };
+
+export function storedBlobCount(): number {
+  return blobs.size;
+}
+
 export function installFakes(): void {
   transcriptions.length = 0;
   emails.length = 0;
@@ -68,6 +76,8 @@ export function installFakes(): void {
   fatSecretDiary.servings.clear();
   fatSecretDiary.weights.clear();
   blobs.clear();
+  telegramPeople.clear();
+  fatSecretProfile.heightCm = null;
   resetApiDeps();
   setApiDeps({
     blobs: {
@@ -79,6 +89,9 @@ export function installFakes(): void {
       async read(url) {
         const entry = blobs.get(url);
         return entry ? { body: new Response(Buffer.from(entry.bytes)).body!, contentType: entry.contentType } : null;
+      },
+      async remove(url) {
+        blobs.delete(url);
       },
     },
     // No embeddings or AI picks in tests unless a test sets them: grounding falls back to its
@@ -103,6 +116,9 @@ export function installFakes(): void {
         assert.equal(access.token, "access-token");
         return [...fatSecretDiary.entries.keys()].filter((day) => sameMonth(day, dateInt));
       },
+      async heightCm() {
+        return fatSecretProfile.heightCm;
+      },
       async dayEntries(_access, dateInt) {
         return fatSecretDiary.entries.get(dateInt) ?? [];
       },
@@ -119,6 +135,14 @@ export function installFakes(): void {
     embedTexts: async () => [],
     pickMatches: (questions) => picker(questions),
     recognizeFoods: (input) => recognizer(input),
+    telegram: {
+      async profile(id) {
+        return telegramPeople.get(id) ?? null;
+      },
+      async photo() {
+        return PNG_BYTES;
+      },
+    },
     // Reads the "spoken" text straight out of the test recording.
     async transcribe({ bytes, mediaType }) {
       transcriptions.push(mediaType);

@@ -84,8 +84,13 @@ The eve channel adds the same bearer check to `getUserFromRequest`, so the app c
 **Me, settings and goals**
 
 ```
-GET    /me                     → { id, name, email, locale, country, timezone, plan, linkedChannels[] }
-PATCH  /me                     { name?, locale?, country?, timezone? }
+GET    /me                     → { id, name, email, avatarUrl, gender, birthDate, heightCm, filledFrom, locale, country, timezone, plan, linkedChannels[] }
+PATCH  /me                     { name?, gender?, birthDate?, heightCm?, locale?, country?, timezone? }   (null clears)
+PUT    /me/avatar              { uploadId }   (a square upload)         → me
+DELETE /me/avatar                                                       → me
+GET    /me/profile-suggestions → { suggestions: [{ source, name?, birthDate?, heightCm? }], telegramPhoto }   (empty details only)
+POST   /me/profile-fill        { source, name?, gender?, birthDate?, heightCm? } → { filled[], me }   (empty details only)
+GET    /me/telegram-photo      → image bytes, to crop and upload
 GET    /me/goals               → { caloriesPerDay, proteinGPerDay, carbsGPerDay, fatGPerDay, fiberGPerDay, goalWeightKg }
 PUT    /me/goals               partial patch
 GET    /me/reminders           → { timezone, reminders: [{ label, enabled, hour, minute, nextRunAt }] }
@@ -198,6 +203,8 @@ POST   /groups/{id}/messages/read
 GET    /groups/{id}/members/{userId}/diary?date=   (owner only, requires member sharing)
 GET    /groups/{id}/members/{userId}/days?from=&to=
 ```
+
+Members and owners carry `avatarUrl` / `ownerAvatarUrl`. A profile photo opens (`GET /uploads/{id}/content`) for its owner, for the owner of a group the person is in, for members of a group the person owns, and for fellow members while the member list is visible; being invited isn't enough, and leaving ends it. Gender, birth date and height are never shown to anyone else.
 
 **Notifications**
 

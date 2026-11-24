@@ -9,6 +9,7 @@ import { integrationRoutes } from "./routes/integrations.ts";
 import { mealRoutes } from "./routes/meals.ts";
 import { meRoutes } from "./routes/me.ts";
 import { notificationRoutes } from "./routes/notifications.ts";
+import { profileRoutes } from "./routes/profile.ts";
 import { savedMealRoutes } from "./routes/saved-meals.ts";
 import { mealShareRoutes } from "./routes/meal-shares.ts";
 import { uploadRoutes } from "./routes/uploads.ts";
@@ -17,6 +18,7 @@ import { voiceRoutes } from "./routes/voice.ts";
 export const apiRoutes: readonly RouteDefinition[] = [
   ...authRoutes,
   ...meRoutes,
+  ...profileRoutes,
   ...bodyRoutes,
   ...diaryRoutes,
   // `/foods/search` and `/foods/barcode/:code` must come before `/foods/:id`.

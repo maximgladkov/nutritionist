@@ -2,6 +2,7 @@ import { randomInt, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { ensureEmailIdentity } from "../../identity.ts";
 import { prisma } from "../../prisma.ts";
+import { fillProfileDetails } from "../../profile.ts";
 import { apiDeps } from "../deps.ts";
 import { ApiError, unauthorized } from "../errors.ts";
 import { json, noContent, readJson } from "../http.ts";
@@ -91,7 +92,7 @@ async function verifiedAppleIdentity(identityToken: string) {
 
 // Finds the account for an Apple ID: first by the Apple identity, then by a verified,
 // non-relay email that already has an account, else a new account.
-async function resolveAppleUser(apple: Awaited<ReturnType<typeof verifiedAppleIdentity>>, name?: string) {
+async function resolveAppleUser(apple: Awaited<ReturnType<typeof verifiedAppleIdentity>>) {
   const identity = await prisma.channelIdentity.findUnique({
     include: { user: true },
     where: { provider_providerUserId: { provider: "apple", providerUserId: apple.sub } },
@@ -109,7 +110,6 @@ async function resolveAppleUser(apple: Awaited<ReturnType<typeof verifiedAppleId
       data: {
         email: email && !owner ? email : null,
         emailVerified: email && !owner ? apiDeps().now() : null,
-        name: name ?? null,
       },
     }));
   await prisma.channelIdentity.create({ data: { provider: "apple", providerUserId: apple.sub, userId: user.id } });
@@ -133,7 +133,11 @@ export const authRoutes: RouteDefinition[] = [
     async handler({ request }) {
       const body = await readJson(request, appleBodySchema);
       const apple = await verifiedAppleIdentity(body.identityToken);
-      const user = await resolveAppleUser(apple, body.fullName || undefined);
+      const user = await resolveAppleUser(apple);
+      // Apple shares the name only the first time, so it's kept if there's none yet.
+      if (body.fullName) {
+        await fillProfileDetails(user.id, "apple", { name: body.fullName });
+      }
       const tokens = await issueTokens(user.id, body.deviceName);
       return json({ ...tokens, user: await toMeView(user.id) });
     },

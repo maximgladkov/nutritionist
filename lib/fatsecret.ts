@@ -75,6 +75,8 @@ export type FatSecretClient = {
   accessToken(request: FatSecretTokens, verifier: string): Promise<FatSecretTokens>;
   // Days (as days since 1970-01-01) in the month containing `dateInt` that have food entries.
   monthDays(access: FatSecretTokens, dateInt: number): Promise<number[]>;
+  // The height in the person's FatSecret profile; null when they haven't set one.
+  heightCm(access: FatSecretTokens): Promise<number | null>;
   dayEntries(access: FatSecretTokens, dateInt: number): Promise<FatSecretFoodEntry[]>;
   monthWeights(access: FatSecretTokens, dateInt: number): Promise<{ dateInt: number; weightKg: number }[]>;
   // Servings of a public food, for grams per serving; null when the food isn't public.
@@ -194,6 +196,11 @@ export const fatSecretClient: FatSecretClient = {
     const json = await callApi("food_entries.get_month", { date: String(dateInt) }, access);
     const month = json.month as { day?: { date_int: string } | { date_int: string }[] } | undefined;
     return list(month?.day).map((day) => Number(day.date_int));
+  },
+  async heightCm(access) {
+    const json = await callApi("profile.get", {}, access);
+    const height = Number((json.profile as { height_cm?: string } | undefined)?.height_cm);
+    return Number.isFinite(height) && height > 0 ? height : null;
   },
   async dayEntries(access, dateInt) {
     const json = await callApi("food_entries.get", { date: String(dateInt) }, access);

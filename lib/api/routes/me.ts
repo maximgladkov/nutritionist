@@ -5,12 +5,22 @@ import { getGoals, saveGoals } from "../../goals.ts";
 import { isLocale, locales, resolveLocale } from "../../i18n/locales.ts";
 import { consumeLinkCode, createLinkCode } from "../../identity.ts";
 import { prisma } from "../../prisma.ts";
+import {
+  avatarUrl,
+  fillProfileDetails,
+  readFilledFrom,
+  readGender,
+  saveProfileDetails,
+  type FilledFrom,
+  type ProfileGender,
+} from "../../profile.ts";
 import { REMINDER_LABELS, isReminderLabel } from "../../reminder-clock.ts";
 import { ensureDefaultReminders, listReminders, rescheduleReminders, saveReminders } from "../../reminders.ts";
 import { listTimeZones, normalizeTimezone } from "../../timezone.ts";
 import { invalid, notFound } from "../errors.ts";
 import { noContent, readJson } from "../http.ts";
 import type { RouteDefinition } from "../router.ts";
+import { birthDateSchema, genderSchema, heightSchema } from "../schemas.ts";
 import { issueTokens } from "../tokens.ts";
 import { ApiError } from "../errors.ts";
 import { apiDeps } from "../deps.ts";
@@ -36,8 +46,14 @@ function readPreferences(value: unknown): Preferences {
 }
 
 export type MeView = {
+  avatarUrl: string | null;
+  birthDate: string | null;
   country: string | null;
   email: string | null;
+  // Details a connected app filled in, until the person changes them.
+  filledFrom: FilledFrom;
+  gender: ProfileGender | null;
+  heightCm: number | null;
   id: string;
   linkedChannels: string[];
   locale: string;
@@ -56,8 +72,13 @@ export async function toMeView(userId: string): Promise<MeView> {
     throw notFound("Account not found.");
   }
   return {
+    avatarUrl: avatarUrl(user.profile),
+    birthDate: user.profile?.birthDate ?? null,
     country: user.profile?.country ?? null,
     email: user.email,
+    filledFrom: readFilledFrom(user.profile?.filledFrom),
+    gender: readGender(user.profile?.gender),
+    heightCm: user.profile?.heightCm ?? null,
     id: user.id,
     linkedChannels: [...new Set(user.identities.map((identity) => identity.provider))].sort(),
     locale: resolveLocale(user.profile?.locale),
@@ -129,9 +150,12 @@ export const meRoutes: RouteDefinition[] = [
         request,
         z
           .object({
+            birthDate: birthDateSchema.nullable().optional(),
             country: z.string().trim().nullable().optional(),
+            gender: genderSchema.nullable().optional(),
+            heightCm: heightSchema.nullable().optional(),
             locale: z.string().optional(),
-            name: z.string().trim().min(1).max(80).optional(),
+            name: z.string().trim().min(1).max(80).nullable().optional(),
             // Merged into what's stored: sending one preference leaves the others as they are.
             preferences: preferencesSchema.optional(),
             timezone: z.string().trim().nullable().optional(),
@@ -163,9 +187,12 @@ export const meRoutes: RouteDefinition[] = [
         }
         profile.timezone = timezone;
       }
-      if (body.name !== undefined) {
-        await prisma.user.update({ data: { name: body.name }, where: { id: user.id } });
-      }
+      await saveProfileDetails(user.id, {
+        birthDate: body.birthDate,
+        gender: body.gender,
+        heightCm: body.heightCm,
+        name: body.name,
+      });
       if (Object.keys(profile).length > 0) {
         await prisma.userProfile.upsert({
           create: { userId: user.id, ...profile },
@@ -272,7 +299,10 @@ export const meRoutes: RouteDefinition[] = [
   },
   {
     async handler({ request, user }) {
-      const body = await readJson(request, z.object({ identityToken: z.string().min(20) }));
+      const body = await readJson(
+        request,
+        z.object({ fullName: z.string().trim().max(80).optional(), identityToken: z.string().min(20) }),
+      );
       let apple;
       try {
         apple = await apiDeps().verifyAppleToken(body.identityToken);
@@ -287,6 +317,9 @@ export const meRoutes: RouteDefinition[] = [
       }
       if (!existing) {
         await prisma.channelIdentity.create({ data: { provider: "apple", providerUserId: apple.sub, userId: user.id } });
+      }
+      if (body.fullName) {
+        await fillProfileDetails(user.id, "apple", { name: body.fullName });
       }
       return toMeView(user.id);
     },

@@ -1,6 +1,7 @@
-import { get, put } from "@vercel/blob";
+import { del, get, put } from "@vercel/blob";
 import { APP_NAME } from "../brand.ts";
 import { fatSecretClient, type FatSecretClient } from "../fatsecret.ts";
+import { telegramProfileClient, type TelegramProfileClient } from "../telegram-profile.ts";
 import { verifyAppleIdentityToken, type AppleIdentity } from "./apple.ts";
 
 export type EmailCodeMessage = { code: string; email: string; locale: string };
@@ -10,6 +11,7 @@ export type StoredBlob = { pathname: string; url: string };
 export type BlobStore = {
   put(pathname: string, bytes: Uint8Array, contentType: string): Promise<StoredBlob>;
   read(url: string): Promise<{ body: ReadableStream<Uint8Array>; contentType: string } | null>;
+  remove(url: string): Promise<void>;
 };
 
 export type PushMessage = { body: string; data?: Record<string, unknown>; title: string; to: string };
@@ -71,6 +73,7 @@ export type ApiDeps = {
   sendPush: (messages: readonly PushMessage[]) => Promise<void>;
   // Queues the FatSecret history import as a background workflow.
   startFatSecretImport: (userId: string) => Promise<void>;
+  telegram: TelegramProfileClient;
   transcribe: AudioTranscriber;
   verifyAppleToken: (identityToken: string) => Promise<AppleIdentity>;
 };
@@ -130,6 +133,9 @@ const vercelBlobStore: BlobStore = {
       return null;
     }
     return { body: result.stream, contentType: result.blob.contentType };
+  },
+  async remove(url) {
+    await del(url);
   },
 };
 
@@ -192,6 +198,7 @@ const defaults: ApiDeps = {
   sendEmailCode: sendEmailCodeWithResend,
   sendPush: sendExpoPush,
   startFatSecretImport: startFatSecretImportWorkflow,
+  telegram: telegramProfileClient,
   transcribe: transcribeWithModel,
   verifyAppleToken: verifyAppleIdentityToken,
 };
