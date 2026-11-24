@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { recordAchievementEvent } from "../../achievements/events.ts";
 import { saveCatalogProduct } from "../../catalog-product.ts";
 import type { MealLabel } from "../../../generated/prisma/client.ts";
 import { productKey, PRODUCT_SEGMENTS } from "../../user-products.ts";
@@ -171,6 +172,7 @@ export const foodRoutes: RouteDefinition[] = [
       if (!food) {
         throw new ApiError(404, "food_not_found", "We don't know this barcode yet. Scan the nutrition label to add it.");
       }
+      apiDeps().background(() => recordAchievementEvent(user.id, "barcode_scan"));
       return food;
     },
     method: "GET",

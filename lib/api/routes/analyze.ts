@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { recordAchievementEvent } from "../../achievements/events.ts";
 import { resolveLocale } from "../../i18n/locales.ts";
 import { computeItemNutrition, scaleNutriments, type NutrientValues } from "../../nutrition.ts";
 import type { ProductNutriments } from "../../open-food-facts.ts";
@@ -258,6 +259,7 @@ export const analyzeRoutes: RouteDefinition[] = [
           );
         }
         const serving = food.servings.find((entry) => entry.label.startsWith("1 serving"));
+        apiDeps().background(() => recordAchievementEvent(user.id, "barcode_scan"));
         const item = await catalogItem(food.id, serving?.amount ?? 100, food.unit, "barcode", [], country);
         return json({ items: [item], note: null, source: body.source });
       }

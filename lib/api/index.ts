@@ -1,4 +1,5 @@
 import { createRouter, type RouteDefinition } from "./router.ts";
+import { achievementRoutes } from "./routes/achievements.ts";
 import { analyzeRoutes } from "./routes/analyze.ts";
 import { authRoutes } from "./routes/auth.ts";
 import { bodyRoutes } from "./routes/body.ts";
@@ -20,6 +21,7 @@ export const apiRoutes: readonly RouteDefinition[] = [
   ...meRoutes,
   ...profileRoutes,
   ...bodyRoutes,
+  ...achievementRoutes,
   ...diaryRoutes,
   // `/foods/search` and `/foods/barcode/:code` must come before `/foods/:id`.
   ...foodRoutes,
