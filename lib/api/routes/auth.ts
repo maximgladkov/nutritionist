@@ -136,7 +136,7 @@ export const authRoutes: RouteDefinition[] = [
       const user = await resolveAppleUser(apple);
       // Apple shares the name only the first time, so it's kept if there's none yet.
       if (body.fullName) {
-        await fillProfileDetails(user.id, "apple", { name: body.fullName });
+        await fillProfileDetails(user.id, { name: body.fullName });
       }
       const tokens = await issueTokens(user.id, body.deviceName);
       return json({ ...tokens, user: await toMeView(user.id) });

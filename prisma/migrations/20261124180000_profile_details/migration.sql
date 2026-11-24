@@ -4,7 +4,7 @@ ALTER TABLE "UserProfile"
   ADD COLUMN "birthDate" TEXT,
   ADD COLUMN "heightCm" DOUBLE PRECISION,
   ADD COLUMN "avatarId" TEXT,
-  ADD COLUMN "filledFrom" JSONB NOT NULL DEFAULT '{}';
+  ADD COLUMN "settledFields" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];
 
 CREATE UNIQUE INDEX "UserProfile_avatarId_key" ON "UserProfile"("avatarId");
 

@@ -46,7 +46,7 @@ describe("profile details", () => {
   it("start empty, save and clear", async () => {
     const empty = await me(kira);
     for (const field of ["avatarUrl", "birthDate", "gender", "heightCm"]) assert.equal(empty[field], null, field);
-    assert.deepEqual(empty.filledFrom, {});
+    assert.deepEqual(empty.settledFields, []);
 
     const saved = await patch(kira, { birthDate: "1991-02-28", gender: "female", heightCm: 168.5, name: "Kira" });
     assert.equal(saved.status, 200, JSON.stringify(saved.body));
@@ -77,38 +77,38 @@ describe("profile details", () => {
 });
 
 describe("filling in from connected apps", () => {
-  it("only fills what's empty, says where from, and forgets that once changed", async () => {
-    await patch(kira, { heightCm: 170 });
-    const filled = await fill(kira, { birthDate: "1990-05-06", gender: "female", heightCm: 169, source: "apple_health" });
+  it("only fills what's empty and what the person never set or cleared", async () => {
+    const lia = await signIn("lia@example.com");
+    await patch(lia, { heightCm: 170 });
+    const filled = await fill(lia, { birthDate: "1990-05-06", gender: "female", heightCm: 169 });
     assert.equal(filled.status, 201, JSON.stringify(filled.body));
     assert.deepEqual([...filled.body.filled].sort(), ["birthDate", "gender"]);
     assert.equal(filled.body.me.heightCm, 170, "what was typed stays");
-    assert.deepEqual(filled.body.me.filledFrom, { birthDate: "apple_health", gender: "apple_health" });
+    assert.deepEqual(filled.body.me.settledFields, ["heightCm"]);
 
-    const changed = await patch(kira, { gender: "nonbinary" });
-    assert.deepEqual(changed.body.filledFrom, { birthDate: "apple_health" });
-    const undone = await patch(kira, { birthDate: null });
-    assert.equal(undone.body.birthDate, null);
-    assert.deepEqual(undone.body.filledFrom, {});
+    await patch(lia, { birthDate: null, gender: "nonbinary" });
+    const again = await fill(lia, { birthDate: "1990-05-06", gender: "female" });
+    assert.deepEqual(again.body.filled, []);
+    assert.equal(again.body.me.birthDate, null, "what was cleared stays cleared");
+    assert.equal(again.body.me.gender, "nonbinary");
   });
 
   it("leaves \"prefer not to say\" alone", async () => {
     await patch(kira, { gender: "undisclosed" });
-    const filled = await fill(kira, { gender: "female", source: "apple_health" });
-    assert.deepEqual(filled.body.filled, []);
-    assert.equal(filled.body.me.gender, "undisclosed");
+    assert.equal((await fill(kira, { gender: "female" })).body.me.gender, "undisclosed");
   });
 
-  it("refuses unknown sources and bad values", async () => {
-    assert.equal((await fill(kira, { heightCm: 170, source: "horoscope" })).status, 400);
-    assert.equal((await fill(kira, { heightCm: 7, source: "apple_health" })).status, 400);
-    assert.equal((await fill(kira, { email: "x@y.z", source: "apple_health" })).status, 400);
+  it("refuses bad values and unknown fields", async () => {
+    assert.equal((await fill(kira, { heightCm: 7 })).status, 400);
+    assert.equal((await fill(kira, { email: "x@y.z" })).status, 400);
+    assert.equal((await fill(kira, { name: "x" })).status, 400);
   });
 
-  it("suggests what Telegram and FatSecret know for empty details", async () => {
+  it("fills from Telegram and FatSecret, the phone's own values first", async () => {
     const tom = await signIn("tom@example.com");
-    const suggestions = () => api("GET", "/me/profile-suggestions", { token: tom.accessToken });
-    assert.deepEqual((await suggestions()).body, { suggestions: [], telegramPhoto: false });
+    const none = await fill(tom, {});
+    assert.deepEqual(none.body.filled, []);
+    assert.equal(none.body.telegramPhoto, false);
     assert.equal((await api("GET", "/me/telegram-photo", { token: tom.accessToken })).status, 404);
 
     await prisma.channelIdentity.create({ data: { provider: "telegram", providerUserId: "42", userId: tom.userId } });
@@ -117,18 +117,18 @@ describe("filling in from connected apps", () => {
       data: { accessSecret: sealSecret("access-secret"), accessToken: sealSecret("access-token"), status: "connected", userId: tom.userId },
     });
     fatSecretProfile.heightCm = 181;
-    const first = (await suggestions()).body;
-    assert.deepEqual(first.suggestions, [
-      { birthDate: "1988-01-02", name: "Tom Reed", source: "telegram" },
-      { heightCm: 181, source: "fatsecret" },
-    ]);
+    const first = (await fill(tom, { birthDate: "1988-01-03" })).body;
+    assert.deepEqual([...first.filled].sort(), ["birthDate", "heightCm", "name"]);
+    assert.equal(first.me.birthDate, "1988-01-03");
+    assert.equal(first.me.heightCm, 181);
+    assert.equal(first.me.name, "Tom Reed");
     assert.equal(first.telegramPhoto, true);
     const photo = await api("GET", "/me/telegram-photo", { token: tom.accessToken });
     assert.equal(photo.status, 200);
     assert.equal(photo.headers.get("content-type"), "image/png");
 
-    await patch(tom, { birthDate: "1988-01-03", heightCm: 180, name: "Tom" });
-    assert.deepEqual((await suggestions()).body.suggestions, []);
+    await patch(tom, { heightCm: null });
+    assert.equal((await fill(tom, {})).body.me.heightCm, null);
   });
 
   it("keeps the name Apple shares when there's none", async () => {
@@ -138,7 +138,6 @@ describe("filling in from connected apps", () => {
       body: { fullName: "Ana Pérez", identityToken: appleToken({ sub: "apple-sub-000000000000" }) },
     });
     assert.equal(again.body.user.name, "Ana Pérez");
-    assert.deepEqual(again.body.user.filledFrom, { name: "apple" });
     const other = await api("POST", "/auth/apple", {
       body: { fullName: "Someone Else", identityToken: appleToken({ sub: "apple-sub-000000000000" }) },
     });
@@ -260,13 +259,13 @@ describe("joining two accounts", () => {
     const absorbed = await signIn("absorbed@example.com");
     await patch(survivor, { heightCm: 175 });
     await patch(absorbed, { heightCm: 160 });
-    await fill(absorbed, { birthDate: "1992-03-04", source: "apple_health" });
+    await fill(absorbed, { birthDate: "1992-03-04" });
     const uploadId = await setPhoto(absorbed);
     await mergeUsers(survivor.userId, absorbed.userId);
     const merged = await me(survivor);
     assert.equal(merged.heightCm, 175);
     assert.equal(merged.birthDate, "1992-03-04");
-    assert.deepEqual(merged.filledFrom, { birthDate: "apple_health" });
+    assert.deepEqual(merged.settledFields, ["heightCm"]);
     assert.equal(merged.avatarUrl, `/api/v1/uploads/${uploadId}/content`);
     assert.equal(await open(survivor, uploadId), 200);
   });

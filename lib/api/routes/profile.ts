@@ -16,8 +16,6 @@ import { birthDateSchema, genderSchema, heightSchema } from "../schemas.ts";
 import { toMeView } from "./me.ts";
 import { API_UPLOAD_SESSION, requireOwnedAttachments } from "./uploads.ts";
 
-type Suggestion = ProfileDetails & { name?: string | null; source: "fatsecret" | "telegram" };
-
 async function telegramProfile(userId: string) {
   const identity = await prisma.channelIdentity.findFirst({ where: { provider: "telegram", userId } });
   return identity ? apiDeps().telegram.profile(identity.providerUserId) : null;
@@ -38,27 +36,19 @@ async function fatSecretHeight(userId: string): Promise<number | null> {
   }
 }
 
-// What the linked services know that the profile is missing. WhatsApp gives a name only when the
-// account is made, and Apple only at sign-in, so neither has anything to ask for here.
-async function loadSuggestions(userId: string): Promise<{ suggestions: Suggestion[]; telegramPhoto: boolean }> {
-  const user = await prisma.user.findUnique({ include: { profile: true }, where: { id: userId } });
+// Fills in what the profile is missing from the phone (Apple Health) and the linked services, in
+// that order. WhatsApp gives a name only when the account is made, and Apple only at sign-in, so
+// neither has anything to ask for here.
+async function fillFromApps(userId: string, fromPhone: ProfileDetails) {
+  const filled = await fillProfileDetails(userId, fromPhone);
+  const me = await toMeView(userId);
   const [telegram, heightCm] = await Promise.all([
     telegramProfile(userId),
-    user?.profile?.heightCm == null ? fatSecretHeight(userId) : null,
+    me.heightCm === null && !me.settledFields.includes("heightCm") ? fatSecretHeight(userId) : null,
   ]);
-  const suggestions: Suggestion[] = [];
-  if (telegram) {
-    const name = user?.name ? null : telegram.name;
-    const birthDate =
-      !user?.profile?.birthDate && telegram.birthDate && isBirthDate(telegram.birthDate) ? telegram.birthDate : null;
-    if (name || birthDate) {
-      suggestions.push({ source: "telegram", ...(name ? { name } : {}), ...(birthDate ? { birthDate } : {}) });
-    }
-  }
-  if (heightCm !== null) {
-    suggestions.push({ heightCm, source: "fatsecret" });
-  }
-  return { suggestions, telegramPhoto: Boolean(telegram?.photoFileId) };
+  const birthDate = telegram?.birthDate && isBirthDate(telegram.birthDate) ? telegram.birthDate : null;
+  filled.push(...(await fillProfileDetails(userId, { birthDate, heightCm, name: telegram?.name })));
+  return { filled, me: await toMeView(userId), telegramPhoto: Boolean(telegram?.photoFileId) };
 }
 
 // Deletes a photo that stopped being the profile photo, unless it's used somewhere else too.
@@ -90,24 +80,20 @@ async function setAvatar(userId: string, avatarId: string | null): Promise<void>
 }
 
 export const profileRoutes: RouteDefinition[] = [
-  { handler: async ({ user }) => loadSuggestions(user.id), method: "GET", path: "/me/profile-suggestions" },
   {
-    // Fills in empty details from a connected app; what the person typed always stays.
+    // Safe to call often: only details that are empty, and that the person never set or cleared, change.
     async handler({ request, user }) {
-      const { source, ...values } = await readJson(
+      const fromPhone = await readJson(
         request,
         z
           .object({
             birthDate: birthDateSchema.optional(),
             gender: genderSchema.optional(),
             heightCm: heightSchema.optional(),
-            name: z.string().trim().min(1).max(80).optional(),
-            source: z.enum(["apple_health", "fatsecret", "telegram"]),
           })
           .strict(),
       );
-      const filled = await fillProfileDetails(user.id, source, values);
-      return { filled, me: await toMeView(user.id) };
+      return fillFromApps(user.id, fromPhone);
     },
     method: "POST",
     path: "/me/profile-fill",

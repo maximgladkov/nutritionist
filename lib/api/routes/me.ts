@@ -8,10 +8,10 @@ import { prisma } from "../../prisma.ts";
 import {
   avatarUrl,
   fillProfileDetails,
-  readFilledFrom,
   readGender,
+  readSettled,
   saveProfileDetails,
-  type FilledFrom,
+  type FillField,
   type ProfileGender,
 } from "../../profile.ts";
 import { REMINDER_LABELS, isReminderLabel } from "../../reminder-clock.ts";
@@ -50,8 +50,6 @@ export type MeView = {
   birthDate: string | null;
   country: string | null;
   email: string | null;
-  // Details a connected app filled in, until the person changes them.
-  filledFrom: FilledFrom;
   gender: ProfileGender | null;
   heightCm: number | null;
   id: string;
@@ -60,6 +58,8 @@ export type MeView = {
   name: string | null;
   plan: "free";
   preferences: Preferences;
+  // Details the person set or cleared themselves, which connected apps no longer fill in.
+  settledFields: FillField[];
   timezone: string | null;
 };
 
@@ -76,7 +76,6 @@ export async function toMeView(userId: string): Promise<MeView> {
     birthDate: user.profile?.birthDate ?? null,
     country: user.profile?.country ?? null,
     email: user.email,
-    filledFrom: readFilledFrom(user.profile?.filledFrom),
     gender: readGender(user.profile?.gender),
     heightCm: user.profile?.heightCm ?? null,
     id: user.id,
@@ -85,6 +84,7 @@ export async function toMeView(userId: string): Promise<MeView> {
     name: user.name,
     plan: "free",
     preferences: readPreferences(user.profile?.preferences),
+    settledFields: readSettled(user.profile?.settledFields),
     timezone: user.profile?.timezone ?? null,
   };
 }
@@ -319,7 +319,7 @@ export const meRoutes: RouteDefinition[] = [
         await prisma.channelIdentity.create({ data: { provider: "apple", providerUserId: apple.sub, userId: user.id } });
       }
       if (body.fullName) {
-        await fillProfileDetails(user.id, "apple", { name: body.fullName });
+        await fillProfileDetails(user.id, { name: body.fullName });
       }
       return toMeView(user.id);
     },

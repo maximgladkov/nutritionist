@@ -310,9 +310,8 @@ model UserProfile {
   // The profile photo: an upload already cropped to a square. See canSeeAvatar for who may load it.
   avatarId  String?  @unique
   avatar    UserAttachment? @relation(fields: [avatarId], references: [id], onDelete: SetNull)
-  // Details a connected app filled in and which one ({ heightCm: "apple_health" }); typing over one
-  // drops it from here.
-  filledFrom Json @default("{}")
+  // Details the person set or cleared themselves ("heightCm"), which are never filled in for them.
+  settledFields String[] @default([])
   startWeightKg Float?
   goalWeightKg  Float?
   notificationsReadAt DateTime?
