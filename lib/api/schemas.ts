@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isBirthDate, isHeightCm, PROFILE_GENDERS } from "../profile.ts";
 import { parseYmd } from "../timezone.ts";
 
 const nutrient = z.number().min(0).max(10_000).optional();
@@ -27,6 +28,10 @@ export const nutrimentsInputSchema = z
 export const mealLabelSchema = z.enum(["breakfast", "lunch", "dinner", "snack", "other"]);
 export const unitSchema = z.enum(["g", "ml", "serving"]);
 export const ymdSchema = z.string().refine((value) => parseYmd(value) !== null, "Use a YYYY-MM-DD date.");
+
+export const birthDateSchema = z.string().refine((value) => isBirthDate(value), "Choose a valid date of birth.");
+export const heightSchema = z.number().refine(isHeightCm, "Enter a height from 50 to 272 cm.");
+export const genderSchema = z.enum(PROFILE_GENDERS);
 
 export const servingSchema = z.object({
   grams: z.number().positive().max(10_000),

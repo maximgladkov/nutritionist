@@ -154,6 +154,7 @@ model UserAttachment {
   catalogImages CatalogProductImage[]
   mealPhotos    MealPhoto[]
   progressPhotos ProgressPhoto[]
+  avatarOf      UserProfile?
 
   @@index([sessionId, turnId])
   @@index([userId])
@@ -301,6 +302,16 @@ model UserProfile {
   country   String?
   locale    String?
   timezone  String?
+  // Only the person sees these. Gender is one of PROFILE_GENDERS (lib/profile.ts); the birth date is
+  // YYYY-MM-DD, so an age never goes stale.
+  gender    String?
+  birthDate String?
+  heightCm  Float?
+  // The profile photo: an upload already cropped to a square. See canSeeAvatar for who may load it.
+  avatarId  String?  @unique
+  avatar    UserAttachment? @relation(fields: [avatarId], references: [id], onDelete: SetNull)
+  // Details the person set or cleared themselves ("heightCm"), which are never filled in for them.
+  settledFields String[] @default([])
   startWeightKg Float?
   goalWeightKg  Float?
   notificationsReadAt DateTime?

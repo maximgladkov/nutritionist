@@ -3,6 +3,7 @@ import { planGoalMerge } from "./goal-values";
 import { generateLinkCodeValue } from "./link-command";
 import { mergeMemoryFiles, parseMemoryFile, serializeMemoryFile } from "./memory-format";
 import type { ChannelProvider } from "./principal";
+import { readSettled } from "./profile";
 import { prisma } from "./prisma";
 import { reassignGroupsOnUserMerge } from "./groups";
 
@@ -303,6 +304,28 @@ export async function mergeUsers(survivorId: string, absorbedId: string): Promis
         }
       }
       await tx.userProfile.deleteMany({ where: { userId: absorbedId } });
+
+      // The absorbed account's own details and photo go where the survivor has none. Done once its
+      // profile is gone: a photo belongs to one profile at a time.
+      const kept = await tx.userProfile.findUniqueOrThrow({ where: { userId: survivorId } });
+      if (!kept.avatarId && absorbedProfile.avatarId) {
+        await tx.userAttachment.update({
+          data: { userId: survivorId },
+          where: { id: absorbedProfile.avatarId },
+        });
+      }
+      await tx.userProfile.update({
+        data: {
+          avatarId: kept.avatarId ?? absorbedProfile.avatarId,
+          birthDate: kept.birthDate ?? absorbedProfile.birthDate,
+          gender: kept.gender ?? absorbedProfile.gender,
+          heightCm: kept.heightCm ?? absorbedProfile.heightCm,
+          settledFields: [
+            ...new Set([...readSettled(kept.settledFields), ...readSettled(absorbedProfile.settledFields)]),
+          ],
+        },
+        where: { userId: survivorId },
+      });
     }
 
     const absorbedDocs = await tx.memoryDocument.findMany({ where: { userId: absorbedId } });

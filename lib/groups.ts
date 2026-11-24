@@ -18,6 +18,7 @@ import {
 import { generateJoinCode, normalizeJoinCode } from "./groups-join-code.ts";
 import { pushToUser } from "./api/push.ts";
 import { resolveLocale, type Locale } from "./i18n/locales.ts";
+import { avatarUrl, personSelect } from "./profile.ts";
 import { prisma } from "./prisma.ts";
 import { resolveReachTarget } from "./reminders.ts";
 import { sendTelegramBotMessage, telegramGroupsMiniAppUrl } from "./telegram-notify.ts";
@@ -44,6 +45,7 @@ export type GroupListItem = {
   // What sharing members show the owner.
   readonly shares: readonly GroupShareKind[];
   readonly name: string;
+  readonly ownerAvatarUrl: string | null;
   readonly ownerName: string | null;
   readonly ownerTitle: string;
   // Items the owner added to the list that this member hasn't answered yet.
@@ -86,6 +88,7 @@ export type PersonalInviteView = {
 };
 
 export type GroupMemberView = {
+  readonly avatarUrl: string | null;
   readonly joinedAt: string;
   readonly name: string | null;
   readonly userId: string;
@@ -138,6 +141,7 @@ export type GroupMemberDetail = {
   readonly messages: readonly GroupMessageView[];
   readonly name: string;
   readonly ownerId: string;
+  readonly ownerAvatarUrl: string | null;
   readonly ownerName: string | null;
   readonly ownerTitle: string;
   readonly role: "member";
@@ -158,7 +162,7 @@ export async function listGroupsForUser(userId: string): Promise<GroupListItem[]
       group: {
         include: {
           _count: { select: { members: true } },
-          owner: { select: { name: true } },
+          owner: { select: personSelect },
         },
       },
     },
@@ -173,6 +177,7 @@ export async function listGroupsForUser(userId: string): Promise<GroupListItem[]
     membersVisible: row.group.membersVisible,
     shares: row.group.shares,
     name: row.group.name,
+    ownerAvatarUrl: avatarUrl(row.group.owner.profile),
     ownerName: row.group.owner.name,
     ownerTitle: row.group.ownerTitle,
     pendingShares: row.role === "member" ? pendingShares(row.group.shares, row.answeredShares) : [],
@@ -327,6 +332,7 @@ export async function createGroup(input: {
       membersVisible: group.membersVisible,
       shares: group.shares,
       name: group.name,
+      ownerAvatarUrl: null,
       ownerName: null,
       pendingShares: [],
       ownerTitle: group.ownerTitle,
@@ -347,6 +353,7 @@ export async function createGroup(input: {
       membersVisible: updated.membersVisible,
       shares: updated.shares,
       name: updated.name,
+      ownerAvatarUrl: null,
       ownerName: null,
       pendingShares: [],
       ownerTitle: updated.ownerTitle,
@@ -575,7 +582,7 @@ export async function getOwnedGroupDetail(input: {
   const group = await prisma.group.findUnique({
     include: {
       members: {
-        include: { user: { select: { name: true } } },
+        include: { user: { select: personSelect } },
         orderBy: { joinedAt: "asc" },
       },
     },
@@ -594,6 +601,7 @@ export async function getOwnedGroupDetail(input: {
     members: group.members
       .filter((row) => row.userId !== group.ownerId)
       .map((row) => ({
+        avatarUrl: avatarUrl(row.user.profile),
         joinedAt: row.joinedAt.toISOString(),
         name: row.user.name,
         pendingShares: pendingShares(group.shares, row.answeredShares),
@@ -620,7 +628,7 @@ export async function getJoinedGroupDetail(input: {
       group: {
         include: {
           _count: { select: { members: true } },
-          owner: { select: { name: true } },
+          owner: { select: personSelect },
         },
       },
     },
@@ -631,7 +639,7 @@ export async function getJoinedGroupDetail(input: {
   }
   const members = member.group.membersVisible
     ? await prisma.groupMember.findMany({
-        include: { user: { select: { name: true } } },
+        include: { user: { select: personSelect } },
         orderBy: [{ role: "asc" }, { joinedAt: "asc" }],
         where: { groupId: input.groupId },
       })
@@ -647,7 +655,12 @@ export async function getJoinedGroupDetail(input: {
     imageUrl: member.group.imageUrl,
     memberCount: member.group.membersVisible ? member.group._count.members : null,
     members:
-      members?.map((row) => ({ joinedAt: row.joinedAt.toISOString(), name: row.user.name, userId: row.userId })) ?? null,
+      members?.map((row) => ({
+        avatarUrl: avatarUrl(row.user.profile),
+        joinedAt: row.joinedAt.toISOString(),
+        name: row.user.name,
+        userId: row.userId,
+      })) ?? null,
     membersVisible: member.group.membersVisible,
     shares: member.group.shares,
     messages: messages.map((row) => ({
@@ -659,6 +672,7 @@ export async function getJoinedGroupDetail(input: {
     })),
     name: member.group.name,
     ownerId: member.group.ownerId,
+    ownerAvatarUrl: avatarUrl(member.group.owner.profile),
     ownerName: member.group.owner.name,
     ownerTitle: member.group.ownerTitle,
     allowedShares: effectiveShares(member.group.shares, member.allowedShares),
