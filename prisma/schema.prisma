@@ -32,6 +32,9 @@ model User {
   groupMemberships GroupMember[]
   groupMessagesSent     GroupMessage[] @relation("GroupMessagesSent")
   groupMessagesReceived GroupMessage[] @relation("GroupMessagesReceived")
+  groupNoticesAuthored  GroupNotice[]  @relation("GroupNoticesAuthored")
+  groupInvitesCreated   GroupInvite[]  @relation("GroupInvitesCreated")
+  groupInvitesUsed      GroupInvite[]  @relation("GroupInvitesUsed")
   refreshTokens RefreshToken[]
   pushDevices   PushDevice[]
   savedMeals    SavedMeal[]
@@ -430,6 +433,16 @@ model ChatSdkEntry {
   updatedAt DateTime  @updatedAt
 }
 
+// What a group's owner sees of a sharing member: daily totals and goals, the foods they logged,
+// their meal photos, their weight log, and Apple Health activity.
+enum GroupShareKind {
+  summary
+  meals
+  photos
+  weight
+  activity
+}
+
 enum GroupMemberRole {
   owner
   member
@@ -444,11 +457,21 @@ model Group {
   imageUrl      String
   imageBlobPath String
   inviteToken   String   @unique
+  // Short code people type in the app ("LEAN-7K2P"); rotates with the invite link.
+  joinCode      String?  @unique
+  // Shown under the owner's name to members ("Nutritionist").
+  ownerTitle    String   @default("")
+  // When false, members see neither the member list nor each other; only the owner does.
+  membersVisible Boolean @default(true)
+  // What members who share their diary show the owner.
+  shares        GroupShareKind[] @default([summary, meals, photos, activity])
   locale        String   @default("en")
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   members       GroupMember[]
   messages      GroupMessage[]
+  notices       GroupNotice[]
+  invites       GroupInvite[]
 
   @@index([ownerId])
 }
@@ -462,6 +485,12 @@ model GroupMember {
   role     GroupMemberRole
   sharing  Boolean         @default(true)
   lastReadAt DateTime?
+  noticesReadAt DateTime?
+  // What this member agreed to show the owner, from the group's list. The owner sees the overlap
+  // of the two, so adding to the group's list needs each member's yes.
+  allowedShares  GroupShareKind[] @default([])
+  // Items the member has answered (allowed or declined); the rest of the group's list is an ask.
+  answeredShares GroupShareKind[] @default([])
   joinedAt DateTime        @default(now())
 
   @@unique([groupId, userId])
@@ -479,11 +508,58 @@ model GroupMessage {
   body       String   @db.Text
   targetDate String?
   targetMealItemId String?
+  // Replies point at the thread's first message and share its target.
+  replyToId  String?
+  replyTo    GroupMessage?  @relation("GroupMessageReplies", fields: [replyToId], references: [id], onDelete: Cascade)
+  replies    GroupMessage[] @relation("GroupMessageReplies")
+  // Set when the member marks the coach's comment as helpful.
+  helpfulAt  DateTime?
   createdAt  DateTime @default(now())
 
   @@index([groupId, toUserId, createdAt])
+  @@index([replyToId])
   @@index([toUserId, createdAt])
   @@index([fromUserId])
+}
+
+// A personal invite: a code and link for one person, which stop working once someone joins with
+// them (or the owner revokes them). The group's own code and link stay reusable.
+model GroupInvite {
+  id          String    @id @default(cuid())
+  groupId     String
+  group       Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdById String
+  createdBy   User      @relation("GroupInvitesCreated", fields: [createdById], references: [id], onDelete: Cascade)
+  code        String    @unique
+  token       String    @unique
+  // Who it's for, as the owner wrote it ("Kira"), so they can tell invites apart.
+  note        String    @default("")
+  usedAt      DateTime?
+  usedById    String?
+  usedBy      User?     @relation("GroupInvitesUsed", fields: [usedById], references: [id], onDelete: SetNull)
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([groupId, createdAt])
+  @@index([createdById])
+  @@index([usedById])
+}
+
+// A post from the group owner that every member sees.
+model GroupNotice {
+  id        String   @id @default(cuid())
+  groupId   String
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation("GroupNoticesAuthored", fields: [authorId], references: [id], onDelete: Cascade)
+  title     String
+  body      String   @db.Text
+  pinned    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([groupId, createdAt])
+  @@index([authorId])
 }
 
 model TelegramInboundBurstItem {

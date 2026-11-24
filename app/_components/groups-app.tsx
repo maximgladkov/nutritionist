@@ -5,17 +5,27 @@ import { bootTelegramWebApp, telegramWebApp } from "@/app/_components/telegram-w
 import {
   createGroupAction,
   deleteGroupAction,
+  deleteGroupNoticeAction,
   getJoinedGroupDetailAction,
   getOwnedGroupDetailAction,
   leaveGroupAction,
+  listGroupNoticesAction,
   listGroupsAction,
   listMemberMessagesAction,
   removeGroupMemberAction,
   rotateInviteTokenAction,
+  saveGroupNoticeAction,
   sendGroupMessageAction,
   updateGroupAction,
 } from "@/app/actions/groups";
-import { GROUP_DESCRIPTION_MAX, GROUP_NAME_MAX } from "@/lib/groups-core";
+import type { GroupNoticeView } from "@/lib/group-notices";
+import {
+  GROUP_DESCRIPTION_MAX,
+  GROUP_NAME_MAX,
+  GROUP_NOTICE_BODY_MAX,
+  GROUP_NOTICE_TITLE_MAX,
+  GROUP_OWNER_TITLE_MAX,
+} from "@/lib/groups-core";
 import type {
   GroupListItem,
   GroupMemberDetail,
@@ -23,13 +33,14 @@ import type {
   GroupMessageView,
   GroupOwnerDetail,
 } from "@/lib/groups";
-import { ArrowLeft, Pencil, PersonFill, TrashBin } from "@gravity-ui/icons";
+import { ArrowLeft, Pencil, PersonFill, Pin, PinFill, PinSlash, TrashBin } from "@gravity-ui/icons";
 import { EmptyState, Sheet } from "@heroui-pro/react";
 import {
   Button,
   Input,
   Label,
   Spinner,
+  Switch,
   TextArea,
   TextField,
   toast,
@@ -237,8 +248,7 @@ function GroupsList({
                   <span className="text-foreground truncate font-medium">{group.name}</span>
                   <span className="text-muted truncate text-sm">
                     {group.role === "owner" ? t`Owner` : (group.ownerName ?? t`Member`)}
-                    {" · "}
-                    {group.memberCount}
+                    {group.memberCount === null ? null : ` · ${group.memberCount}`}
                   </span>
                 </span>
               </button>
@@ -375,23 +385,43 @@ function OwnedGroupView({
                 toast.danger(result.error);
                 return;
               }
-              setDetail({
-                ...detail,
-                inviteToken: result.data.inviteToken,
-                telegramInviteUrl: result.data.telegramInviteUrl,
-                webInviteUrl: result.data.webInviteUrl,
-              });
+              void reload();
               toast.success(t`Invite link reset.`);
             });
           }}
         >
           <Trans>Reset invite link</Trans>
         </Button>
+        {detail.joinCode ? (
+          <div className="bg-surface-secondary flex items-center justify-between gap-3 rounded-2xl px-3 py-2">
+            <div className="flex min-w-0 flex-col">
+              <span className="text-muted text-xs">
+                <Trans>Code to join in the Btr.me app</Trans>
+              </span>
+              <span className="text-foreground font-mono text-base font-semibold tracking-wider">{detail.joinCode}</span>
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              onPress={() => {
+                void copyWebInvite(detail.joinCode ?? "", t`Code copied.`, t`Could not copy the code.`);
+              }}
+            >
+              <Trans>Copy</Trans>
+            </Button>
+          </div>
+        ) : null}
       </div>
+      <NoticesSection groupId={groupId} initData={initData} />
       <div className="flex flex-col gap-2">
         <h2 className="text-foreground text-sm font-semibold">
           <Trans>Members</Trans>
         </h2>
+        {detail.membersVisible ? null : (
+          <p className="text-muted text-sm">
+            <Trans>The member list is hidden. Members can't see who else is in the group.</Trans>
+          </p>
+        )}
         {detail.members.length === 0 ? (
           <p className="text-muted text-sm">
             <Trans>No one has joined yet. Share the invite to get started.</Trans>
@@ -604,6 +634,155 @@ function MemberPersonView({
   );
 }
 
+function NoticesSection({ groupId, initData }: { readonly groupId: string; readonly initData?: string }) {
+  const { t } = useLingui();
+  const [notices, setNotices] = useState<GroupNoticeView[] | null>(null);
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [pinned, setPinned] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  async function reload() {
+    const result = await listGroupNoticesAction({ groupId, initData });
+    if (result.ok) {
+      setNotices(result.data);
+    }
+  }
+
+  useEffect(() => {
+    void reload();
+  }, [groupId, initData]);
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-foreground text-sm font-semibold">
+          <Trans>Notices</Trans>
+        </h2>
+        <p className="text-muted text-sm">
+          <Trans>Every member sees notices in the app and gets a notification. Pinned notices stay on top.</Trans>
+        </p>
+      </div>
+      <TextField value={title} onChange={setTitle}>
+        <Label>
+          <Trans>Title</Trans>
+        </Label>
+        <Input maxLength={GROUP_NOTICE_TITLE_MAX} placeholder={t`Week 3 focus: protein at every meal`} variant="secondary" />
+      </TextField>
+      <TextField value={body} onChange={setBody}>
+        <Label>
+          <Trans>Notice</Trans>
+        </Label>
+        <TextArea className="w-full" maxLength={GROUP_NOTICE_BODY_MAX} rows={3} variant="secondary" />
+      </TextField>
+      <div className="flex items-center justify-between gap-3">
+        <Switch isSelected={pinned} onChange={setPinned}>
+          <Switch.Content>
+            <Switch.Control>
+              <Switch.Thumb />
+            </Switch.Control>
+            <Label className="text-sm">
+              <Trans>Pin to top</Trans>
+            </Label>
+          </Switch.Content>
+        </Switch>
+        <Button
+          isDisabled={title.trim().length === 0 || body.trim().length === 0}
+          isPending={busy === "new"}
+          onPress={() => {
+            setBusy("new");
+            void saveGroupNoticeAction({ body, groupId, initData, pinned, title }).then((result) => {
+              setBusy(null);
+              if (!result.ok) {
+                toast.danger(result.error);
+                return;
+              }
+              setTitle("");
+              setBody("");
+              setPinned(false);
+              void reload();
+            });
+          }}
+        >
+          <Trans>Post notice</Trans>
+        </Button>
+      </div>
+      {notices && notices.length > 0 ? (
+        <ul className="flex flex-col gap-2">
+          {notices.map((notice) => (
+            <li className="bg-surface-secondary flex flex-col gap-1 rounded-2xl p-3" key={notice.id}>
+              <div className="flex items-start gap-2">
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <p className="text-foreground flex items-center gap-1 text-sm font-semibold">
+                    {notice.pinned ? <PinFill aria-label={t`Pinned`} className="text-accent size-3.5 shrink-0" /> : null}
+                    <span className="min-w-0">{notice.title}</span>
+                  </p>
+                  <p className="text-foreground whitespace-pre-wrap text-sm">{notice.body}</p>
+                  <p className="text-muted text-xs">
+                    {new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(
+                      new Date(notice.createdAt),
+                    )}
+                  </p>
+                </div>
+                <Tooltip delay={0}>
+                  <Button
+                    aria-label={notice.pinned ? t`Unpin notice` : t`Pin notice`}
+                    isIconOnly
+                    isPending={busy === `pin:${notice.id}`}
+                    size="sm"
+                    variant="ghost"
+                    onPress={() => {
+                      setBusy(`pin:${notice.id}`);
+                      void saveGroupNoticeAction({ groupId, initData, noticeId: notice.id, pinned: !notice.pinned }).then(
+                        (result) => {
+                          setBusy(null);
+                          if (!result.ok) {
+                            toast.danger(result.error);
+                            return;
+                          }
+                          void reload();
+                        },
+                      );
+                    }}
+                  >
+                    {notice.pinned ? <PinSlash className="size-4" /> : <Pin className="size-4" />}
+                  </Button>
+                  <Tooltip.Content>{notice.pinned ? <Trans>Unpin</Trans> : <Trans>Pin</Trans>}</Tooltip.Content>
+                </Tooltip>
+                <Tooltip delay={0}>
+                  <Button
+                    aria-label={t`Delete notice`}
+                    isIconOnly
+                    isPending={busy === `delete:${notice.id}`}
+                    size="sm"
+                    variant="ghost"
+                    onPress={() => {
+                      setBusy(`delete:${notice.id}`);
+                      void deleteGroupNoticeAction({ groupId, initData, noticeId: notice.id }).then((result) => {
+                        setBusy(null);
+                        if (!result.ok) {
+                          toast.danger(result.error);
+                          return;
+                        }
+                        void reload();
+                      });
+                    }}
+                  >
+                    <TrashBin className="size-4" />
+                  </Button>
+                  <Tooltip.Content>
+                    <Trans>Delete</Trans>
+                  </Tooltip.Content>
+                </Tooltip>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
 function GroupFormSheet({
   group,
   initData,
@@ -622,6 +801,8 @@ function GroupFormSheet({
   const { t } = useLingui();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [ownerTitle, setOwnerTitle] = useState("");
+  const [membersVisible, setMembersVisible] = useState(true);
   const [file, setFile] = useState<File | null>(null);
   const [pending, setPending] = useState(false);
   const preview = useMemo(() => {
@@ -637,6 +818,8 @@ function GroupFormSheet({
     }
     setName(group?.name ?? "");
     setDescription(group?.description ?? "");
+    setOwnerTitle(group?.ownerTitle ?? "");
+    setMembersVisible(group?.membersVisible ?? true);
     setFile(null);
     setPending(false);
   }, [group, open]);
@@ -685,6 +868,26 @@ function GroupFormSheet({
                 </Label>
                 <TextArea className="w-full" maxLength={GROUP_DESCRIPTION_MAX} rows={4} variant="secondary" />
               </TextField>
+              {mode === "edit" ? (
+                <>
+                  <TextField value={ownerTitle} onChange={setOwnerTitle}>
+                    <Label>
+                      <Trans>Your title</Trans>
+                    </Label>
+                    <Input maxLength={GROUP_OWNER_TITLE_MAX} placeholder={t`Nutritionist`} variant="secondary" />
+                  </TextField>
+                  <Switch isSelected={membersVisible} onChange={setMembersVisible}>
+                    <Switch.Content>
+                      <Switch.Control>
+                        <Switch.Thumb />
+                      </Switch.Control>
+                      <Label className="text-sm">
+                        <Trans>Members can see each other</Trans>
+                      </Label>
+                    </Switch.Content>
+                  </Switch>
+                </>
+              ) : null}
               <label className="flex cursor-[var(--cursor-interactive)] flex-col gap-2">
                 <span className="text-sm font-medium">
                   <Trans>Image</Trans>
@@ -716,6 +919,10 @@ function GroupFormSheet({
                   const formData = new FormData();
                   formData.set("name", name);
                   formData.set("description", description);
+                  if (mode === "edit") {
+                    formData.set("ownerTitle", ownerTitle);
+                    formData.set("membersVisible", membersVisible ? "true" : "false");
+                  }
                   if (initData) {
                     formData.set("initData", initData);
                   }
@@ -784,6 +991,7 @@ function MessageList({ messages }: { readonly messages: readonly GroupMessageVie
               new Date(message.createdAt),
             )}
             {message.fromName ? ` · ${message.fromName}` : ` · ${t`Coach`}`}
+            {message.helpful ? ` · ${t`Marked helpful`}` : ""}
           </p>
         </li>
       ))}

@@ -30,7 +30,7 @@ msgstr "цель: {label}"
 msgid "{title} time"
 msgstr "время: {title}"
 
-#: app/_components/nutrition-summary.tsx:350
+#: app/_components/nutrition-summary.tsx:345
 msgid "<0>Set daily goals</0> to track them as you eat."
 msgstr "<0>Задайте дневные цели</0>, чтобы отслеживать их по мере еды."
 
@@ -100,7 +100,6 @@ msgstr "Стань лучшей версией себя."
 msgid "Breakfast"
 msgstr "Завтрак"
 
-#: app/_components/group-invite.tsx:213
 #: app/layout.tsx:41
 #: app/login/page.tsx:35
 msgid "BTR.me"
@@ -147,19 +146,19 @@ msgstr "Выберите продукт, который нужно удалит�
 msgid "Choose a food to update."
 msgstr "Выберите продукт, который нужно изменить."
 
-#: app/actions/groups.ts:482
+#: app/actions/groups.ts:569
 msgid "Choose a group name."
 msgstr "Укажите название группы."
 
-#: app/actions/groups.ts:160
+#: app/actions/groups.ts:175
 msgid "Choose a group to update."
 msgstr "Выберите группу для изменения."
 
-#: app/actions/groups.ts:494
+#: app/actions/groups.ts:581
 msgid "Choose a JPEG, PNG, GIF, or WebP image."
 msgstr "Выберите изображение JPEG, PNG, GIF или WebP."
 
-#: app/actions/groups.ts:510
+#: app/actions/groups.ts:597
 msgid "Choose a name, description, or image to update."
 msgstr "Измените название, описание или изображение."
 
@@ -167,19 +166,27 @@ msgstr "Измените название, описание или изобра�
 msgid "Choose a product."
 msgstr "Выберите продукт."
 
-#: app/actions/groups.ts:486
+#: app/actions/groups.ts:573
 msgid "Choose a shorter description."
 msgstr "Сделайте описание короче."
 
-#: app/actions/groups.ts:484
+#: app/actions/groups.ts:571
 msgid "Choose a shorter group name."
 msgstr "Сделайте название группы короче."
 
-#: app/actions/groups.ts:490
+#: app/actions/groups.ts:577
 msgid "Choose a shorter message."
 msgstr "Сделайте сообщение короче."
 
-#: app/actions/groups.ts:492
+#: app/actions/groups.ts:607
+msgid "Choose a shorter notice."
+msgstr "Сократите объявление."
+
+#: app/actions/groups.ts:605
+msgid "Choose a shorter title."
+msgstr "Сократите заголовок."
+
+#: app/actions/groups.ts:579
 msgid "Choose a smaller image."
 msgstr "Выберите изображение меньшего размера."
 
@@ -193,12 +200,12 @@ msgstr "Укажите корректное количество."
 msgid "Choose a valid country."
 msgstr "Выберите существующую страну."
 
-#: app/actions/groups.ts:414
+#: app/actions/groups.ts:501
 #: app/actions/summary.ts:73
 msgid "Choose a valid date range."
 msgstr "Выберите корректный диапазон дат."
 
-#: app/actions/groups.ts:381
+#: app/actions/groups.ts:468
 #: app/actions/summary.ts:51
 msgid "Choose a valid date."
 msgstr "Выберите корректную дату."
@@ -223,7 +230,7 @@ msgstr "Выберите корректный часовой пояс."
 msgid "Choose an amount or a meal."
 msgstr "Выберите количество или приём пищи."
 
-#: app/_components/groups-app.tsx:696
+#: app/_components/groups-app.tsx:900
 msgid "Choose an image"
 msgstr "Выберите изображение"
 
@@ -237,15 +244,27 @@ msgstr "Выберите завтрак, обед, ужин или переку�
 msgid "Close search"
 msgstr "Закрыть поиск"
 
-#: app/_components/groups-app.tsx:786
+#: app/_components/groups-app.tsx:994
 msgid "Coach"
 msgstr "Тренер"
+
+#: app/_components/groups-app.tsx:408
+msgid "Code copied."
+msgstr "Код скопирован."
+
+#: app/_components/groups-app.tsx:400
+msgid "Code to join in the Btr.me app"
+msgstr "Код для входа в приложении Btr.me"
 
 #: app/_components/settings-forms.tsx:664
 msgid "Connect Telegram or WhatsApp with a one-time code."
 msgstr "Свяжите Telegram или WhatsApp одноразовым кодом."
 
-#: app/_components/groups-app.tsx:365
+#: app/_components/groups-app.tsx:411
+msgid "Copy"
+msgstr "Копировать"
+
+#: app/_components/groups-app.tsx:376
 msgid "Copy web link"
 msgstr "Скопировать веб-ссылку"
 
@@ -253,28 +272,36 @@ msgstr "Скопировать веб-ссылку"
 msgid "Could not add that food."
 msgstr "Не удалось добавить этот продукт."
 
-#: app/_components/groups-app.tsx:362
+#: app/_components/groups-app.tsx:408
+msgid "Could not copy the code."
+msgstr "Не удалось скопировать код."
+
+#: app/_components/groups-app.tsx:373
 msgid "Could not copy the link."
 msgstr "Не удалось скопировать ссылку."
 
-#: app/actions/groups.ts:148
-#: app/actions/groups.ts:512
+#: app/actions/groups.ts:163
+#: app/actions/groups.ts:599
 msgid "Could not create that group."
 msgstr "Не удалось создать группу."
 
-#: app/actions/groups.ts:189
+#: app/actions/groups.ts:276
 msgid "Could not delete that group."
 msgstr "Не удалось удалить группу."
 
-#: app/actions/groups.ts:223
+#: app/actions/groups.ts:259
+msgid "Could not delete that notice."
+msgstr "Не удалось удалить объявление."
+
+#: app/actions/groups.ts:310
 msgid "Could not join that group."
 msgstr "Не удалось вступить в группу."
 
-#: app/actions/groups.ts:240
+#: app/actions/groups.ts:327
 msgid "Could not leave that group."
 msgstr "Не удалось выйти из группы."
 
-#: app/_components/groups-app.tsx:87
+#: app/_components/groups-app.tsx:98
 msgid "Could not load groups."
 msgstr "Не удалось загрузить группы."
 
@@ -288,29 +315,30 @@ msgstr "Не удалось загрузить продукты."
 msgid "Could not load settings."
 msgstr "Не удалось загрузить настройки."
 
-#: app/actions/groups.ts:400
+#: app/actions/groups.ts:487
 #: app/actions/summary.ts:61
 msgid "Could not load that day."
 msgstr "Не удалось загрузить этот день."
 
-#: app/actions/groups.ts:279
-#: app/actions/groups.ts:296
+#: app/actions/groups.ts:205
+#: app/actions/groups.ts:366
+#: app/actions/groups.ts:383
 msgid "Could not load that group."
 msgstr "Не удалось загрузить группу."
 
 #: app/_components/member-diary.tsx:193
 #: app/_components/nutrition-summary.tsx:219
-#: app/actions/groups.ts:368
+#: app/actions/groups.ts:455
 #: app/actions/summary.ts:40
 msgid "Could not load that summary."
 msgstr "Не удалось загрузить сводку."
 
-#: app/actions/groups.ts:437
+#: app/actions/groups.ts:524
 #: app/actions/summary.ts:83
 msgid "Could not load those days."
 msgstr "Не удалось загрузить эти дни."
 
-#: app/actions/groups.ts:318
+#: app/actions/groups.ts:405
 msgid "Could not load those messages."
 msgstr "Не удалось загрузить сообщения."
 
@@ -322,17 +350,21 @@ msgstr "Не удалось прочитать фото."
 msgid "Could not remove that food."
 msgstr "Не удалось удалить этот продукт."
 
-#: app/actions/groups.ts:262
+#: app/actions/groups.ts:349
 msgid "Could not remove that person."
 msgstr "Не удалось удалить этого человека."
 
-#: app/actions/groups.ts:206
+#: app/actions/groups.ts:293
 msgid "Could not reset that invite link."
 msgstr "Не удалось сбросить ссылку-приглашение."
 
 #: app/actions/settings.ts:254
 msgid "Could not save reminders."
 msgstr "Не удалось сохранить напоминания."
+
+#: app/actions/groups.ts:241
+msgid "Could not save that notice."
+msgstr "Не удалось сохранить объявление."
 
 #: app/actions/settings.ts:81
 #: app/actions/settings.ts:195
@@ -343,7 +375,7 @@ msgstr "Не удалось сохранить эти цели."
 msgid "Could not send a sign-in email"
 msgstr "Не удалось отправить письмо для входа"
 
-#: app/actions/groups.ts:342
+#: app/actions/groups.ts:429
 msgid "Could not send that message."
 msgstr "Не удалось отправить сообщение."
 
@@ -359,7 +391,7 @@ msgstr "Не удалось обновить избранное."
 msgid "Could not update that food."
 msgstr "Не удалось обновить этот продукт."
 
-#: app/actions/groups.ts:172
+#: app/actions/groups.ts:189
 msgid "Could not update that group."
 msgstr "Не удалось обновить группу."
 
@@ -376,11 +408,11 @@ msgstr "Страна сброшена. Поиск идёт по мировому
 msgid "Country saved."
 msgstr "Страна сохранена."
 
-#: app/_components/groups-app.tsx:742
+#: app/_components/groups-app.tsx:950
 msgid "Create"
 msgstr "Создать"
 
-#: app/_components/groups-app.tsx:208
+#: app/_components/groups-app.tsx:219
 msgid "Create a group and send the invite to people you help."
 msgstr "Создайте группу и отправьте приглашение тем, кому помогаете."
 
@@ -430,15 +462,20 @@ msgstr "Дневной белок должен быть целым числом 
 msgid "Daily summary"
 msgstr "Итоги дня"
 
-#: app/_components/groups-app.tsx:341
+#: app/_components/groups-app.tsx:352
+#: app/_components/groups-app.tsx:775
 msgid "Delete"
 msgstr "Удалить"
 
-#: app/_components/groups-app.tsx:321
+#: app/_components/groups-app.tsx:332
 msgid "Delete group"
 msgstr "Удалить группу"
 
-#: app/_components/groups-app.tsx:684
+#: app/_components/groups-app.tsx:755
+msgid "Delete notice"
+msgstr "Удалить объявление"
+
+#: app/_components/groups-app.tsx:868
 msgid "Description"
 msgstr "Описание"
 
@@ -451,12 +488,12 @@ msgstr "Ужин"
 msgid "Each photo must be 10 MB or smaller."
 msgstr "Каждое фото должно быть не больше 10 МБ."
 
-#: app/_components/groups-app.tsx:316
+#: app/_components/groups-app.tsx:327
 msgid "Edit"
 msgstr "Изменить"
 
-#: app/_components/groups-app.tsx:312
-#: app/_components/groups-app.tsx:672
+#: app/_components/groups-app.tsx:323
+#: app/_components/groups-app.tsx:856
 msgid "Edit group"
 msgstr "Изменить группу"
 
@@ -479,6 +516,10 @@ msgstr "Включить напоминание: {title}"
 #: app/_components/settings-forms.tsx:700
 msgid "Enter a code from chat"
 msgstr "Введите код из чата"
+
+#: app/_components/groups-app.tsx:664
+msgid "Every member sees notices in the app and gets a notification. Pinned notices stay on top."
+msgstr "Все участники видят объявления в приложении и получают уведомление. Закреплённые остаются сверху."
 
 #: app/_components/i18n-labels.ts:10
 msgid "Fat"
@@ -504,6 +545,10 @@ msgstr "Создать"
 msgid "Generate a code"
 msgstr "Создать код"
 
+#: app/actions/groups.ts:601
+msgid "Give the notice a title."
+msgstr "Добавьте заголовок объявления."
+
 #: app/_components/day-goal-progress.tsx:86
 msgid "Goal"
 msgstr "Цель"
@@ -513,18 +558,18 @@ msgid "grams per day"
 msgstr "граммы в день"
 
 #: app/_components/desktop-workspace.tsx:131
-#: app/_components/groups-app.tsx:205
-#: app/_components/groups-app.tsx:300
-#: app/_components/groups-app.tsx:309
-#: app/_components/groups-app.tsx:482
-#: app/_components/groups-app.tsx:490
+#: app/_components/groups-app.tsx:216
+#: app/_components/groups-app.tsx:311
+#: app/_components/groups-app.tsx:320
+#: app/_components/groups-app.tsx:513
+#: app/_components/groups-app.tsx:521
 #: app/_components/mini-app-tab-bar.tsx:126
 #: app/_components/mini-app-tab-bar.tsx:156
 #: app/groups/page.tsx:14
 msgid "Groups"
 msgstr "Группы"
 
-#: app/_components/groups-app.tsx:690
+#: app/_components/groups-app.tsx:894
 msgid "Image"
 msgstr "Изображение"
 
@@ -534,7 +579,7 @@ msgstr "Изображение"
 msgid "Invite"
 msgstr "Приглашение"
 
-#: app/_components/groups-app.tsx:384
+#: app/_components/groups-app.tsx:390
 msgid "Invite link reset."
 msgstr "Ссылка-приглашение сброшена."
 
@@ -550,7 +595,7 @@ msgstr "Перейти к дате"
 msgid "kilocalories per day"
 msgstr "килокалории в день"
 
-#: app/_components/group-invite.tsx:247
+#: app/_components/group-invite.tsx:244
 #: app/_components/settings-forms.tsx:261
 #: app/_components/settings-forms.tsx:286
 msgid "Language"
@@ -564,7 +609,7 @@ msgstr "Язык и местоположение"
 msgid "Language saved."
 msgstr "Язык сохранён."
 
-#: app/_components/groups-app.tsx:524
+#: app/_components/groups-app.tsx:555
 msgid "Leave group"
 msgstr "Покинуть группу"
 
@@ -597,23 +642,31 @@ msgstr "Запишите приём пищи сегодня, чтобы нача
 msgid "Lunch"
 msgstr "Обед"
 
-#: app/_components/groups-app.tsx:239
-#: app/_components/groups-app.tsx:410
-#: app/_components/groups-app.tsx:545
+#: app/_components/groups-app.tsx:995
+msgid "Marked helpful"
+msgstr "Отмечено как полезное"
+
+#: app/_components/groups-app.tsx:250
+#: app/_components/groups-app.tsx:441
+#: app/_components/groups-app.tsx:576
 msgid "Member"
 msgstr "Участник"
 
-#: app/_components/groups-app.tsx:393
-#: app/_components/groups-app.tsx:557
+#: app/_components/groups-app.tsx:419
+#: app/_components/groups-app.tsx:588
 msgid "Members"
 msgstr "Участники"
 
-#: app/_components/groups-app.tsx:566
+#: app/_components/groups-app.tsx:886
+msgid "Members can see each other"
+msgstr "Участники видят друг друга"
+
+#: app/_components/groups-app.tsx:597
 msgid "Message"
 msgstr "Сообщение"
 
-#: app/_components/groups-app.tsx:499
-#: app/_components/groups-app.tsx:562
+#: app/_components/groups-app.tsx:530
+#: app/_components/groups-app.tsx:593
 msgid "Messages"
 msgstr "Сообщения"
 
@@ -629,7 +682,7 @@ msgstr "Переместить в"
 msgid "Moved to {mealName}."
 msgstr "Перемещено в {mealName}."
 
-#: app/_components/groups-app.tsx:678
+#: app/_components/groups-app.tsx:862
 msgid "Name"
 msgstr "Название"
 
@@ -641,9 +694,9 @@ msgstr "Навигация"
 msgid "New chat"
 msgstr "Новый чат"
 
-#: app/_components/groups-app.tsx:213
-#: app/_components/groups-app.tsx:251
-#: app/_components/groups-app.tsx:672
+#: app/_components/groups-app.tsx:224
+#: app/_components/groups-app.tsx:262
+#: app/_components/groups-app.tsx:856
 msgid "New group"
 msgstr "Новая группа"
 
@@ -655,11 +708,11 @@ msgstr "Пока нет избранного"
 msgid "No matching products"
 msgstr "Нет подходящих продуктов"
 
-#: app/_components/groups-app.tsx:503
+#: app/_components/groups-app.tsx:534
 msgid "No messages yet."
 msgstr "Пока нет сообщений."
 
-#: app/_components/groups-app.tsx:397
+#: app/_components/groups-app.tsx:428
 msgid "No one has joined yet. Share the invite to get started."
 msgstr "Пока никто не вступил. Отправьте приглашение, чтобы начать."
 
@@ -675,12 +728,28 @@ msgstr "Не задано"
 msgid "Not set (worldwide)"
 msgstr "Не задано (весь мир)"
 
+#: app/_components/groups-app.tsx:675
+msgid "Notice"
+msgstr "Объявление"
+
+#: app/actions/groups.ts:609
+msgid "Notice not found."
+msgstr "Объявление не найдено."
+
+#: app/_components/groups-app.tsx:661
+msgid "Notices"
+msgstr "Объявления"
+
+#: app/_components/groups-app.tsx:878
+msgid "Nutritionist"
+msgstr "Нутрициолог"
+
 #: app/_components/group-invite.tsx:193
 msgid "Open groups"
 msgstr "Открыть группы"
 
 #: app/_components/nutrition-summary.tsx:212
-#: app/actions/groups.ts:469
+#: app/actions/groups.ts:556
 #: app/actions/meals.ts:97
 #: app/actions/products.ts:150
 #: app/actions/settings.ts:75
@@ -696,15 +765,15 @@ msgstr "или"
 msgid "Other"
 msgstr "Другое"
 
-#: app/_components/groups-app.tsx:239
+#: app/_components/groups-app.tsx:250
 msgid "Owner"
 msgstr "Владелец"
 
-#: app/actions/groups.ts:504
+#: app/actions/groups.ts:591
 msgid "Owners can delete the group instead of leaving."
 msgstr "Владелец может удалить группу, а не выйти из неё."
 
-#: app/actions/groups.ts:506
+#: app/actions/groups.ts:593
 msgid "Owners cannot be removed."
 msgstr "Владельца нельзя удалить."
 
@@ -715,6 +784,26 @@ msgstr "Фото"
 #: app/_components/day-ring-strip.tsx:497
 msgid "Pick a day"
 msgstr "Выб. день"
+
+#: app/_components/groups-app.tsx:751
+msgid "Pin"
+msgstr "Закрепить"
+
+#: app/_components/groups-app.tsx:730
+msgid "Pin notice"
+msgstr "Закрепить объявление"
+
+#: app/_components/groups-app.tsx:686
+msgid "Pin to top"
+msgstr "Закрепить сверху"
+
+#: app/_components/groups-app.tsx:718
+msgid "Pinned"
+msgstr "Закреплено"
+
+#: app/_components/groups-app.tsx:708
+msgid "Post notice"
+msgstr "Опубликовать"
 
 #: app/_components/products-app.tsx:151
 msgid "Product lists"
@@ -743,7 +832,7 @@ msgstr "Недавние"
 msgid "Reminders saved."
 msgstr "Напоминания сохранены."
 
-#: app/_components/groups-app.tsx:434
+#: app/_components/groups-app.tsx:465
 #: app/_components/meal-item-sheet.tsx:175
 msgid "Remove"
 msgstr "Удалить"
@@ -758,7 +847,7 @@ msgstr "Удалить {0}"
 msgid "Remove from favorites"
 msgstr "Убрать из избранного"
 
-#: app/_components/groups-app.tsx:414
+#: app/_components/groups-app.tsx:445
 msgid "Remove member"
 msgstr "Удалить участника"
 
@@ -770,7 +859,7 @@ msgstr "Удалено."
 msgid "Request failed"
 msgstr "Запрос не выполнен"
 
-#: app/_components/groups-app.tsx:388
+#: app/_components/groups-app.tsx:394
 msgid "Reset invite link"
 msgstr "Сбросить ссылку-приглашение"
 
@@ -779,7 +868,7 @@ msgstr "Сбросить ссылку-приглашение"
 msgid "Responded: {0}"
 msgstr "Ответ: {0}"
 
-#: app/_components/groups-app.tsx:742
+#: app/_components/groups-app.tsx:950
 #: app/_components/meal-item-sheet.tsx:206
 msgid "Save"
 msgstr "Сохранить"
@@ -810,7 +899,7 @@ msgid "Search…"
 msgstr "Поиск…"
 
 #: app/_components/agent-chat.tsx:247
-#: app/_components/groups-app.tsx:599
+#: app/_components/groups-app.tsx:630
 msgid "Send"
 msgstr "Отправить"
 
@@ -822,7 +911,7 @@ msgstr "Отправьте /link CODE в личный чат с ботом."
 msgid "Set a time zone first to turn reminders on."
 msgstr "Сначала задайте часовой пояс, чтобы включить напоминания."
 
-#: app/_components/nutrition-summary.tsx:344
+#: app/_components/nutrition-summary.tsx:339
 msgid "Set daily goals in chat to track them here."
 msgstr "Задайте дневные цели в чате, чтобы отслеживать их здесь."
 
@@ -833,12 +922,12 @@ msgstr "Задайте дневные цели в чате, чтобы отсл�
 msgid "Settings"
 msgstr "Настройки"
 
-#: app/_components/groups-app.tsx:357
+#: app/_components/groups-app.tsx:368
 msgid "Share in Telegram"
 msgstr "Поделиться в Telegram"
 
-#: app/actions/groups.ts:452
-#: app/actions/groups.ts:454
+#: app/actions/groups.ts:539
+#: app/actions/groups.ts:541
 #: app/actions/settings.ts:67
 msgid "Sign in to continue."
 msgstr "Войдите, чтобы продолжить."
@@ -905,7 +994,7 @@ msgstr "Стоп"
 msgid "Summary"
 msgstr "Сводка"
 
-#: app/actions/groups.ts:467
+#: app/actions/groups.ts:554
 #: app/actions/meals.ts:95
 #: app/actions/products.ts:148
 #: app/actions/settings.ts:73
@@ -913,7 +1002,7 @@ msgstr "Сводка"
 msgid "Telegram is not configured."
 msgstr "Telegram не настроен."
 
-#: app/actions/groups.ts:464
+#: app/actions/groups.ts:551
 #: app/actions/meals.ts:89
 #: app/actions/products.ts:142
 #: app/actions/settings.ts:70
@@ -921,7 +1010,7 @@ msgstr "Telegram не настроен."
 msgid "Telegram login expired. Close and open the summary again."
 msgstr "Вход через Telegram истёк. Закройте сводку и откройте её снова."
 
-#: app/_components/groups-app.tsx:349
+#: app/_components/groups-app.tsx:360
 msgid "Telegram opens the Mini App. The web link works in a browser."
 msgstr "Telegram открывает мини-приложение. Веб-ссылка работает в браузере."
 
@@ -933,12 +1022,12 @@ msgstr "Этот код истёк."
 msgid "That code is not valid."
 msgstr "Этот код недействителен."
 
-#: app/actions/groups.ts:105
-#: app/actions/groups.ts:496
+#: app/actions/groups.ts:120
+#: app/actions/groups.ts:583
 msgid "That invite link is not valid."
 msgstr "Эта ссылка-приглашение недействительна."
 
-#: app/actions/groups.ts:508
+#: app/actions/groups.ts:595
 msgid "That person is not in this group."
 msgstr "Этого человека нет в группе."
 
@@ -953,6 +1042,10 @@ msgstr "Владелец группы увидит имя вашего акка�
 #: app/_components/group-invite.tsx:181
 msgid "The group owner will see your daily nutrient summaries."
 msgstr "Владелец группы увидит сводки питательных веществ по дням."
+
+#: app/_components/groups-app.tsx:423
+msgid "The member list is hidden. Members can't see who else is in the group."
+msgstr "Список участников скрыт. Участники не видят, кто ещё в группе."
 
 #: app/_components/agent-chat.tsx:28
 msgid "The model is temporarily unavailable. Please try again."
@@ -980,9 +1073,9 @@ msgstr "Часовой пояс сброшен."
 msgid "Time zone saved."
 msgstr "Часовой пояс сохранён."
 
-#: app/_components/nutrition-summary.tsx:262
-msgid "Times use UTC until you save a time zone in Settings."
-msgstr "Время считается по UTC, пока вы не сохраните часовой пояс в Настройках."
+#: app/_components/groups-app.tsx:669
+msgid "Title"
+msgstr "Заголовок"
 
 #: app/_components/day-ring-strip.tsx:418
 msgid "Today"
@@ -1012,17 +1105,33 @@ msgstr "Введите ответ…"
 msgid "Unable to cancel the response."
 msgstr "Не удалось отменить ответ."
 
+#: app/_components/groups-app.tsx:751
+msgid "Unpin"
+msgstr "Открепить"
+
+#: app/_components/groups-app.tsx:730
+msgid "Unpin notice"
+msgstr "Открепить объявление"
+
 #: app/_components/agent-message.tsx:246
 msgid "Used tool: "
 msgstr "Инструмент: "
 
-#: app/_components/groups-app.tsx:362
+#: app/_components/groups-app.tsx:373
 msgid "Web invite copied."
 msgstr "Веб-ссылка скопирована."
 
-#: app/actions/groups.ts:488
+#: app/_components/groups-app.tsx:671
+msgid "Week 3 focus: protein at every meal"
+msgstr "Неделя 3: белок в каждом приёме пищи"
+
+#: app/actions/groups.ts:575
 msgid "Write a message."
 msgstr "Напишите сообщение."
+
+#: app/actions/groups.ts:603
+msgid "Write the notice."
+msgstr "Напишите текст объявления."
 
 #: app/_components/day-ring-strip.tsx:419
 msgid "Yesterday"
@@ -1032,11 +1141,11 @@ msgstr "Вчера"
 msgid "You are already in this group."
 msgstr "Вы уже в этой группе."
 
-#: app/actions/groups.ts:502
+#: app/actions/groups.ts:589
 msgid "You are not a member of that group."
 msgstr "Вы не участник этой группы."
 
-#: app/actions/groups.ts:500
+#: app/actions/groups.ts:587
 msgid "You are not in that group."
 msgstr "Вас нет в этой группе."
 
@@ -1044,10 +1153,14 @@ msgstr "Вас нет в этой группе."
 msgid "You can attach up to {MAX_ATTACHMENT_FILES} photos."
 msgstr "Можно прикрепить до {MAX_ATTACHMENT_FILES} фото."
 
-#: app/actions/groups.ts:498
+#: app/actions/groups.ts:585
 msgid "You cannot edit that group."
 msgstr "Вы не можете изменить эту группу."
 
 #: app/actions/settings.ts:266
 msgid "Your code is {code}. It expires in 10 minutes."
 msgstr "Ваш код: {code}. Он действует 10 минут."
+
+#: app/_components/groups-app.tsx:876
+msgid "Your title"
+msgstr "Ваша должность"

@@ -41,7 +41,8 @@ function hasRequiredModels(client: PrismaClient | undefined): client is PrismaCl
     typeof client?.telegramInboundBurstItem?.findMany === "function" &&
     typeof client?.group?.findMany === "function" &&
     typeof client?.groupMember?.findMany === "function" &&
-    typeof client?.groupMessage?.findMany === "function"
+    typeof client?.groupMessage?.findMany === "function" &&
+    typeof client?.groupNotice?.findMany === "function"
   );
 }
 

@@ -139,7 +139,9 @@ describe("groups", () => {
       token: coach.accessToken,
     });
     assert.equal(sent.status, 201, JSON.stringify(sent.body));
-    assert.deepEqual(sent.body.message.target, { mealItemId: itemId, type: "mealItem" });
+    assert.equal(sent.body.message.target.type, "mealItem");
+    assert.equal(sent.body.message.target.mealItemId, itemId);
+    assert.equal(sent.body.message.target.food.name, "Pan rústico natural");
     await new Promise((resolve) => setTimeout(resolve, 20));
     assert.equal(pushes.length, 1);
     assert.equal(pushes[0]?.to, "ExponentPushToken[member-device]");

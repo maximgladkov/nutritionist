@@ -8,6 +8,10 @@ export class GroupError extends Error {
 export const GROUP_NAME_MAX = 80;
 export const GROUP_DESCRIPTION_MAX = 500;
 export const GROUP_MESSAGE_MAX = 4000;
+export const GROUP_OWNER_TITLE_MAX = 60;
+export const GROUP_INVITE_NOTE_MAX = 60;
+export const GROUP_NOTICE_TITLE_MAX = 120;
+export const GROUP_NOTICE_BODY_MAX = 2000;
 export const GROUP_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
 export type GroupRole = "owner" | "member";

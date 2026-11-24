@@ -1,4 +1,4 @@
-import type { Prisma } from "../generated/prisma/client";
+import type { GroupInvite, Prisma } from "../generated/prisma/client";
 import { groupInviteLinks } from "./app-url.ts";
 import { uploadGroupCover } from "./group-images.ts";
 import {
@@ -6,6 +6,8 @@ import {
   GROUP_DESCRIPTION_MAX,
   GROUP_MESSAGE_MAX,
   GROUP_NAME_MAX,
+  GROUP_INVITE_NOTE_MAX,
+  GROUP_OWNER_TITLE_MAX,
   type GroupRole,
 } from "./groups-core.ts";
 import {
@@ -13,6 +15,8 @@ import {
   isInviteToken,
   planMembershipMerge,
 } from "./groups-invite.ts";
+import { generateJoinCode, normalizeJoinCode } from "./groups-join-code.ts";
+import { pushToUser } from "./api/push.ts";
 import { resolveLocale, type Locale } from "./i18n/locales.ts";
 import { prisma } from "./prisma.ts";
 import { resolveReachTarget } from "./reminders.ts";
@@ -24,6 +28,9 @@ export {
   GROUP_IMAGE_MAX_BYTES,
   GROUP_MESSAGE_MAX,
   GROUP_NAME_MAX,
+  GROUP_NOTICE_BODY_MAX,
+  GROUP_NOTICE_TITLE_MAX,
+  GROUP_OWNER_TITLE_MAX,
   type GroupRole,
 } from "./groups-core.ts";
 
@@ -31,19 +38,51 @@ export type GroupListItem = {
   readonly description: string;
   readonly id: string;
   readonly imageUrl: string;
-  readonly memberCount: number;
+  // Null for members when the owner hides the member list, so the size stays private too.
+  readonly memberCount: number | null;
+  readonly membersVisible: boolean;
+  // What sharing members show the owner.
+  readonly shares: readonly GroupShareKind[];
   readonly name: string;
   readonly ownerName: string | null;
+  readonly ownerTitle: string;
+  // Items the owner added to the list that this member hasn't answered yet.
+  readonly pendingShares: readonly GroupShareKind[];
   readonly role: GroupRole;
 };
+
+export const GROUP_SHARE_KINDS = ["summary", "meals", "photos", "weight", "activity"] as const;
+export type GroupShareKind = (typeof GROUP_SHARE_KINDS)[number];
+export const DEFAULT_GROUP_SHARES: readonly GroupShareKind[] = ["summary", "meals", "photos", "activity"];
 
 export type GroupInvitePreview = {
   readonly description: string;
   readonly imageUrl: string;
   readonly locale: Locale;
+  // Null for members when the owner hides the member list, so the size stays private too.
+  readonly memberCount: number | null;
+  readonly membersVisible: boolean;
+  // What sharing members show the owner.
+  readonly shares: readonly GroupShareKind[];
   readonly name: string;
   readonly ownerName: string | null;
+  readonly ownerTitle: string;
+  // A personal invite works once; the group's own code and link keep working.
+  readonly singleUse: boolean;
   readonly token: string;
+};
+
+export type PersonalInviteView = {
+  readonly code: string;
+  readonly createdAt: string;
+  readonly id: string;
+  readonly note: string;
+  readonly revokedAt: string | null;
+  readonly telegramInviteUrl: string | null;
+  readonly token: string;
+  readonly usedAt: string | null;
+  readonly usedByName: string | null;
+  readonly webInviteUrl: string | null;
 };
 
 export type GroupMemberView = {
@@ -56,6 +95,8 @@ export type GroupMessageView = {
   readonly body: string;
   readonly createdAt: string;
   readonly fromName: string | null;
+  // The member marked this comment helpful.
+  readonly helpful: boolean;
   readonly id: string;
 };
 
@@ -64,8 +105,20 @@ export type GroupOwnerDetail = {
   readonly id: string;
   readonly imageUrl: string;
   readonly inviteToken: string;
-  readonly members: readonly GroupMemberView[];
+  readonly joinCode: string | null;
+  // Members only (not the owner), with whether each shares their diary.
+  // Members only (not the owner): whether each shares their diary, what of the group's list they
+  // agreed to, and what they haven't answered yet.
+  readonly members: readonly (GroupMemberView & {
+    readonly pendingShares: readonly GroupShareKind[];
+    readonly shares: readonly GroupShareKind[];
+    readonly sharing: boolean;
+  })[];
+  readonly membersVisible: boolean;
+  // What sharing members show the owner.
+  readonly shares: readonly GroupShareKind[];
   readonly name: string;
+  readonly ownerTitle: string;
   readonly role: "owner";
   readonly telegramInviteUrl: string | null;
   readonly webInviteUrl: string | null;
@@ -75,10 +128,22 @@ export type GroupMemberDetail = {
   readonly description: string;
   readonly id: string;
   readonly imageUrl: string;
+  // Null for members when the owner hides the member list, so the size stays private too.
+  readonly memberCount: number | null;
+  // Everyone in the group, owner first (the enum orders owner before member); null when the owner hides the member list.
+  readonly members: readonly GroupMemberView[] | null;
+  readonly membersVisible: boolean;
+  // What sharing members show the owner.
+  readonly shares: readonly GroupShareKind[];
   readonly messages: readonly GroupMessageView[];
   readonly name: string;
+  readonly ownerId: string;
   readonly ownerName: string | null;
+  readonly ownerTitle: string;
   readonly role: "member";
+  // What you agreed to show the owner (from the group's list), and what they've asked for since.
+  readonly allowedShares: readonly GroupShareKind[];
+  readonly pendingShares: readonly GroupShareKind[];
 };
 
 export type JoinGroupResult = {
@@ -104,31 +169,99 @@ export async function listGroupsForUser(userId: string): Promise<GroupListItem[]
     description: row.group.description,
     id: row.group.id,
     imageUrl: row.group.imageUrl,
-    memberCount: row.group._count.members,
+    memberCount: row.role === "member" && !row.group.membersVisible ? null : row.group._count.members,
+    membersVisible: row.group.membersVisible,
+    shares: row.group.shares,
     name: row.group.name,
     ownerName: row.group.owner.name,
+    ownerTitle: row.group.ownerTitle,
+    pendingShares: row.role === "member" ? pendingShares(row.group.shares, row.answeredShares) : [],
     role: row.role,
   }));
 }
 
-export async function getGroupInvitePreview(token: string): Promise<GroupInvitePreview> {
-  if (!isInviteToken(token)) {
-    throw new GroupError("That invite link is not valid.");
+// What the owner sees of a member: the group's list, limited to what the member agreed to.
+export function effectiveShares(groupShares: readonly GroupShareKind[], allowed: readonly GroupShareKind[]): GroupShareKind[] {
+  return groupShares.filter((kind) => allowed.includes(kind));
+}
+
+export function pendingShares(groupShares: readonly GroupShareKind[], answered: readonly GroupShareKind[]): GroupShareKind[] {
+  return groupShares.filter((kind) => !answered.includes(kind));
+}
+
+// The member answers the group's current list: they allow `allowed` (within it), and every item on
+// it counts as answered, so the rest are declined until they change their mind.
+export async function setMemberShares(input: {
+  allowed: readonly GroupShareKind[];
+  groupId: string;
+  userId: string;
+}): Promise<{ allowedShares: GroupShareKind[]; pendingShares: GroupShareKind[] }> {
+  const member = await prisma.groupMember.findUnique({
+    include: { group: { select: { shares: true } } },
+    where: { groupId_userId: { groupId: input.groupId, userId: input.userId } },
+  });
+  if (!member || member.role !== "member") {
+    throw new GroupError("You are not a member of that group.");
+  }
+  const allowedShares = GROUP_SHARE_KINDS.filter(
+    (kind) => input.allowed.includes(kind) || (member.allowedShares.includes(kind) && !member.group.shares.includes(kind)),
+  );
+  const answeredShares = GROUP_SHARE_KINDS.filter((kind) => member.answeredShares.includes(kind) || member.group.shares.includes(kind));
+  await prisma.groupMember.update({ data: { allowedShares, answeredShares }, where: { id: member.id } });
+  return { allowedShares: effectiveShares(member.group.shares, allowedShares), pendingShares: [] };
+}
+
+// An invite is a group's own link token or typed code (reusable until the owner resets them), or a
+// personal invite's token or code (good for one join, unless revoked).
+type ResolvedInvite = {
+  group: Prisma.GroupGetPayload<{ include: { _count: { select: { members: true } }; owner: { select: { name: true } } } }>;
+  personal: GroupInvite | null;
+};
+
+const inviteGroupInclude = { _count: { select: { members: true } }, owner: { select: { name: true } } } as const;
+
+async function resolveInvite(tokenOrCode: string): Promise<ResolvedInvite | null> {
+  const value = tokenOrCode.trim();
+  const joinCode = isInviteToken(value) ? null : normalizeJoinCode(value);
+  if (!isInviteToken(value) && !joinCode) {
+    return null;
   }
   const group = await prisma.group.findUnique({
-    include: { owner: { select: { name: true } } },
-    where: { inviteToken: token },
+    include: inviteGroupInclude,
+    where: joinCode ? { joinCode } : { inviteToken: value },
   });
-  if (!group) {
+  if (group) {
+    return { group, personal: null };
+  }
+  const personal = await prisma.groupInvite.findUnique({
+    include: { group: { include: inviteGroupInclude } },
+    where: joinCode ? { code: joinCode } : { token: value },
+  });
+  if (!personal || personal.usedAt || personal.revokedAt) {
+    return null;
+  }
+  const { group: personalGroup, ...invite } = personal;
+  return { group: personalGroup, personal: invite };
+}
+
+export async function getGroupInvitePreview(tokenOrCode: string): Promise<GroupInvitePreview> {
+  const resolved = await resolveInvite(tokenOrCode);
+  if (!resolved) {
     throw new GroupError("That invite link is not valid.");
   }
+  const { group, personal } = resolved;
   return {
     description: group.description,
     imageUrl: group.imageUrl,
     locale: resolveLocale(group.locale),
+    memberCount: group.membersVisible ? group._count.members : null,
+    membersVisible: group.membersVisible,
     name: group.name,
     ownerName: group.owner.name,
-    token,
+    ownerTitle: group.ownerTitle,
+    shares: group.shares,
+    singleUse: personal !== null,
+    token: personal?.token ?? group.inviteToken,
   };
 }
 
@@ -136,34 +269,33 @@ export async function getMembershipForInvite(input: {
   token: string;
   userId: string;
 }): Promise<{ groupId: string; role: GroupRole } | null> {
-  if (!isInviteToken(input.token)) {
-    return null;
-  }
-  const group = await prisma.group.findUnique({
-    select: { id: true },
-    where: { inviteToken: input.token },
-  });
-  if (!group) {
+  const resolved = await resolveInvite(input.token);
+  if (!resolved) {
     return null;
   }
   const member = await prisma.groupMember.findUnique({
-    where: { groupId_userId: { groupId: group.id, userId: input.userId } },
+    where: { groupId_userId: { groupId: resolved.group.id, userId: input.userId } },
   });
   if (!member) {
     return null;
   }
-  return { groupId: group.id, role: member.role };
+  return { groupId: resolved.group.id, role: member.role };
 }
 
 export async function createGroup(input: {
   description: string;
   image?: File;
+  membersVisible?: boolean;
   name: string;
   ownerId: string;
+  ownerTitle?: string;
+  shares?: readonly GroupShareKind[];
 }): Promise<GroupListItem> {
   const name = normalizeName(input.name);
   const description = normalizeDescription(input.description);
+  const ownerTitle = normalizeOwnerTitle(input.ownerTitle ?? "");
   const inviteToken = await uniqueInviteToken();
+  const joinCode = await uniqueJoinCode(name);
   const profile = await prisma.userProfile.findUnique({
     select: { locale: true },
     where: { userId: input.ownerId },
@@ -174,10 +306,14 @@ export async function createGroup(input: {
       imageBlobPath: "",
       imageUrl: "",
       inviteToken,
+      joinCode,
       locale: resolveLocale(profile?.locale),
       members: {
         create: { role: "owner", userId: input.ownerId },
       },
+      membersVisible: input.membersVisible ?? true,
+      ownerTitle,
+      shares: normalizeShares(input.shares ?? DEFAULT_GROUP_SHARES),
       name,
       ownerId: input.ownerId,
     },
@@ -188,8 +324,12 @@ export async function createGroup(input: {
       id: group.id,
       imageUrl: group.imageUrl,
       memberCount: 1,
+      membersVisible: group.membersVisible,
+      shares: group.shares,
       name: group.name,
       ownerName: null,
+      pendingShares: [],
+      ownerTitle: group.ownerTitle,
       role: "owner",
     };
   }
@@ -204,8 +344,12 @@ export async function createGroup(input: {
       id: updated.id,
       imageUrl: updated.imageUrl,
       memberCount: 1,
+      membersVisible: updated.membersVisible,
+      shares: updated.shares,
       name: updated.name,
       ownerName: null,
+      pendingShares: [],
+      ownerTitle: updated.ownerTitle,
       role: "owner",
     };
   } catch (error) {
@@ -218,8 +362,11 @@ export async function updateGroup(input: {
   description?: string;
   groupId: string;
   image?: File;
+  membersVisible?: boolean;
   name?: string;
   ownerId: string;
+  ownerTitle?: string;
+  shares?: readonly GroupShareKind[];
 }): Promise<void> {
   await requireOwnedGroup(input.groupId, input.ownerId);
   const data: Prisma.GroupUpdateInput = {};
@@ -229,6 +376,15 @@ export async function updateGroup(input: {
   if (input.description !== undefined) {
     data.description = normalizeDescription(input.description);
   }
+  if (input.membersVisible !== undefined) {
+    data.membersVisible = input.membersVisible;
+  }
+  if (input.shares !== undefined) {
+    data.shares = normalizeShares(input.shares);
+  }
+  if (input.ownerTitle !== undefined) {
+    data.ownerTitle = normalizeOwnerTitle(input.ownerTitle);
+  }
   if (input.image && input.image.size > 0) {
     const cover = await uploadGroupCover({ file: input.image, groupId: input.groupId });
     data.imageBlobPath = cover.imageBlobPath;
@@ -237,7 +393,12 @@ export async function updateGroup(input: {
   if (Object.keys(data).length === 0) {
     throw new GroupError("Choose a name, description, or image to update.");
   }
+  const before = await prisma.group.findUnique({ select: { name: true, shares: true }, where: { id: input.groupId } });
   await prisma.group.update({ data, where: { id: input.groupId } });
+  const added = (data.shares as GroupShareKind[] | undefined)?.filter((kind) => !before?.shares.includes(kind)) ?? [];
+  if (added.length > 0) {
+    void notifyShareAsk({ added, groupId: input.groupId, groupName: before?.name ?? "", ownerId: input.ownerId });
+  }
 }
 
 export async function deleteGroup(input: { groupId: string; ownerId: string }): Promise<void> {
@@ -245,33 +406,135 @@ export async function deleteGroup(input: { groupId: string; ownerId: string }): 
   await prisma.group.delete({ where: { id: input.groupId } });
 }
 
+// Rotating revokes both the link and the typed code.
 export async function rotateInviteToken(input: { groupId: string; ownerId: string }): Promise<string> {
-  await requireOwnedGroup(input.groupId, input.ownerId);
+  const group = await requireOwnedGroup(input.groupId, input.ownerId);
   const inviteToken = await uniqueInviteToken();
-  await prisma.group.update({ data: { inviteToken }, where: { id: input.groupId } });
+  const joinCode = await uniqueJoinCode(group.name);
+  await prisma.group.update({ data: { inviteToken, joinCode }, where: { id: input.groupId } });
   return inviteToken;
 }
 
-export async function joinGroupByToken(input: { token: string; userId: string }): Promise<JoinGroupResult> {
-  if (!isInviteToken(input.token)) {
+export async function joinGroupByToken(input: {
+  sharing?: boolean;
+  token: string;
+  userId: string;
+}): Promise<JoinGroupResult> {
+  const resolved = await resolveInvite(input.token);
+  if (!resolved) {
     throw new GroupError("That invite link is not valid.");
   }
-  const group = await prisma.group.findUnique({
-    where: { inviteToken: input.token },
-  });
-  if (!group) {
-    throw new GroupError("That invite link is not valid.");
-  }
+  const { group, personal } = resolved;
   const existing = await prisma.groupMember.findUnique({
     where: { groupId_userId: { groupId: group.id, userId: input.userId } },
   });
   if (existing) {
+    // Opening a personal invite you don't need leaves it for its person.
     return { alreadyMember: true, groupId: group.id, role: existing.role };
   }
-  await prisma.groupMember.create({
-    data: { groupId: group.id, role: "member", userId: input.userId },
+  await prisma.$transaction(async (tx) => {
+    if (personal) {
+      // Claims the invite only if nobody used or revoked it in the meantime.
+      const claimed = await tx.groupInvite.updateMany({
+        data: { usedAt: new Date(), usedById: input.userId },
+        where: { id: personal.id, revokedAt: null, usedAt: null },
+      });
+      if (claimed.count === 0) {
+        throw new GroupError("That invite link is not valid.");
+      }
+    }
+    await tx.groupMember.create({
+      // Joining agrees to everything the group lists right now.
+      data: {
+        allowedShares: group.shares,
+        answeredShares: group.shares,
+        groupId: group.id,
+        role: "member",
+        sharing: input.sharing ?? true,
+        userId: input.userId,
+      },
+    });
   });
   return { alreadyMember: false, groupId: group.id, role: "member" };
+}
+
+function personalInviteView(row: GroupInvite & { usedBy: { name: string | null } | null }): PersonalInviteView {
+  const links = groupInviteLinks(row.token);
+  return {
+    code: row.code,
+    createdAt: row.createdAt.toISOString(),
+    id: row.id,
+    note: row.note,
+    revokedAt: row.revokedAt?.toISOString() ?? null,
+    telegramInviteUrl: links.telegramInviteUrl,
+    token: row.token,
+    usedAt: row.usedAt?.toISOString() ?? null,
+    usedByName: row.usedBy?.name ?? null,
+    webInviteUrl: links.webInviteUrl,
+  };
+}
+
+// A code and link for one person; it stops working once someone joins with it.
+export async function createPersonalInvite(input: {
+  groupId: string;
+  note?: string;
+  ownerId: string;
+}): Promise<PersonalInviteView> {
+  const group = await requireOwnedGroup(input.groupId, input.ownerId);
+  const note = (input.note ?? "").trim().replace(/\s+/gu, " ");
+  if (note.length > GROUP_INVITE_NOTE_MAX) {
+    throw new GroupError("Choose a shorter note.");
+  }
+  const row = await prisma.groupInvite.create({
+    data: {
+      code: await uniqueJoinCode(group.name),
+      createdById: input.ownerId,
+      groupId: input.groupId,
+      note,
+      token: await uniqueInviteToken(),
+    },
+    include: { usedBy: { select: { name: true } } },
+  });
+  return personalInviteView(row);
+}
+
+// Personal invites still waiting to be used, then the ones used or revoked in the last 30 days.
+export async function listPersonalInvites(input: { groupId: string; ownerId: string }): Promise<PersonalInviteView[]> {
+  await requireOwnedGroup(input.groupId, input.ownerId);
+  const since = new Date(Date.now() - 30 * 86_400_000);
+  const rows = await prisma.groupInvite.findMany({
+    include: { usedBy: { select: { name: true } } },
+    orderBy: { createdAt: "desc" },
+    take: 100,
+    where: {
+      groupId: input.groupId,
+      OR: [{ revokedAt: null, usedAt: null }, { usedAt: { gte: since } }, { revokedAt: { gte: since } }],
+    },
+  });
+  return rows.map(personalInviteView);
+}
+
+export async function revokePersonalInvite(input: { groupId: string; inviteId: string; ownerId: string }): Promise<void> {
+  await requireOwnedGroup(input.groupId, input.ownerId);
+  const revoked = await prisma.groupInvite.updateMany({
+    data: { revokedAt: new Date() },
+    where: { groupId: input.groupId, id: input.inviteId, revokedAt: null, usedAt: null },
+  });
+  if (revoked.count === 0) {
+    throw new GroupError("Invite not found.");
+  }
+}
+
+// Clears a revoked invite from the owner's list. Unused ones are revoked first and used ones stay,
+// since they record who joined with them.
+export async function removePersonalInvite(input: { groupId: string; inviteId: string; ownerId: string }): Promise<void> {
+  await requireOwnedGroup(input.groupId, input.ownerId);
+  const removed = await prisma.groupInvite.deleteMany({
+    where: { groupId: input.groupId, id: input.inviteId, revokedAt: { not: null } },
+  });
+  if (removed.count === 0) {
+    throw new GroupError("Invite not found.");
+  }
 }
 
 export async function leaveGroup(input: { groupId: string; userId: string }): Promise<void> {
@@ -327,14 +590,21 @@ export async function getOwnedGroupDetail(input: {
     id: group.id,
     imageUrl: group.imageUrl,
     inviteToken: group.inviteToken,
+    joinCode: group.joinCode,
     members: group.members
       .filter((row) => row.userId !== group.ownerId)
       .map((row) => ({
         joinedAt: row.joinedAt.toISOString(),
         name: row.user.name,
+        pendingShares: pendingShares(group.shares, row.answeredShares),
+        shares: effectiveShares(group.shares, row.allowedShares),
+        sharing: row.sharing,
         userId: row.userId,
       })),
+    membersVisible: group.membersVisible,
+    shares: group.shares,
     name: group.name,
+    ownerTitle: group.ownerTitle,
     role: "owner",
     telegramInviteUrl: links.telegramInviteUrl,
     webInviteUrl: links.webInviteUrl,
@@ -349,6 +619,7 @@ export async function getJoinedGroupDetail(input: {
     include: {
       group: {
         include: {
+          _count: { select: { members: true } },
           owner: { select: { name: true } },
         },
       },
@@ -358,6 +629,13 @@ export async function getJoinedGroupDetail(input: {
   if (!member || member.role === "owner") {
     throw new GroupError("You are not a member of that group.");
   }
+  const members = member.group.membersVisible
+    ? await prisma.groupMember.findMany({
+        include: { user: { select: { name: true } } },
+        orderBy: [{ role: "asc" }, { joinedAt: "asc" }],
+        where: { groupId: input.groupId },
+      })
+    : null;
   const messages = await prisma.groupMessage.findMany({
     include: { fromUser: { select: { name: true } } },
     orderBy: { createdAt: "desc" },
@@ -367,14 +645,24 @@ export async function getJoinedGroupDetail(input: {
     description: member.group.description,
     id: member.group.id,
     imageUrl: member.group.imageUrl,
+    memberCount: member.group.membersVisible ? member.group._count.members : null,
+    members:
+      members?.map((row) => ({ joinedAt: row.joinedAt.toISOString(), name: row.user.name, userId: row.userId })) ?? null,
+    membersVisible: member.group.membersVisible,
+    shares: member.group.shares,
     messages: messages.map((row) => ({
       body: row.body,
       createdAt: row.createdAt.toISOString(),
       fromName: row.fromUser.name,
+      helpful: row.helpfulAt !== null,
       id: row.id,
     })),
     name: member.group.name,
+    ownerId: member.group.ownerId,
     ownerName: member.group.owner.name,
+    ownerTitle: member.group.ownerTitle,
+    allowedShares: effectiveShares(member.group.shares, member.allowedShares),
+    pendingShares: pendingShares(member.group.shares, member.answeredShares),
     role: "member",
   };
 }
@@ -394,6 +682,7 @@ export async function listMessagesForMember(input: {
     body: row.body,
     createdAt: row.createdAt.toISOString(),
     fromName: row.fromUser.name,
+    helpful: row.helpfulAt !== null,
     id: row.id,
   }));
 }
@@ -426,6 +715,7 @@ export async function sendGroupMessage(input: {
     body: created.body,
     createdAt: created.createdAt.toISOString(),
     fromName: created.fromUser.name,
+    helpful: false,
     id: created.id,
   };
 }
@@ -444,6 +734,9 @@ export async function reassignGroupsOnUserMerge(
   absorbedId: string,
 ): Promise<void> {
   await tx.group.updateMany({ data: { ownerId: survivorId }, where: { ownerId: absorbedId } });
+  await tx.groupNotice.updateMany({ data: { authorId: survivorId }, where: { authorId: absorbedId } });
+  await tx.groupInvite.updateMany({ data: { createdById: survivorId }, where: { createdById: absorbedId } });
+  await tx.groupInvite.updateMany({ data: { usedById: survivorId }, where: { usedById: absorbedId } });
   await tx.groupMessage.updateMany({
     data: { fromUserId: survivorId },
     where: { fromUserId: absorbedId },
@@ -504,14 +797,74 @@ function normalizeMessage(value: string): string {
   return body;
 }
 
+const SHARE_NAMES: Record<GroupShareKind, string> = {
+  activity: "activity",
+  meals: "meal items",
+  photos: "meal photos",
+  summary: "daily summary",
+  weight: "weight",
+};
+
+// Tells members who haven't answered the new items that the owner asks for them.
+async function notifyShareAsk(input: { added: GroupShareKind[]; groupId: string; groupName: string; ownerId: string }): Promise<void> {
+  const [owner, members] = await Promise.all([
+    prisma.user.findUnique({ select: { name: true }, where: { id: input.ownerId } }),
+    prisma.groupMember.findMany({ select: { answeredShares: true, userId: true }, where: { groupId: input.groupId, role: "member" } }),
+  ]);
+  const who = owner?.name?.trim().split(/\s+/u)[0] || "Your coach";
+  await Promise.all(
+    members.map((member) => {
+      const asked = input.added.filter((kind) => !member.answeredShares.includes(kind));
+      if (asked.length === 0) {
+        return Promise.resolve(0);
+      }
+      return pushToUser(member.userId, {
+        body: `${who} also asks to see your ${asked.map((kind) => SHARE_NAMES[kind]).join(", ")}. Open the group to allow it.`,
+        data: { groupId: input.groupId, type: "group_share_ask" },
+        title: input.groupName,
+      });
+    }),
+  ).catch((error: unknown) => console.error("group share ask notify failed", error));
+}
+
+function normalizeShares(value: readonly GroupShareKind[]): GroupShareKind[] {
+  const shares = GROUP_SHARE_KINDS.filter((kind) => value.includes(kind));
+  if (shares.length === 0) {
+    throw new GroupError("Choose at least one thing members share.");
+  }
+  return shares;
+}
+
+function normalizeOwnerTitle(value: string): string {
+  const title = value.trim().replace(/\s+/gu, " ");
+  if (title.length > GROUP_OWNER_TITLE_MAX) {
+    throw new GroupError("Choose a shorter title.");
+  }
+  return title;
+}
+
+async function uniqueJoinCode(name: string): Promise<string> {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const joinCode = generateJoinCode(name);
+    const [group, invite] = await Promise.all([
+      prisma.group.findUnique({ select: { id: true }, where: { joinCode } }),
+      prisma.groupInvite.findUnique({ select: { id: true }, where: { code: joinCode } }),
+    ]);
+    if (!group && !invite) {
+      return joinCode;
+    }
+  }
+  throw new GroupError("Could not create that group.");
+}
+
 async function uniqueInviteToken(): Promise<string> {
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const inviteToken = generateInviteToken();
-    const existing = await prisma.group.findUnique({
-      select: { id: true },
-      where: { inviteToken },
-    });
-    if (!existing) {
+    const [group, invite] = await Promise.all([
+      prisma.group.findUnique({ select: { id: true }, where: { inviteToken } }),
+      prisma.groupInvite.findUnique({ select: { id: true }, where: { token: inviteToken } }),
+    ]);
+    if (!group && !invite) {
       return inviteToken;
     }
   }
