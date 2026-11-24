@@ -7,6 +7,7 @@ import type {
   LanguageModelV4StreamResult,
 } from "@ai-sdk/provider";
 import type { LanguageModelMiddleware } from "ai";
+import { APP_INSTRUCTIONS_HEADING, APP_LANGUAGE_REMINDER } from "./assistant/app-instructions.ts";
 import {
   TOOL_INTENTS_CONTEXT_PREFIX,
   formatIntentPlanContext,
@@ -143,6 +144,19 @@ export function prependSystemLine(prompt: LanguageModelV4Prompt, line: string): 
   return [{ content: line, role: "system" }, ...prompt];
 }
 
+// Only in the app, where every turn answers something the person just said.
+export function appendAppLanguageReminder(prompt: LanguageModelV4Prompt): LanguageModelV4Prompt {
+  const inApp = prompt.some((message) => message.role === "system" && message.content.includes(APP_INSTRUCTIONS_HEADING));
+  const index = lastUserIndex(prompt);
+  const message = prompt[index];
+  if (!inApp || message?.role !== "user") {
+    return prompt;
+  }
+  const next = [...prompt];
+  next[index] = { ...message, content: [...message.content, { text: APP_LANGUAGE_REMINDER, type: "text" }] };
+  return next;
+}
+
 export function injectToolCategoriesContext(
   prompt: LanguageModelV4Prompt,
   categories: readonly ToolCategory[],
@@ -202,7 +216,9 @@ export function createRequireWriteToolsMiddleware(options?: {
     specificationVersion: "v4",
     async transformParams({ params }) {
       const resolved = await resolveCategories(params.prompt, classify, classified);
-      const prompt = injectToolCategoriesContext(params.prompt, resolved.categories, resolved.intents);
+      const prompt = appendAppLanguageReminder(
+        injectToolCategoriesContext(params.prompt, resolved.categories, resolved.intents),
+      );
       const policy = writeToolPolicy({ categories: resolved.categories, params: { ...params, prompt } });
       if (!policy.shouldRequire) {
         return { ...params, prompt };
