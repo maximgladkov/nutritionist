@@ -198,8 +198,10 @@ export const mealRoutes: RouteDefinition[] = [
       const body = await readJson(request, z.object({ uploadId: z.string().min(1) }));
       const meal = await requireOwnedMeal(user.id, params.id ?? "");
       await requireOwnedAttachments(user.id, [body.uploadId]);
+      // A new photo goes after the ones already there.
+      const last = await prisma.mealPhoto.aggregate({ _max: { position: true }, where: { mealId: meal.id } });
       await prisma.mealPhoto.upsert({
-        create: { attachmentId: body.uploadId, mealId: meal.id },
+        create: { attachmentId: body.uploadId, mealId: meal.id, position: (last._max.position ?? -1) + 1 },
         update: {},
         where: { mealId_attachmentId: { attachmentId: body.uploadId, mealId: meal.id } },
       });
@@ -216,5 +218,24 @@ export const mealRoutes: RouteDefinition[] = [
     },
     method: "DELETE",
     path: "/meals/:id/photos/:photoId",
+  },
+  {
+    // Puts the meal's photos in the order given; it must name every photo the meal has.
+    async handler({ params, request, user }) {
+      const body = await readJson(request, z.object({ photoIds: z.array(z.string().min(1)).max(100) }));
+      const meal = await requireOwnedMeal(user.id, params.id ?? "");
+      const photos = await prisma.mealPhoto.findMany({ select: { id: true }, where: { mealId: meal.id } });
+      const known = new Set(photos.map((photo) => photo.id));
+      const given = new Set(body.photoIds);
+      if (given.size !== body.photoIds.length || given.size !== known.size || body.photoIds.some((id) => !known.has(id))) {
+        throw invalid("List each of the meal's photos once.");
+      }
+      await prisma.$transaction(
+        body.photoIds.map((id, position) => prisma.mealPhoto.update({ data: { position }, where: { id } })),
+      );
+      return { meal: await mealWithPhotos(await loadMeal(user.id, meal.id)) };
+    },
+    method: "PUT",
+    path: "/meals/:id/photos/order",
   },
 ];

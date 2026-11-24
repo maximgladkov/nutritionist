@@ -665,6 +665,8 @@ model MealPhoto {
   meal         Meal           @relation(fields: [mealId], references: [id], onDelete: Cascade)
   attachmentId String
   attachment   UserAttachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+  // Where it sits among the meal's photos, from 0; people reorder them by dragging.
+  position     Int            @default(0)
   createdAt    DateTime       @default(now())
 
   @@unique([mealId, attachmentId])
