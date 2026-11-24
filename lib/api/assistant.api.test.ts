@@ -210,9 +210,9 @@ describe("talking", () => {
   const start = (token = session.accessToken) => api("POST", "/assistant/talk", { token });
 
   it("hands out a one-time key and never the server's own", async () => {
-    process.env.ASSISTANT_TALK_GATEWAY_KEY = "server-secret";
+    process.env.AI_GATEWAY_API_KEY = "server-secret";
     const { body, headers, status } = await start();
-    delete process.env.ASSISTANT_TALK_GATEWAY_KEY;
+    delete process.env.AI_GATEWAY_API_KEY;
     assert.equal(status, 200, JSON.stringify(body));
     assert.equal(body.token, "one-time");
     assert.equal(headers.get("cache-control"), "no-store");

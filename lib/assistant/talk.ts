@@ -10,10 +10,9 @@ export const TALK_DAILY_CALLS = 15;
 
 export const TALK_INSTRUCTIONS = `You are the voice of the personal coach in Btr.me, a food diary app. Speak the user's language. You can hold a natural conversation, but you can't see their diary, goals, foods or weight, remember past calls, or change anything yourself. For anything beyond greetings and small talk, including every question about food, nutrition, calories, plans, weight or health, delegate to the application right away and briefly acknowledge it while it works. Never guess a number and never say something was logged or added unless the application says so. When the result arrives, say it naturally in your own words and keep every reply short. If the application suggests a meal, ask whether to add it, then delegate whatever the user replies, even a single word. Never answer for the user. If the user mentions an emergency or harming themselves, tell them to call local emergency services now.`;
 
-// The gateway only takes a real key for live sessions, not Vercel's OIDC token. It has its own
-// variable so setting it doesn't change how every other model call is billed.
+// The gateway only takes a real key for live sessions, not Vercel's OIDC token.
 export function talkKey(): string | null {
-  return process.env.ASSISTANT_TALK_GATEWAY_KEY?.trim() || null;
+  return process.env.AI_GATEWAY_API_KEY?.trim() || null;
 }
 
 export type TalkSecret = { expiresAt: number; token: string };
@@ -21,7 +20,7 @@ export type TalkSecret = { expiresAt: number; token: string };
 export async function mintTalkSecret(): Promise<TalkSecret> {
   const key = talkKey();
   if (!key) {
-    throw new Error("ASSISTANT_TALK_GATEWAY_KEY is not configured");
+    throw new Error("AI_GATEWAY_API_KEY is not configured");
   }
   const response = await fetch("https://ai-gateway.vercel.sh/v1/realtime/client-secrets", {
     body: JSON.stringify({ model: TALK_MODEL, routeKind: "live" }),
