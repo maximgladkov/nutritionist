@@ -81,7 +81,7 @@ describe("clockContextText", () => {
       timeZone: "Europe/Madrid",
       timezoneIsFallback: false,
     });
-    assert.match(text, /Catalog country: ES \(search names in Spanish and English\)/);
+    assert.match(text, /Catalog country: ES \(search names in Spanish and English; this is not the reply language\)/);
   });
 
   it("uses English only when the catalog language is English", () => {

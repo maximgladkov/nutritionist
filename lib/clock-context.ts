@@ -16,7 +16,7 @@ export function catalogCountryContextText(country?: string | null): string {
   if (language === "en") {
     return `Catalog country: ${code} (search names in English).`;
   }
-  return `Catalog country: ${code} (search names in ${languageName} and English).`;
+  return `Catalog country: ${code} (search names in ${languageName} and English; this is not the reply language).`;
 }
 
 export function clockContextText(input: {

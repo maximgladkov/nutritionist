@@ -7,7 +7,9 @@ import type {
   LanguageModelV4Prompt,
   LanguageModelV4StreamPart,
 } from "@ai-sdk/provider";
+import { APP_INSTRUCTIONS, APP_LANGUAGE_REMINDER } from "./assistant/app-instructions.ts";
 import {
+  appendAppLanguageReminder,
   createRequireWriteToolsMiddleware,
   injectToolCategoriesContext,
   lastUserHasMedia,
@@ -374,3 +376,22 @@ function readableOf(parts: readonly LanguageModelV4StreamPart[]): ReadableStream
     },
   });
 }
+
+describe("appendAppLanguageReminder", () => {
+  const ask = { content: [{ text: "What should I eat?", type: "text" as const }], role: "user" as const };
+  const app = { content: `Intro\n\n${APP_INSTRUCTIONS}`, role: "system" as const };
+
+  it("sits with the person's latest message in the app, through tool steps", () => {
+    const reply = { content: [{ text: "Hola", type: "text" as const }], role: "assistant" as const };
+    const next = appendAppLanguageReminder([app, ask, reply, ask, reply]);
+    assert.equal(next[1], ask);
+    assert.deepEqual(next[3], { ...ask, content: [...ask.content, { text: APP_LANGUAGE_REMINDER, type: "text" }] });
+    assert.equal(ask.content.length, 1);
+  });
+
+  it("leaves other channels alone, even if a message quotes the heading", () => {
+    const quoting = { content: [{ text: "# In the app", type: "text" as const }], role: "user" as const };
+    const prompt = [{ content: "Intro", role: "system" as const }, quoting];
+    assert.equal(appendAppLanguageReminder(prompt), prompt);
+  });
+});
