@@ -8,6 +8,7 @@ import {
 } from "eve/channels/auth";
 import type { ChannelReceiveContext } from "eve/channels";
 import { appPrincipal } from "../../lib/principal";
+import { ASSISTANT_MAX_REQUEST_BYTES, assistantLimit } from "../../lib/assistant/limits";
 import { prisma } from "../../lib/prisma";
 import { eveSessionIdFromPath, getUserFromRequest } from "../../lib/session";
 import { formatToolCategoriesContext } from "../../lib/tool-categories";
@@ -24,6 +25,8 @@ function appSession(): AuthFn<Request> {
       return null;
     }
 
+    // The mobile app signs its requests with an API token; the web app has a session cookie.
+    const channel = /^Bearer\s/i.test(request.headers.get("authorization") ?? "") ? "app" : "web";
     const sessionId = eveSessionIdFromPath(new URL(request.url).pathname);
     if (sessionId) {
       const owned = await prisma.agentSession.findUnique({
@@ -33,18 +36,34 @@ function appSession(): AuthFn<Request> {
         throw new ForbiddenError({ message: "This conversation belongs to another user." });
       }
       if (!owned) {
-        await prisma.agentSession.create({
-          data: {
-            channel: "web",
-            eveSessionId: sessionId,
-            userId: user.id,
-          },
+        // The session hook may be writing the same row, so a second write is fine.
+        await prisma.agentSession.createMany({
+          data: [{ channel, eveSessionId: sessionId, userId: user.id }],
+          skipDuplicates: true,
         });
       }
     }
 
-    return appPrincipal(user.id, "web");
+    if (channel === "app" && request.method === "POST") {
+      await requireAssistantCapacity(request, user.id);
+    }
+
+    return appPrincipal(user.id, channel);
   };
+}
+
+async function requireAssistantCapacity(request: Request, userId: string): Promise<void> {
+  // Stopping a reply is always allowed.
+  if (new URL(request.url).pathname.endsWith("/cancel")) {
+    return;
+  }
+  if (Number(request.headers.get("content-length") ?? 0) > ASSISTANT_MAX_REQUEST_BYTES) {
+    throw new ForbiddenError({ code: "message_too_long", message: "That message is too long." });
+  }
+  const limited = await assistantLimit(userId);
+  if (limited) {
+    throw new ForbiddenError({ code: "rate_limited", message: limited });
+  }
 }
 
 const channel = eveChannel({

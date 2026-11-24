@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { resolveProductByBarcode } from "./catalog-product.ts";
 import { inferMealLabel } from "./meal-label.ts";
 import { choosePackagedFoodName } from "./open-food-facts-name.ts";
@@ -358,6 +359,7 @@ export type CopyMealSlots = {
 
 export type CopyMealResult =
   | {
+      addedItemIds: string[];
       asLabel: MealLabel;
       copied: true;
       date: string;
@@ -496,8 +498,9 @@ export async function copyMeal(input: {
   if (items.length > MAX_ITEMS) {
     throw new MealError(`A meal can have at most ${MAX_ITEMS} items`);
   }
+  const clones = items.map((item) => ({ ...cloneMealItemCreateData(item), id: randomUUID() }));
   const meal = await writeClonedMealItems({
-    items: items.map(cloneMealItemCreateData),
+    items: clones,
     label: slots.targetLabel,
     now,
     range: slots.targetRange,
@@ -505,6 +508,7 @@ export async function copyMeal(input: {
   });
   return {
     ...base,
+    addedItemIds: clones.map((item) => item.id),
     copied: true,
     meal,
   };
@@ -760,6 +764,16 @@ export function mealQueryRange(input: {
     }
     throw error;
   }
+}
+
+// What these items would be logged as, without logging them.
+export async function previewMealItems(input: {
+  items: MealItemInput[];
+  country?: string;
+  signal?: AbortSignal;
+}): Promise<{ amount: number; metrics: NutrientValues; name: string; unit: AmountUnit }[]> {
+  const resolved = await resolveItems(input.items, input.country, input.signal);
+  return resolved.map(({ amount, metrics, name, unit }) => ({ amount, metrics, name, unit }));
 }
 
 async function resolveItems(

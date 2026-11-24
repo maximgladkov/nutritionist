@@ -3,6 +3,7 @@ import { z } from "zod";
 import { copyMeal } from "../../lib/meals";
 import { attachTodayNutritionProgress } from "../../lib/nutrition-progress";
 import { mealLabelSchema } from "../lib/meal-item-schema";
+import { withAppCard } from "../lib/app-card";
 import { requireUser } from "../lib/require-user";
 
 export default defineTool({
@@ -23,6 +24,7 @@ export default defineTool({
       label,
       userId,
     });
-    return attachTodayNutritionProgress(userId, copied);
+    const result = await attachTodayNutritionProgress(userId, copied);
+    return copied.copied ? withAppCard(ctx, userId, copied.meal, copied.addedItemIds, result) : result;
   },
 });

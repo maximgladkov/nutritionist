@@ -118,6 +118,12 @@ export function normalizeChannelKind(kind: string | undefined): string {
   return kind;
 }
 
+// The app talks over the same eve channel as the web; its principal says which one it is.
+export function turnChannel(kind: string | undefined, attributes: Readonly<Record<string, unknown>> | undefined): string {
+  const channel = normalizeChannelKind(kind);
+  return channel === "web" && attributes?.channel === "app" ? "app" : channel;
+}
+
 export function clipJson(value: unknown): unknown {
   if (value === undefined) {
     return undefined;

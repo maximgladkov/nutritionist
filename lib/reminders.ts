@@ -393,7 +393,8 @@ export async function mealAlreadyLoggedToday(input: {
 export async function resolveReachTarget(userId: string): Promise<ReachTarget | null> {
   const [latestSession, identities] = await Promise.all([
     prisma.agentSession.findFirst({
-      where: { userId },
+      // Check-ins aren't delivered into the app's conversation, only to these channels.
+      where: { channel: { not: "app" }, userId },
       orderBy: { updatedAt: "desc" },
     }),
     prisma.channelIdentity.findMany({

@@ -1,9 +1,11 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { upsertMealItems } from "../../lib/meals";
+import { withItemIds } from "../../lib/assistant/actions";
 import { attachTodayNutritionProgress } from "../../lib/nutrition-progress";
 import { mealItemInputSchema, mealLabelSchema } from "../lib/meal-item-schema";
 import { resolveLookupCountry } from "../lib/resolve-country";
+import { withAppCard } from "../lib/app-card";
 import { requireUser } from "../lib/require-user";
 
 export default defineTool({
@@ -18,14 +20,16 @@ export default defineTool({
   async execute({ items, label, date, country }, ctx) {
     const { userId } = await requireUser(ctx);
     const resolvedCountry = await resolveLookupCountry(country, ctx);
+    const identified = withItemIds(items);
     const meal = await upsertMealItems({
       userId,
-      items,
+      items: identified,
       label,
       date,
       country: resolvedCountry,
       signal: ctx.abortSignal,
     });
-    return attachTodayNutritionProgress(userId, meal);
+    const result = await attachTodayNutritionProgress(userId, meal);
+    return withAppCard(ctx, userId, meal, identified.map((item) => item.id), result);
   },
 });
