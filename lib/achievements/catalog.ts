@@ -287,7 +287,7 @@ function dayBest(input: {
   const amount = (value: number) => `${value.toLocaleString("en-US")} ${unit}`;
   return [
     ...targets.map((target): Achievement => ({
-      color, description: `${amount(target)} in a single day.`, icon, id: `${id}-${target}`, metric: best, name: target.toLocaleString("en-US"),
+      color, description: "All in a single day. Keep moving.", icon, id: `${id}-${target}`, metric: best, name: target.toLocaleString("en-US"),
       target, tier: tier(target), title: `${amount(target)} in a day`, toGo: () => `Reach ${amount(target)} in one day.`, unit,
     })),
     ...[7, 30].map((count): Achievement => ({
