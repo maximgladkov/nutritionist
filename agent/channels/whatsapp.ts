@@ -1,6 +1,6 @@
 import { createWhatsAppAdapter } from "@chat-adapter/whatsapp";
 import type { Message, Thread } from "chat";
-import { chatSdkChannel, messageToUserContent } from "eve/channels/chat-sdk";
+import { chatSdkChannel, messageContentOf } from "eve/channels/chat-sdk";
 import { handleChannelLink, resolveChannelUser, saveChannelThreadId } from "../lib/channel-identity";
 import { createPrismaChatState } from "../lib/chat-sdk-state";
 import { APP_NAME } from "../../lib/brand";
@@ -44,7 +44,7 @@ async function dispatchWhatsApp(thread: Thread, message: Message) {
     providerUserId: message.author.userId,
     threadId: serialized.id ?? serialized.channelId ?? thread.channelId,
   });
-  await send(messageToUserContent(message), {
+  await send(messageContentOf(message), {
     auth: appPrincipal(user.id, "whatsapp"),
     thread,
   });

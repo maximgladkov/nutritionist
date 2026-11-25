@@ -1,8 +1,12 @@
 import type { LanguageModelV4FilePart, LanguageModelV4Message, LanguageModelV4Prompt } from "@ai-sdk/provider";
-import type { LanguageModelMiddleware, UserContent } from "ai";
+import type { LanguageModelMiddleware } from "ai";
+import type { MessageContent } from "eve/channels";
 import type { AgentTurnUserPart } from "../agent-turn-model.ts";
 import { apiDeps } from "../api/deps.ts";
+import { sniffImageMediaType } from "../image-bytes.ts";
+import { mediaRef, readMediaRef } from "../media-ref.ts";
 import { prisma } from "../prisma.ts";
+import { fetchTelegramFileBytes } from "../telegram-file.ts";
 
 // Photos a message may carry: enough for a long menu.
 export const ASSISTANT_MAX_PHOTOS = 8;
@@ -25,18 +29,42 @@ export function photoLink(id: string): string {
   return `https://btr.me/api/v1/uploads/${id}/content`;
 }
 
+// The transcript keeps an attachment's name, not the reference behind it.
+const PHOTO_NAME = /^upload-([A-Za-z0-9_-]{1,64})$/u;
+
+export function attachedPhotoLink(filename: string | undefined): string | undefined {
+  const id = filename && PHOTO_NAME.exec(filename)?.[1];
+  return id ? photoLink(id) : undefined;
+}
+
+// Uploads go on as references, which eve keeps as they are.
+export function referToPhotos(message: MessageContent): MessageContent {
+  if (typeof message === "string") return message;
+  return message.map((part) => {
+    const id = part.type === "file" ? photoId(linkOf(part.data)) : null;
+    if (part.type !== "file" || !id) return part;
+    return { ...part, data: mediaRef("upload", id) as unknown as string, filename: `upload-${id}` };
+  });
+}
+
+function linkOf(data: unknown): string | undefined {
+  if (data instanceof URL) return data.href;
+  return typeof data === "string" ? data.replace(/^eve-url:/u, "") : undefined;
+}
+
 export class PhotoError extends Error {}
 
 // Everything the app attaches must be an upload of the person sending it, and nobody else's upload
 // may be attached from anywhere.
-export async function requireOwnPhotos(message: string | UserContent, caller: { channel: string; userId: string }): Promise<void> {
+export async function requireOwnPhotos(message: MessageContent, caller: { channel: string; userId: string }): Promise<void> {
   if (typeof message === "string") {
     return;
   }
   const ids: string[] = [];
   for (const part of message) {
     if (part.type !== "file") continue;
-    const id = typeof part.data === "string" ? photoId(part.data) : null;
+    if (typeof part.data === "object" && !(part.data instanceof URL)) throw new PhotoError("Only files can be attached.");
+    const id = photoId(linkOf(part.data));
     if (id) ids.push(id);
     else if (caller.channel === "app") throw new PhotoError("Only uploaded photos can be attached.");
   }
@@ -62,7 +90,7 @@ export function photosIn(parts: readonly AgentTurnUserPart[] | undefined): { id:
   });
 }
 
-type Photo = { bytes: Uint8Array; mediaType: string };
+type Photo = { bytes: Uint8Array; mediaType?: string };
 export type LoadPhoto = (id: string) => Promise<Photo | null>;
 
 const cache = new Map<string, Photo>();
@@ -88,19 +116,37 @@ export async function loadPhoto(id: string): Promise<Photo | null> {
   return photo;
 }
 
-function linkedPhoto(part: LanguageModelV4FilePart): string | null {
-  return part.data.type === "url" ? photoId(part.data.url.toString()) : null;
+// A file sent in Telegram: a photo, a voice note or a video.
+export async function loadTelegramFile(id: string): Promise<Photo | null> {
+  const kept = cache.get(`telegram:${id}`);
+  if (kept) {
+    return kept;
+  }
+  const file = await fetchTelegramFileBytes(id);
+  if (!file) {
+    return null;
+  }
+  const photo = { bytes: new Uint8Array(file.bytes), mediaType: sniffImageMediaType(file.bytes) ?? undefined };
+  cache.set(`telegram:${id}`, photo);
+  if (cache.size > PHOTO_CACHE) cache.delete(cache.keys().next().value!);
+  return photo;
+}
+
+function linkedFile(part: LanguageModelV4FilePart) {
+  if (part.data.type === "reference") return readMediaRef(part.data.reference);
+  const id = part.data.type === "url" ? photoId(part.data.url.toString()) : null;
+  return id ? { id, kind: "upload" as const } : null;
 }
 
 type UserPart = Extract<LanguageModelV4Message, { role: "user" }>["content"][number];
 
 function isLinkedPhoto(part: UserPart): part is LanguageModelV4FilePart {
-  return part.type === "file" && linkedPhoto(part) !== null;
+  return part.type === "file" && linkedFile(part) !== null;
 }
 
 // Puts the photos themselves in place of their links: all of the newest message that has any, and
 // earlier ones, newest first, while there's room.
-export async function showPhotos(prompt: LanguageModelV4Prompt, load: LoadPhoto = loadPhoto): Promise<LanguageModelV4Prompt> {
+export async function showPhotos(prompt: LanguageModelV4Prompt, load: LoadPhoto = loadPhoto, loadTelegram: LoadPhoto = loadTelegramFile): Promise<LanguageModelV4Prompt> {
   const next = [...prompt];
   let room = PHOTOS_MAX_BYTES;
   let left = ASSISTANT_MAX_PHOTOS;
@@ -119,7 +165,8 @@ export async function showPhotos(prompt: LanguageModelV4Prompt, load: LoadPhoto 
         message.content.map(async (part) => {
           if (!isLinkedPhoto(part)) return null;
           try {
-            return await load(linkedPhoto(part)!);
+            const file = linkedFile(part)!;
+            return await (file.kind === "telegram" ? loadTelegram : load)(file.id);
           } catch (error) {
             console.error("assistant photo load failed", error);
             return null;
@@ -142,7 +189,7 @@ export async function showPhotos(prompt: LanguageModelV4Prompt, load: LoadPhoto 
         if (!fits) return { text: EARLIER_PHOTO_NOTE, type: "text" };
         const photo = photos[at];
         if (!photo) return { text: MISSING_PHOTO_NOTE, type: "text" };
-        return { data: { data: photo.bytes, type: "data" }, mediaType: photo.mediaType, type: "file" };
+        return { data: { data: photo.bytes, type: "data" }, mediaType: photo.mediaType ?? part.mediaType, type: "file" };
       }),
     };
     newest = false;

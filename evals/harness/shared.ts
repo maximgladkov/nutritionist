@@ -49,16 +49,5 @@ export function calledNoToolsIn(names: readonly string[], label: string) {
 }
 
 function toolNamesFromEvent(event: EveEvalStreamEvent): string[] {
-  if (event.type === "action.input.appended") {
-    return event.data.toolName ? [event.data.toolName] : [];
-  }
-  if (event.type !== "actions.requested") {
-    return [];
-  }
-  return event.data.actions.flatMap((action) => {
-    if (action.kind === "tool-call" && typeof action.toolName === "string") {
-      return [action.toolName];
-    }
-    return [];
-  });
+  return event.type === "call.requested" && event.data.capability.kind === "tool" ? [event.data.capability.name] : [];
 }

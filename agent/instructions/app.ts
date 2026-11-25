@@ -3,16 +3,14 @@ import { resolveAuthenticatedUserId } from "../../lib/identity";
 import { loadSettings, settingsInstructions } from "../../lib/assistant/settings";
 import { APP_INSTRUCTIONS } from "../../lib/assistant/app-instructions";
 
-export default defineDynamic({
-  events: {
-    async "turn.started"(_event, ctx) {
-      const caller = ctx.session.auth.current ?? ctx.session.auth.initiator;
-      if (!caller || caller.attributes?.channel !== "app") {
-        return null;
-      }
-      return defineInstructions({ content: [APP_INSTRUCTIONS, await chosen(caller.principalId, ctx.session.id)].filter(Boolean).join("\n\n") });
-    },
-  },
+export default defineDynamic(async (ctx) => {
+  const caller = ctx.session.auth.current ?? ctx.session.auth.initiator;
+  if (!caller || caller.attributes?.channel !== "app") {
+    return null;
+  }
+  // Called before every model call; what they chose is read once a turn.
+  const settings = await ctx.memo(["settings", ctx.turn?.id ?? null], () => chosen(caller.principalId, ctx.session.id));
+  return defineInstructions({ content: [APP_INSTRUCTIONS, settings].filter(Boolean).join("\n\n") });
 });
 
 async function chosen(principalId: string, eveSessionId: string): Promise<string | null> {

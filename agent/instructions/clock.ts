@@ -1,21 +1,18 @@
-import { defineDynamic, defineInstructions, type DynamicResolveContext } from "eve/instructions";
+import { defineDynamic, defineInstructions, type DynamicContext } from "eve/instructions";
 import { clockContextText } from "../../lib/clock-context";
 import { liveNutritionContextText } from "../../lib/live-nutrition-context";
 import { loadTodayNutritionProgress } from "../../lib/nutrition-progress";
 import { prisma } from "../../lib/prisma";
 import { getLiveUserId } from "../lib/require-user";
 
-export default defineDynamic({
-  events: {
-    async "turn.started"(_event, ctx) {
-      return defineInstructions({
-        content: await resolveClockContext(ctx),
-      });
-    },
-  },
-});
+// Called before every model call; the same words all through a turn.
+export default defineDynamic(async (ctx) =>
+  defineInstructions({
+    content: await ctx.memo(["clock", ctx.turn?.id ?? null], () => resolveClockContext(ctx)),
+  }),
+);
 
-async function resolveClockContext(ctx: DynamicResolveContext): Promise<string> {
+async function resolveClockContext(ctx: DynamicContext): Promise<string> {
   const now = new Date();
   let timeZone = "UTC";
   let timezoneIsFallback = true;

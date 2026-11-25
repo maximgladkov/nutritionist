@@ -16,10 +16,19 @@ import {
   replaceUserMessageParts,
   summarizeTranscript,
   TOOL_JSON_MAX_CHARS,
-  toolCallsFromActions,
-  toolResultFromAction,
   userPreviewFrom,
+  waitedForAnswersMs,
 } from "./agent-turn-model.ts";
+
+describe("waitedForAnswersMs", () => {
+  it("is the time from a question to what came after the answer", () => {
+    const at = (second: number) => new Date(second * 1000).toISOString();
+    const tool = (toolName: string, second: number) => ({ at: at(second), callId: toolName, stepIndex: 0, toolName, type: "tool" as const });
+    const said = (second: number) => ({ at: at(second), stepIndex: 1, text: "Logged.", type: "assistant" as const });
+    assert.equal(waitedForAnswersMs([tool("list_meals", 1), tool("ask_question", 2), said(602)]), 600_000);
+    assert.equal(waitedForAnswersMs([tool("ask_question", 2)]), 0);
+  });
+});
 
 describe("normalizeChannelKind", () => {
   it("maps eve and http to web", () => {
@@ -30,6 +39,7 @@ describe("normalizeChannelKind", () => {
 
   it("strips the authored channel prefix", () => {
     assert.equal(normalizeChannelKind("channel:telegram"), "telegram");
+    assert.equal(normalizeChannelKind("channel:eve"), "web");
     assert.equal(normalizeChannelKind("telegram"), "telegram");
   });
 });
@@ -283,32 +293,5 @@ describe("userPreviewFrom", () => {
     const preview = userPreviewFrom("a".repeat(400));
     assert.equal(preview?.endsWith("…"), true);
     assert.equal(preview?.length, 280);
-  });
-});
-
-describe("action extractors", () => {
-  it("reads tool-call actions", () => {
-    const calls = toolCallsFromActions([
-      { callId: "c1", kind: "tool-call", toolName: "log_meal", input: { label: "lunch" } },
-    ]);
-    assert.deepEqual(calls, [
-      { callId: "c1", toolInput: { label: "lunch" }, toolName: "log_meal" },
-    ]);
-  });
-
-  it("reads tool results", () => {
-    const result = toolResultFromAction({
-      callId: "c1",
-      isError: false,
-      kind: "tool-result",
-      output: { ok: true },
-      toolName: "log_meal",
-    });
-    assert.deepEqual(result, {
-      callId: "c1",
-      isError: false,
-      output: { ok: true },
-      toolName: "log_meal",
-    });
   });
 });

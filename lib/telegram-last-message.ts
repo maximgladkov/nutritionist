@@ -48,13 +48,13 @@ export function wrapTelegramLastMessageSource<TState>(
             : address
           : address;
       if (chatId.length > 0) {
-        bindLatencySession(chatId, session.id);
+        bindLatencySession(chatId, session.sessionId);
       }
-      markLatency(sessionLatencyKey(session.id), "send_returned");
+      markLatency(sessionLatencyKey(session.sessionId), "send_returned");
       const userId = options.auth?.principalType === "user" ? options.auth.principalId : undefined;
       await persistTelegramConversationMessage({
         role: "user",
-        sessionId: session.id,
+        sessionId: session.sessionId,
         text: conversationMessageText(message),
         userId,
       });

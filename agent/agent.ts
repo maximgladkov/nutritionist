@@ -8,8 +8,9 @@ import { classifyToolCategories } from "../lib/telegram-ack";
 const MODEL_ID = "alibaba/qwen3.7-flash";
 
 export default defineAgent({
+  defaultTools: false,
   compaction: {
-    thresholdPercent: 0.6,
+    threshold: 0.6,
   },
   model: wrapLanguageModel({
     middleware: [createRequireWriteToolsMiddleware({ classify: classifyToolCategories }), leanMiddleware, photosMiddleware],
