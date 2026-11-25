@@ -119,6 +119,8 @@ describe("home message", () => {
     assert.equal(ok("Kira, 1.234 kcal left today."), "Kira, 1.234 kcal left today.");
     assert.equal(ok("Kira, about 1,200 kcal left today."), null);
     assert.equal(ok("Kira, seven days in a row, well done."), null);
+    assert.equal(ok("Кира, осталось 75 граммов белка."), "Кира, осталось 75 граммов белка.");
+    assert.equal(ok("Осталось 75 граммов белка."), null);
     assert.equal(ok("You have 1,234 kcal left today."), null);
     assert.equal(ok("Kira, **75** grams to go."), null);
     assert.equal(ok("Kira, 75 grams to go.", 4), null);

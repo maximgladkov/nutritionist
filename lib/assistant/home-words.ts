@@ -1,8 +1,8 @@
 import { gateway, generateText, Output } from "ai";
 import { z } from "zod";
 
-export const HOME_MODEL = "google/gemini-3.5-flash-lite";
-const TIMEOUT_MS = 4_000;
+export const HOME_MODEL = "anthropic/claude-haiku-5.5";
+const TIMEOUT_MS = 6_000;
 export const HOME_TEXT_MAX = 130;
 
 export type HomeWordsInput = {
@@ -26,6 +26,7 @@ const RULES = [
   "Sound like a person who knows them, not a report. Don't restate the fact: say what it means for them now, or the next easy step. Use one number at most unless two are the point. Contractions are good; 'you have', 'fits with', 'you are only' and 'let me know' are stiff.",
   "Style only, never their content: 'Kira, dinner's sorted: your salmon bowl fits with room to spare.' 'Kira, yesterday went well. What's the plan for lunch?' 'Kira, 30 grams of protein to go. Cottage cheese tonight?' 'Quiet diary today. Did lunch slip by?'",
   "A number keeps its meaning: protein left to eat, protein in a dish and calories left are different things. Don't suggest eating just to keep a streak or earn a badge.",
+  "Stay exactly as strong as the fact: 'covers it' isn't 'covers most of it'. Never compare with what's usual, recent or better unless the fact does.",
   "Where a fact carries advice to you (ask, be kind, only if), follow it and never repeat it.",
   "Vary the kind: a concrete suggestion, a small summary, encouragement, a gentle heads-up, or a question they'd want to answer.",
   "Use only what the fact says. Never add, change, round or work out a number, and write numbers as digits exactly as given. Never invent a food, habit, feeling or event.",
@@ -41,7 +42,7 @@ export async function writeHomeWords(input: HomeWordsInput): Promise<HomeWords[]
     maxRetries: 0,
     model: gateway(process.env.ASSISTANT_HOME_MODEL?.trim() || HOME_MODEL),
     output: Output.object({ schema }),
-    // A line, not a puzzle: without this an Anthropic model thinks past the limits above.
+    // A line, not a puzzle: without this it thinks past the limits above.
     providerOptions: { anthropic: { thinking: { type: "disabled" } } },
     prompt: [
       input.name
@@ -78,6 +79,13 @@ function spelledIn(text: string): string[] {
   });
 }
 
+// A name written in the script of the language it's in: "Кира, ..." for Kira.
+function inAnotherScript(text: string, name: string): boolean {
+  const called = /^\p{L}[\p{L}'’-]*(?=[,，、])/u.exec(text)?.[0];
+  const latin = /\p{Script=Latin}/u;
+  return called !== undefined && latin.test(called) !== latin.test(name);
+}
+
 // What the model wrote, if it's fit to show: the right length, a fact that exists, and no number
 // that isn't in it.
 export function acceptWords(words: HomeWords, facts: readonly string[], name: string | null, wantsName: boolean): string | null {
@@ -85,7 +93,7 @@ export function acceptWords(words: HomeWords, facts: readonly string[], name: st
   const text = words.text.trim().replace(/\s+/gu, " ");
   if (fact === undefined || text.length < 12 || text.length > HOME_TEXT_MAX) return null;
   if (/[*_#`<>{}[\]]|https?:/u.test(text)) return null;
-  if (name && wantsName && !text.toLowerCase().includes(name.toLowerCase())) return null;
+  if (name && wantsName && !text.toLowerCase().includes(name.toLowerCase()) && !inAnotherScript(text, name)) return null;
   const known = new Set(numbersIn(`${fact} ${name ?? ""}`));
   return [...numbersIn(text), ...spelledIn(text)].every((number) => known.has(number)) ? text : null;
 }
