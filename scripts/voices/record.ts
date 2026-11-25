@@ -185,7 +185,7 @@ async function askKey(): Promise<string> {
   const given = process.env.AI_GATEWAY_API_KEY?.trim();
   if (given) return given;
   const prompt = createInterface({ input: process.stdin, output: process.stdout, terminal: true });
-  process.stdout.write("AI Gateway key (not shown): ");
+  process.stdout.write("Paste the AI Gateway key and press Return. It will not be shown.\n");
   Object.assign(prompt, { _writeToOutput: () => undefined });
   return new Promise((resolve) => prompt.question("", (key) => {
     prompt.close();
