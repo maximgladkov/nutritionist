@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { after, beforeEach, describe, it } from "node:test";
 import { HOME_DAILY_RUNS, openingNotes, type HomeMessage } from "../assistant/home-message.ts";
+import { dayInWords, mealNamed, namesWrongMeal, nextMeal } from "../assistant/home-day.ts";
 import { acceptWords, numbersIn, type HomeWords, type HomeWordsInput } from "../assistant/home-words.ts";
 import { upsertMealItems } from "../meals.ts";
 import { prisma } from "../prisma.ts";
@@ -61,7 +62,7 @@ describe("home message", () => {
   it("says something true with the name when the model can't", async () => {
     await goals();
     await eat();
-    assert.match((await message()).text, /^Kira, you still need 75 grams of protein\. Chicken covers most of it\.$/);
+    assert.match((await message()).text, /^Kira, you still need 75 grams of protein\.$/);
     assert.equal((await api("GET", "/assistant/message")).status, 401);
   });
 
@@ -122,6 +123,7 @@ describe("home message", () => {
     assert.equal(ok("Kira, 1.234 kcal left today."), "Kira, 1.234 kcal left today.");
     assert.equal(ok("Kira, about 1,200 kcal left today."), null);
     assert.equal(ok("Kira, seven days in a row, well done."), null);
+    assert.equal(ok("Кира, осталось семь граммов белка."), null);
     assert.equal(ok("Кира, осталось 75 граммов белка."), "Кира, осталось 75 граммов белка.");
     assert.equal(ok("Осталось 75 граммов белка."), null);
     // As seen: no figure, no name, and the opposite of what was true.
@@ -163,6 +165,50 @@ describe("home message", () => {
       keys.push((row.payload as { key: string }).key);
     }
     for (let index = 1; index < keys.length; index += 1) assert.notEqual(keys[index], keys[index - 1]);
+  });
+
+  it("knows which meals they've had and what comes next", () => {
+    assert.equal(nextMeal(16, new Set(["breakfast", "lunch", "snack"])), "dinner");
+    assert.equal(nextMeal(9, new Set()), "breakfast");
+    assert.equal(nextMeal(12, new Set()), "lunch");
+    assert.equal(nextMeal(10, new Set(["breakfast"])), "lunch");
+    assert.equal(nextMeal(13, new Set(["lunch"])), "dinner");
+    assert.equal(nextMeal(19, new Set(["dinner"])), null);
+    assert.equal(nextMeal(23, new Set()), null);
+    assert.equal(mealNamed("Мой завтрак"), "breakfast");
+    assert.equal(mealNamed("Breakfast"), "breakfast");
+    assert.equal(mealNamed("Lemon chicken"), null);
+    // As seen, in the afternoon with breakfast logged.
+    assert.equal(namesWrongMeal("Maxim, 1298 ккал осталось на сегодня. Твой сохранённый завтрак на 1156 ккал сюда спокойно влезет.", "dinner"), true);
+    assert.equal(namesWrongMeal("Maxim, 1298 ккал осталось. Хочешь идею для ужина?", "dinner"), false);
+    assert.equal(namesWrongMeal("Maxim, завтра продолжим. Это победа.", "dinner"), false);
+    assert.equal(namesWrongMeal("Kira, dinner's next.", null), true);
+    assert.match(dayInWords([{ at: { hour: 9, minute: 6 }, foods: ["Eggs"], label: "breakfast" }], "dinner"), /breakfast at 9:06 \(Eggs\)\. Next main meal: dinner/);
+  });
+
+  it("doesn't offer a saved breakfast in the afternoon, a whole day's food, or what they've just had", async () => {
+    model(three);
+    await goals();
+    await eat();
+    const save = (name: string, food: string, amount: number) =>
+      prisma.savedMeal.create({
+        data: { items: { create: [{ amount, name: food, nutrimentsPer100g: { energyKcal100g: 200, proteins100g: 30 }, sortOrder: 0, unit: "g" }] }, name, userId: session.userId },
+      });
+    await save("Breakfast", "Eggs", 100);
+    await save("Feast", "Beef", 500);
+    await save("Usual bowl", "Chicken", 150);
+    await message();
+    assert.ok(!calls[0]!.facts.some((fact) => fact.includes("saved meal")), calls[0]!.facts.join("\n"));
+    assert.match(calls[0]!.day, /lunch at .*Chicken.*Next main meal: dinner/);
+    await save("Salmon", "Salmon", 150);
+    at(40);
+    await eat();
+    at(45);
+    await message();
+    at(80);
+    await prisma.assistantAction.deleteMany({ where: { state: "ready" } });
+    await message();
+    assert.ok(calls.at(-1)!.facts.some((fact) => fact.includes('saved meal "Salmon" (Salmon) fits for dinner')), calls.at(-1)!.facts.join("\n"));
   });
 
   it("asks rather than praises when hardly anything is logged by evening", async () => {
