@@ -9,9 +9,10 @@ import { listRecipes } from "../recipes.ts";
 import { loadNutritionDays, readSummaryContext } from "../summary.ts";
 import { DAY_START_HOUR, formatDateInTimeZone, getZonedParts, localDayRange, shiftYmd } from "../timezone.ts";
 import { listMeals } from "../meals.ts";
-import { frequentFoods } from "./frequent-foods.ts";
+import { frequentFoods, type FrequentFood } from "./frequent-foods.ts";
 import { coverage } from "./home-card.ts";
 import { dayInWords, mealNamed, nextMeal, type MainMeal } from "./home-day.ts";
+import { dayFlags, type ServingFood } from "./home-flags.ts";
 
 export type HomeMood = "happy" | "idle" | "thinking";
 
@@ -21,6 +22,8 @@ export type HomeFact = {
   // What it's about, so the same thing isn't said twice in a row.
   key: string;
   mood: HomeMood;
+  // Something they need to hear today, such as a limit passed: said before anything else.
+  flag?: boolean;
   // Higher is better to say now.
   score: number;
   // What to say without the model, in the middle of a sentence after a name; null when only it can.
@@ -116,6 +119,16 @@ function sinceDayStart({ hour, minute }: { hour: number; minute: number }): numb
   return ((hour - DAY_START_HOUR + 24) % 24) * 60 + minute;
 }
 
+// A usual food at the amount they had last; nothing when its amount can't be worked out.
+function servingOf(food: FrequentFood): ServingFood[] {
+  try {
+    const { metrics } = computeItemNutrition({ amount: food.amount, nutriments: (food.nutrimentsPer100g ?? {}) as ProductNutriments, unit: food.unit });
+    return [{ fat: metrics.fat, kcal: food.kcal ?? metrics.energyKcal, name: food.name, proteins: food.proteins ?? metrics.proteins, salt: metrics.salt, saturatedFat: metrics.saturatedFat, sugars: metrics.sugars }];
+  } catch {
+    return [];
+  }
+}
+
 export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFacts> {
   const { goals, timezone, today } = await readSummaryContext(userId, now);
   const clock = getZonedParts(now, timezone);
@@ -163,13 +176,40 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
   const proteinGoal = goals.proteinGPerDay;
   const kcalLeft = kcalGoal ? Math.round(kcalGoal - eaten) : null;
   const proteinLeft = proteinGoal ? Math.round(proteinGoal - protein) : null;
-  // Late in the day with little logged is far more often a gap in the diary than a success.
-  const sparse = kcalGoal !== null && eaten > 0 && hour >= 20 && eaten < kcalGoal * 0.5;
 
-  if (sparse) {
-    add("sparse", 92, "thinking", `Only ${n(eaten)} kcal is logged today and it's evening. Probably something is missing from the diary. Ask, don't praise.`, `only ${n(eaten)} kcal is logged today. Is anything missing?`);
-  } else if (eaten > 0) {
-    if (proteinLeft !== null && proteinLeft >= 15 && hour >= 10) {
+  const week = history.days.filter((day) => day.date >= shiftYmd(today, -7) && day.itemCount > 0);
+  const before = history.days.filter((day) => day.date < shiftYmd(today, -7) && day.itemCount > 0);
+  const mean = (rows: typeof week, key: "energyKcal" | "proteins") => rows.reduce((sum, day) => sum + (day.totals[key] ?? 0), 0) / Math.max(1, rows.length);
+  const latest = weights[0];
+  const goalWeight = profile?.goalWeightKg ?? null;
+  const recentWeight = latest && goalWeight !== null && latest.date >= shiftYmd(today, -7) ? latest : null;
+  const earlierWeight = recentWeight ? weights.find((entry) => entry.date <= shiftYmd(recentWeight.date, -14)) : undefined;
+
+  // What must be said first: a limit passed, a day with nothing logged, protein far short, weight
+  // going the wrong way.
+  const flags = dayFlags({
+    eaten: {
+      energyKcal: eaten,
+      fat: progress.current.fat ?? 0,
+      proteins: protein,
+      salt: progress.current.salt ?? 0,
+      saturatedFat: progress.current.saturatedFat ?? 0,
+      sugars: progress.current.sugars ?? 0,
+    },
+    goals,
+    had,
+    hour,
+    next,
+    usual: foods.flatMap(servingOf),
+    weight: recentWeight && earlierWeight ? { earlierDate: earlierWeight.date, earlierKg: earlierWeight.weightKg, goalKg: goalWeight!, latestKg: recentWeight.weightKg } : null,
+    weekKcal: week.length >= 3 ? mean(week, "energyKcal") : null,
+  });
+  for (const flag of flags) facts.push({ ...flag, flag: true });
+  const flagged = new Set(flags.map((flag) => flag.key));
+
+  // Late in the day with little logged is far more often a gap in the diary than a success.
+  if (!flagged.has("sparse") && eaten > 0) {
+    if (proteinLeft !== null && proteinLeft >= 15 && hour >= 10 && !flagged.has("protein_low")) {
       const best = (next ? foods : []).filter((food) => (food.proteins ?? 0) > 0 && isNew(food.name)).sort((a, b) => (b.proteins ?? 0) - (a.proteins ?? 0))[0];
       const share = best ? coverage(best.proteins ?? 0, proteinLeft) : null;
       const idea = best && share ? ` ${best.name}, which they often log, ${share}.` : "";
@@ -181,7 +221,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
         `you still need ${n(proteinLeft)} grams of protein.${best && share ? ` ${best.name} ${share}.` : ""}`,
       );
     }
-    if (kcalLeft !== null && kcalLeft >= 150 && hour >= 11) {
+    if (kcalLeft !== null && kcalLeft >= 150 && hour >= 11 && ![...flagged].some((key) => key.startsWith("over:"))) {
       const dish = kept
         .filter((row) => {
           const meant = mealNamed(row.name);
@@ -205,14 +245,8 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
     if (proteinLeft !== null && proteinLeft <= 0) {
       add("protein_done", 78, "happy", `Protein goal reached today: ${n(protein)} of ${n(proteinGoal!)} grams.`, `your protein goal is done for today. Nice work.`);
     }
-    if (kcalLeft !== null && kcalLeft < -kcalGoal! * 0.05) {
-      add("over", 55, "thinking", `${n(-kcalLeft)} kcal over today's goal. Be kind and practical: one day matters little; offer help planning tomorrow.`, `one day over doesn't undo your week. Want a hand planning tomorrow?`);
-    }
   }
 
-  const week = history.days.filter((day) => day.date >= shiftYmd(today, -7) && day.itemCount > 0);
-  const before = history.days.filter((day) => day.date < shiftYmd(today, -7) && day.itemCount > 0);
-  const mean = (rows: typeof week, key: "energyKcal" | "proteins") => rows.reduce((sum, day) => sum + (day.totals[key] ?? 0), 0) / Math.max(1, rows.length);
   if (week.length >= 3) {
     if (proteinGoal) {
       const hit = week.filter((day) => (day.totals.proteins ?? 0) >= proteinGoal).length;
@@ -248,14 +282,11 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
   const near = badges.closest[0];
   if (near && near.progress >= 0.7) add("next_badge", 54, "happy", `Closest badge: "${near.title}", ${near.progressText}. ${near.description}`, `you're close to a badge: ${near.title}, ${near.progressText}.`);
 
-  const latest = weights[0];
-  const goalWeight = profile?.goalWeightKg ?? null;
-  if (latest && goalWeight !== null && latest.date >= shiftYmd(today, -7)) {
-    const earlier = weights.find((entry) => entry.date <= shiftYmd(latest.date, -14));
-    const closer = earlier ? Math.abs(earlier.weightKg - goalWeight) - Math.abs(latest.weightKg - goalWeight) : 0;
-    // Only ever said when it's going where they want.
-    if (earlier && closer >= 0.3) {
-      add("weight", 62, "happy", `Weight is ${one(closer)} kg closer to the goal than on ${earlier.date}.`, `you're ${one(closer)} kg closer to your goal weight than a few weeks ago.`);
+  if (recentWeight && earlierWeight) {
+    const closer = Math.abs(earlierWeight.weightKg - goalWeight!) - Math.abs(recentWeight.weightKg - goalWeight!);
+    // Going where they want; the other way is a flag.
+    if (closer >= 0.3) {
+      add("weight", 62, "happy", `Weight is ${one(closer)} kg closer to the goal than on ${earlierWeight.date}.`, `you're ${one(closer)} kg closer to your goal weight than a few weeks ago.`);
     }
   }
 
@@ -275,7 +306,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
 
   if (usual) add("usual", 70, "idle", `They usually have ${usual.name} around this time (${usual.count} of the last 21 days) and haven't logged it today.`, `time for your usual ${usual.name}? Tell me and I'll log it.`);
 
-  if (eaten === 0) {
+  if (eaten === 0 && !flagged.has("empty_evening")) {
     if (hour >= 11) add("empty", 72, "idle", "Nothing logged yet today, and it's past 11. They can tell you what they ate, or send a photo, and you log it.", "nothing's logged yet today. Tell me what you ate and I'll add it.");
     else if (hour >= 4) add("morning", 44, "happy", "A new day with nothing logged yet. Ask what's for breakfast, or wish them a good start.", "good morning! What's for breakfast?");
   }

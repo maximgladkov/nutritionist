@@ -8,6 +8,7 @@ import { namesWrongMeal } from "./home-day.ts";
 import { chosenLanguage, toneLine, type AssistantSettings, type HomeTopic } from "./settings.ts";
 import { loadHomeFacts, type HomeFact, type HomeMood } from "./home-facts.ts";
 import { acceptWords } from "./home-words.ts";
+import { rank } from "./home-flags.ts";
 
 export const HOME_KIND = "home";
 const RUN_KIND = "home_run";
@@ -27,10 +28,10 @@ const TELL_MS = 24 * 3_600_000;
 export type HomeMessage = { id: string; mood: HomeMood; text: string };
 
 // Raised when older messages shouldn't be shown any more.
-const VERSION = 3;
+const VERSION = 4;
 
 // Said without a figure and still clear.
-const NO_FIGURE = ["chat", "empty", "hello", "morning", "over", "usual"];
+const NO_FIGURE = ["chat", "empty", "empty_evening", "hello", "morning", "usual"];
 
 function needsNumber(key: string): boolean {
   return !NO_FIGURE.includes(key) && !key.startsWith("comments:");
@@ -66,7 +67,6 @@ const TOPICS: Record<string, HomeTopic> = {
   kcal_left: "ideas",
   morning: "cheer",
   next_badge: "cheer",
-  over: "reminders",
   protein_done: "cheer",
   protein_left: "ideas",
   protein_up: "progress",
@@ -83,18 +83,14 @@ function topicOf(key: string): HomeTopic {
   return TOPICS[key] ?? "reminders";
 }
 
+// Flags aren't a kind of message to opt out of: a limit passed is said whatever topics are chosen.
+function wanted(fact: HomeFact, settings: AssistantSettings): boolean {
+  return fact.flag === true || settings.homeTopics.includes(topicOf(fact.key));
+}
+
 export function plainText(fact: HomeFact, name: string | null): string {
   const plain = fact.plain ?? "";
   return name ? `${name}, ${plain}` : plain.charAt(0).toUpperCase() + plain.slice(1);
-}
-
-// The same thing again, or something said lately, comes after what hasn't been.
-function rank(facts: readonly HomeFact[], shownKeys: readonly string[]): HomeFact[] {
-  const worth = (fact: HomeFact) => {
-    const ago = shownKeys.indexOf(fact.key);
-    return fact.score - (ago < 0 ? 0 : ago === 0 ? 60 : ago <= 2 ? 30 : 12);
-  };
-  return [...facts].sort((a, b) => worth(b) - worth(a));
 }
 
 // Takes one of the day's model calls and returns its id; null when they're spent. Never more than the limit, however
@@ -119,7 +115,7 @@ export async function homeMessage(userId: string, now: Date, settings: Assistant
     loadHomeFacts(userId, now),
     prisma.assistantAction.findMany({ orderBy: { createdAt: "desc" }, take: 60, where: { kind: HOME_KIND, userId } }),
   ]);
-  const info = { ...loaded, facts: loaded.facts.filter((fact) => settings.homeTopics.includes(topicOf(fact.key))) };
+  const info = { ...loaded, facts: loaded.facts.filter((fact) => wanted(fact, settings)) };
   if (info.facts.length === 0) {
     return null;
   }
@@ -131,11 +127,14 @@ export async function homeMessage(userId: string, now: Date, settings: Assistant
   const since = (at: string | undefined) => (at ? now.getTime() - Date.parse(at) : Number.POSITIVE_INFINITY);
   const current = shown[0];
   const isTrue = (fact: string) => info.facts.some((row) => row.text === fact);
+  const flagged = info.facts.some((row) => row.flag);
+  // While something is flagged, only a flag is shown.
+  const fits = (fact: string) => !flagged || info.facts.some((row) => row.text === fact && row.flag);
 
   const save = async (row: AssistantAction, change: Partial<Payload>, state = row.state) =>
     prisma.assistantAction.update({ data: { payload: write({ ...read(row), ...change }), state }, where: { id: row.id } });
 
-  if (current && current.state !== "opened" && read(current).version === VERSION && info.facts.some((fact) => fact.key === read(current).key) && read(current).style === style && since(read(current).seenAt) < VISIT_GAP_MS) {
+  if (current && current.state !== "opened" && read(current).version === VERSION && fits(read(current).fact) && info.facts.some((fact) => fact.key === read(current).key) && read(current).style === style && since(read(current).seenAt) < VISIT_GAP_MS) {
     const { fact, shownAt, stamp } = read(current);
     if (stamp === info.stamp || (isTrue(fact) && since(shownAt) < SETTLE_MS)) {
       // Not put back over an opening that happened meanwhile.
@@ -147,7 +146,7 @@ export async function homeMessage(userId: string, now: Date, settings: Assistant
 
   const show = { seenAt: now.toISOString(), shownAt: now.toISOString(), stamp: info.stamp };
   const ready = rows.filter(
-    (row) => row.state === "ready" && read(row).version === VERSION && read(row).style === style && now.getTime() - row.createdAt.getTime() < READY_MS && isTrue(read(row).fact) && read(row).key !== (current && read(current).key),
+    (row) => row.state === "ready" && read(row).version === VERSION && read(row).style === style && now.getTime() - row.createdAt.getTime() < READY_MS && isTrue(read(row).fact) && fits(read(row).fact) && read(row).key !== (current && read(current).key),
   );
   if (ready.length > 0) {
     // Newest batch first, and within it the order they were written in.
@@ -187,13 +186,15 @@ export async function homeMessage(userId: string, now: Date, settings: Assistant
         recent: shown.slice(0, 10).map((row) => read(row).text),
       });
       const used = new Set<number>();
-      const good = written.slice(0, 3).flatMap((words) => {
+      const accepted = written.slice(0, 3).flatMap((words) => {
         const text = used.has(words.fact) ? null : acceptWords(words, texts, info.name, needsNumber(facts[words.fact]?.key ?? ""));
         if (text === null || namesWrongMeal(text, info.next)) return [];
         used.add(words.fact);
         return [{ fact: facts[words.fact]!, text }];
       });
-      if (good.length > 0) {
+      // The top fact goes first; when it's a flag, words that skip it aren't shown first.
+      const good = [...accepted].sort((a, b) => Number(b.fact === facts[0]) - Number(a.fact === facts[0]));
+      if (good.length > 0 && (!facts[0]!.flag || good[0]!.fact === facts[0])) {
         // Writing these took the coach's time, and counts towards the week's.
         await prisma.assistantAction.update({
           data: { payload: { ms: Math.round(performance.now() - startedAt) } },
@@ -223,7 +224,8 @@ export async function homeMessage(userId: string, now: Date, settings: Assistant
 
 export type HomeOpener = { at: string; id: string; text: string };
 
-// They tapped it, so it's now the coach's line in the conversation. Tapping again changes nothing.
+// They answered it (the app calls this as their reply goes, or a call starts, not on the tap), so
+// it's now the coach's line in the conversation, just before their words. Again changes nothing.
 export async function openHomeMessage(input: { id: string; now: Date; userId: string }): Promise<HomeOpener | null> {
   const row = await prisma.assistantAction.findFirst({ where: { id: input.id, kind: HOME_KIND, userId: input.userId } });
   if (!row || !read(row).shownAt) {
