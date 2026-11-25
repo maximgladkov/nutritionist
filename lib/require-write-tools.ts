@@ -284,6 +284,10 @@ async function resolveCategories(
     return { categories: tagged };
   }
   const key = lastUserText(prompt);
+  // A photo with no words has nothing to classify.
+  if (key.length === 0) {
+    return { categories: ["none"] };
+  }
   const cached = classified.get(key);
   if (cached !== undefined) {
     return cached;

@@ -7,6 +7,7 @@ import { readSummaryContext } from "../summary.ts";
 import { getZonedParts, localDayRange } from "../timezone.ts";
 import { cardView, type AssistantCard } from "./actions.ts";
 import { DISPLAY_KINDS, displayView, type AssistantDisplay } from "./displays.ts";
+import { photosIn } from "./photos.ts";
 import type { TalkLine, TalkPayload } from "./talk.ts";
 
 export const CONVERSATION_PAGE = 30;
@@ -38,6 +39,8 @@ export type AssistantTurnView = {
   checked: string[];
   displays: AssistantDisplay[];
   id: string;
+  // What they attached. Show with the owner's token.
+  photos: { id: string; url: string }[];
   reply: string;
   status: "cancelled" | "completed" | "failed" | "running";
   text: string;
@@ -218,7 +221,16 @@ export async function loadConversation(input: { before?: Date; now: Date; userId
 
   const turns = page.map((row): AssistantTurnView => {
     const items = transcripts.get(row.id) ?? [];
-    const text = items.flatMap((item) => (item.type === "user" ? [item.text] : [])).join("\n");
+    const said = items.flatMap((item) => (item.type === "user" ? [item] : []));
+    const photos = said.flatMap((item) => photosIn(item.parts));
+    const text = said
+      .map((item) =>
+        photosIn(item.parts).length > 0
+          ? item.parts!.flatMap((part) => (part.type === "text" && part.text ? [part.text] : [])).join("\n")
+          : item.text,
+      )
+      .filter((words) => words.length > 0)
+      .join("\n");
     const tools = items.flatMap((item) => (item.type === "tool" ? [item] : []));
     const stale = row.status === "running" && now.getTime() - row.startedAt.getTime() > TURN_STALE_MS;
     return {
@@ -231,6 +243,7 @@ export async function loadConversation(input: { before?: Date; now: Date; userId
       ],
       displays: displaysOf(tools.flatMap((tool) => byCall.get(tool.callId) ?? [])),
       id: `${row.sessionId}:${row.turnId}`,
+      photos,
       reply: replyText(items),
       status: stale ? "failed" : row.status,
       text,

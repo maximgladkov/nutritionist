@@ -1,5 +1,8 @@
 import type { UserContent } from "ai";
-import { eveChannel } from "eve/channels/eve";
+import {
+  defaultEveAuth,
+  eveChannel,
+} from "eve/channels/eve";
 import {
   ForbiddenError,
   localDev,
@@ -9,6 +12,7 @@ import {
 import type { ChannelReceiveContext } from "eve/channels";
 import { appPrincipal } from "../../lib/principal";
 import { ASSISTANT_MAX_REQUEST_BYTES, assistantLimit } from "../../lib/assistant/limits";
+import { requireOwnPhotos } from "../../lib/assistant/photos";
 import { prisma } from "../../lib/prisma";
 import { eveSessionIdFromPath, getUserFromRequest } from "../../lib/session";
 import { formatToolCategoriesContext } from "../../lib/tool-categories";
@@ -68,6 +72,14 @@ async function requireAssistantCapacity(request: Request, userId: string): Promi
 
 const channel = eveChannel({
   auth: [appSession(), vercelOidc(), localDev()],
+  async onMessage(ctx, message) {
+    const caller = ctx.eve.caller;
+    await requireOwnPhotos(message, {
+      channel: String(caller?.attributes?.channel ?? ""),
+      userId: caller?.principalId ?? "",
+    });
+    return { auth: defaultEveAuth(ctx) };
+  },
 });
 
 Object.assign(channel, {

@@ -1,5 +1,6 @@
 import { gateway, wrapLanguageModel } from "ai";
 import { defineAgent } from "eve";
+import { photosMiddleware } from "../lib/assistant/photos";
 import { createRequireWriteToolsMiddleware } from "../lib/require-write-tools";
 import { classifyToolCategories } from "../lib/telegram-ack";
 
@@ -10,7 +11,7 @@ export default defineAgent({
     thresholdPercent: 0.6,
   },
   model: wrapLanguageModel({
-    middleware: createRequireWriteToolsMiddleware({ classify: classifyToolCategories }),
+    middleware: [createRequireWriteToolsMiddleware({ classify: classifyToolCategories }), photosMiddleware],
     model: gateway(MODEL_ID),
     modelId: MODEL_ID,
   }),
