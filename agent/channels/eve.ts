@@ -12,6 +12,7 @@ import {
 import type { ChannelReceiveContext } from "eve/channels";
 import { appPrincipal } from "../../lib/principal";
 import { ASSISTANT_MAX_REQUEST_BYTES, assistantLimit } from "../../lib/assistant/limits";
+import { openingNotes } from "../../lib/assistant/home-message";
 import { requireOwnPhotos } from "../../lib/assistant/photos";
 import { prisma } from "../../lib/prisma";
 import { eveSessionIdFromPath, getUserFromRequest } from "../../lib/session";
@@ -78,7 +79,8 @@ const channel = eveChannel({
       channel: String(caller?.attributes?.channel ?? ""),
       userId: caller?.principalId ?? "",
     });
-    return { auth: defaultEveAuth(ctx) };
+    const inApp = caller?.attributes?.channel === "app";
+    return { auth: defaultEveAuth(ctx), context: inApp ? await openingNotes(caller.principalId, new Date()).catch(() => []) : undefined };
   },
 });
 

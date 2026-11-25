@@ -137,6 +137,7 @@ export function installFakes(): void {
       },
     },
     embedTexts: async () => [],
+    writeHome: async () => [],
     pickMatches: (questions) => picker(questions),
     recognizeFoods: (input) => recognizer(input),
     talk: {

@@ -7,6 +7,7 @@ import { readSummaryContext } from "../summary.ts";
 import { getZonedParts, localDayRange } from "../timezone.ts";
 import { cardView, type AssistantCard } from "./actions.ts";
 import { DISPLAY_KINDS, displayView, type AssistantDisplay } from "./displays.ts";
+import { openersBetween, type HomeOpener } from "./home-message.ts";
 import { photosIn } from "./photos.ts";
 import type { TalkLine, TalkPayload } from "./talk.ts";
 
@@ -69,6 +70,8 @@ export type ConversationView = {
   greeting: AssistantGreeting | null;
   // Send as `before` for the turns before these; null at the beginning.
   next: string | null;
+  // Home messages they tapped, oldest first: the coach's own lines. Older apps don't read these.
+  openers: HomeOpener[];
   // The session to continue, or null to start one.
   sessionId: string | null;
   // Oldest first. Apps from before calls were saved don't read these.
@@ -255,11 +258,16 @@ export async function loadConversation(input: { before?: Date; now: Date; userId
   // little further, so one that began just before the page still covers its turns here.
   const more = rows.length > CONVERSATION_PAGE;
   const from = more ? page[0]!.startedAt : null;
-  const talks = await talksBetween(userId, from && new Date(from.getTime() - TALK_OVERLAP_MS), before ?? null);
+  const reach = from && new Date(from.getTime() - TALK_OVERLAP_MS);
+  const [talks, openers] = await Promise.all([
+    talksBetween(userId, reach, before ?? null),
+    openersBetween(userId, reach, before ?? null, CONVERSATION_PAGE),
+  ]);
 
   return {
     greeting: before ? null : await greetingFor(userId, now),
     next: rows.length > CONVERSATION_PAGE ? page[0]!.startedAt.toISOString() : null,
+    openers,
     sessionId: session?.eveSessionId ?? null,
     talks,
     turns,

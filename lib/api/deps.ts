@@ -1,5 +1,6 @@
 import { del, get, put } from "@vercel/blob";
 import { APP_NAME } from "../brand.ts";
+import type { HomeWriter } from "../assistant/home-words.ts";
 import { mintTalkSecret, talkKey } from "../assistant/talk.ts";
 import { fatSecretClient, type FatSecretClient } from "../fatsecret.ts";
 import { telegramProfileClient, type TelegramProfileClient } from "../telegram-profile.ts";
@@ -79,6 +80,8 @@ export type ApiDeps = {
   telegram: TelegramProfileClient;
   transcribe: AudioTranscriber;
   verifyAppleToken: (identityToken: string) => Promise<AppleIdentity>;
+  // Words the coach's message on Today, from facts already worked out.
+  writeHome: HomeWriter;
 };
 
 async function sendEmailCodeWithResend({ code, email }: EmailCodeMessage): Promise<void> {
@@ -189,6 +192,11 @@ async function pickWithModel(questions: readonly MatchQuestion[]) {
   return pickMatchesWithModel(questions);
 }
 
+async function writeHomeWithModel(input: Parameters<HomeWriter>[0]) {
+  const { writeHomeWords } = await import("../assistant/home-words.ts");
+  return writeHomeWords(input);
+}
+
 const defaults: ApiDeps = {
   background: runAfterResponse,
   blobs: vercelBlobStore,
@@ -205,6 +213,7 @@ const defaults: ApiDeps = {
   telegram: telegramProfileClient,
   transcribe: transcribeWithModel,
   verifyAppleToken: verifyAppleIdentityToken,
+  writeHome: writeHomeWithModel,
 };
 
 let current: ApiDeps = defaults;
