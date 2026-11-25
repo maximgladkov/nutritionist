@@ -66,10 +66,10 @@ async function requireAssistantCapacity(request: Request, userId: string): Promi
   if (Number(request.headers.get("content-length") ?? 0) > ASSISTANT_MAX_REQUEST_BYTES) {
     throw new ForbiddenError({ code: "message_too_long", message: "That message is too long." });
   }
-  if ((await loadUsage(userId, new Date())).asleep) {
+  const [usage, limited] = await Promise.all([loadUsage(userId, new Date()), assistantLimit(userId)]);
+  if (usage.asleep) {
     throw new ForbiddenError({ code: "asleep", message: ASLEEP_MESSAGE });
   }
-  const limited = await assistantLimit(userId);
   if (limited) {
     throw new ForbiddenError({ code: "rate_limited", message: limited });
   }
@@ -79,12 +79,15 @@ const channel = eveChannel({
   auth: [appSession(), vercelOidc(), localDev()],
   async onMessage(ctx, message) {
     const caller = ctx.eve.caller;
-    await requireOwnPhotos(message, {
-      channel: String(caller?.attributes?.channel ?? ""),
-      userId: caller?.principalId ?? "",
-    });
     const inApp = caller?.attributes?.channel === "app";
-    return { auth: defaultEveAuth(ctx), context: inApp ? await openingNotes(caller.principalId, new Date()).catch(() => []) : undefined };
+    const [context] = await Promise.all([
+      inApp ? openingNotes(caller.principalId, new Date()).catch(() => []) : undefined,
+      requireOwnPhotos(message, {
+        channel: String(caller?.attributes?.channel ?? ""),
+        userId: caller?.principalId ?? "",
+      }),
+    ]);
+    return { auth: defaultEveAuth(ctx), context };
   },
 });
 
