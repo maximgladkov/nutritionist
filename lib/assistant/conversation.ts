@@ -16,7 +16,7 @@ export const CONVERSATION_PAGE = 30;
 const SESSION_MAX_AGE_MS = 25 * 24 * 60 * 60_000;
 // Sessions begun on eve before 1.0 stay on the deployment that began them, which can't be talked to
 // as the app does now.
-const FIRST_SESSION_AT = new Date("2026-11-26T00:00:00Z");
+const FIRST_SESSION_AT = new Date("2026-11-25T20:30:00Z");
 // No call lasts longer than this.
 const TALK_OVERLAP_MS = 15 * 60_000;
 // A reply that hasn't finished by now never will.
