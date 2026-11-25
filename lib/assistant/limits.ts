@@ -1,6 +1,6 @@
 import { prisma } from "../prisma.ts";
 
-// Text only, so anything bigger than this isn't a chat message.
+// Photos are uploaded first and sent as links, so anything bigger than this isn't a chat message.
 export const ASSISTANT_MAX_REQUEST_BYTES = 32 * 1024;
 export const ASSISTANT_BURST = { max: 20, windowMs: 5 * 60_000 };
 export const ASSISTANT_DAILY = { max: 150, windowMs: 24 * 60 * 60_000 };
