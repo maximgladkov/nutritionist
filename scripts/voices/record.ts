@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 
 // Run by hand with the gateway key: has each of the live voices say one line, and keeps those that did
@@ -18,6 +18,8 @@ const VOICES = [
 ] as const;
 type Voice = (typeof VOICES)[number];
 
+// A voice doesn't always speak first.
+const ATTEMPTS = 3;
 const RATE = 24_000;
 const CHUNK_MS = 100;
 const START_TIMEOUT_MS = 10_000;
@@ -159,7 +161,14 @@ async function recordSample({ token, voice }: { token: string; voice: Voice }): 
       if (event.type === "session.started") {
         clearTimeout(starting);
         ending = setTimeout(finish, MAX_MS);
-        send({ content: order, delegation_id: null, type: "session.instructions.append" });
+        const ask = () => {
+          if (done || lastLoudByte >= 0 || said) return;
+          send({ content: order, delegation_id: null, type: "session.instructions.append" });
+          send({ content: line, delegation_id: null, type: "session.commentary.append" });
+        };
+        setTimeout(ask, 300);
+        setTimeout(ask, 4_000);
+        setTimeout(ask, 8_000);
         // It listens all along, so it's given a quiet room.
         const silence = Buffer.alloc((RATE * 2 * CHUNK_MS) / 1000).toString("base64");
         feeding = setInterval(() => send({ audio: silence, type: "session.input_audio.append" }), CHUNK_MS);
@@ -212,16 +221,18 @@ const out = new URL("../../public/voice-samples/", import.meta.url);
 mkdirSync(out, { recursive: true });
 const report: Omit<Result, "wav">[] = [];
 for (const voice of voices) {
-  let result: Result;
-  try {
-    result = await recordSample({ token: await mint(key), voice });
-  } catch (error) {
-    result = { errors: [(error as Error).message], said: "", speechMs: 0, voice, wav: null };
+  let result: Result = { errors: [], said: "", speechMs: 0, voice, wav: null };
+  for (let attempt = 0; attempt < ATTEMPTS && !result.wav; attempt += 1) {
+    try {
+      result = await recordSample({ token: await mint(key), voice });
+    } catch (error) {
+      result = { errors: [(error as Error).message], said: "", speechMs: 0, voice, wav: null };
+      break;
+    }
   }
   const { wav: recording, ...rest } = result;
   const file = new URL(`${voice}.wav`, out);
   if (recording) writeFileSync(file, recording);
-  else rmSync(file, { force: true });
   report.push(rest);
   console.log(recording ? "ok  " : "FAIL", voice.padEnd(11), `${rest.speechMs} ms`.padEnd(8), rest.said || "-", rest.errors.join("; "));
   // A gateway that refuses the key refuses every voice.
