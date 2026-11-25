@@ -7,7 +7,7 @@ import type { ProductNutriments } from "../open-food-facts.ts";
 import { prisma } from "../prisma.ts";
 import { listRecipes } from "../recipes.ts";
 import { loadNutritionDays, readSummaryContext } from "../summary.ts";
-import { formatDateInTimeZone, getZonedParts, localDayRange, shiftYmd } from "../timezone.ts";
+import { DAY_START_HOUR, formatDateInTimeZone, getZonedParts, localDayRange, shiftYmd } from "../timezone.ts";
 import { listMeals } from "../meals.ts";
 import { frequentFoods } from "./frequent-foods.ts";
 import { coverage } from "./home-card.ts";
@@ -112,6 +112,10 @@ async function usualNow(userId: string, now: Date, timezone: string, today: stri
   return best && best.dates.size >= 4 ? { count: best.dates.size, name: best.name } : null;
 }
 
+function sinceDayStart({ hour, minute }: { hour: number; minute: number }): number {
+  return ((hour - DAY_START_HOUR + 24) % 24) * 60 + minute;
+}
+
 export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFacts> {
   const { goals, timezone, today } = await readSummaryContext(userId, now);
   const clock = getZonedParts(now, timezone);
@@ -143,7 +147,8 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
       foods: meal.items.map((item) => item.name),
       label: meal.label,
     }))
-    .sort((a, b) => a.at.hour * 60 + a.at.minute - (b.at.hour * 60 + b.at.minute));
+    // The small hours are the end of the day.
+    .sort((a, b) => sinceDayStart(a.at) - sinceDayStart(b.at));
   const next = nextMeal(hour, new Set<string>(todays.map((meal) => meal.label)));
   const had = new Set(todays.flatMap((meal) => meal.foods.map((food) => food.trim().toLowerCase())));
   // Not what they've already had, nor food for a day that's over.

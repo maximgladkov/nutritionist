@@ -66,3 +66,24 @@ function meal(input: {
     totals: emptyNutrients(),
   };
 }
+
+describe("a late-night snack", () => {
+  it("is the day before's, with the time it was eaten there", () => {
+    const meal = { eatenAt: "2026-11-25T00:40:00.000Z", id: "m", incomplete: [], items: [], label: "snack", totals: {} } as never;
+    const payload = toListMealsDayPayload({
+      from: "2026-11-24T03:00:00.000Z",
+      meals: [meal],
+      now: new Date("2026-11-25T14:00:00Z"),
+      timeZone: "Europe/Madrid",
+      to: "2026-11-26T03:00:00.000Z",
+    });
+    const [yesterday, today] = payload.days;
+    assert.equal(yesterday!.day, "yesterday");
+    assert.equal(yesterday!.date, "2026-11-24");
+    assert.equal(yesterday!.meals[0]!.eatenAtLocal, "01:40, late that night");
+    assert.equal(today!.day, "today");
+    assert.deepEqual(today!.meals, []);
+    // The moment itself would read as the next day.
+    assert.ok(!JSON.stringify(payload.days).includes("T00:40"));
+  });
+});

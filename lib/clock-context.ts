@@ -37,9 +37,12 @@ export function clockContextText(input: {
   const zone = input.timezoneIsFallback
     ? `${input.timeZone}; timezone is unknown`
     : input.timeZone;
+  const nutritionDay = formatDateInTimeZone(input.now, input.timeZone);
+  const afterMidnight =
+    nutritionDay === calendarDate ? " Something eaten after midnight but before 04:00 this morning was yesterday's." : " It is after midnight, but the day isn't over until 04:00.";
   return [
     `Current local time: ${weekday} ${calendarDate} ${formatClock(local.hour, local.minute)} (${zone}).`,
-    `Nutrition day: ${formatDateInTimeZone(input.now, input.timeZone)} (04:00 to 04:00 the next morning).`,
+    `Nutrition day: ${nutritionDay} (04:00 to 04:00 the next morning). "Today" always means ${nutritionDay} and "yesterday" ${shiftYmd(nutritionDay, -1)}, as in the app's diary.${afterMidnight}`,
     `Current week (Monday to Sunday): ${week.from} to ${week.to}. Last week: ${lastWeek.from} to ${lastWeek.to}.`,
     mealSlotContextText(inferMealLabel(input.now, input.timeZone)),
     catalogCountryContextText(input.catalogCountry),
