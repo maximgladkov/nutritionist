@@ -37,8 +37,6 @@ function needsNumber(key: string): boolean {
 }
 
 type Payload = {
-  // Worded by the model, so it counts as time with the coach.
-  ai?: boolean;
   fact: string;
   key: string;
   mood: HomeMood;
@@ -99,18 +97,19 @@ function rank(facts: readonly HomeFact[], shownKeys: readonly string[]): HomeFac
   return [...facts].sort((a, b) => worth(b) - worth(a));
 }
 
-// Takes one of the day's model calls; false when they're spent. Never more than the limit, however
+// Takes one of the day's model calls and returns its id; null when they're spent. Never more than the limit, however
 // many ask at once.
-async function takeRun(userId: string, today: string, now: Date): Promise<boolean> {
+async function takeRun(userId: string, today: string, now: Date): Promise<string | null> {
   const used = await prisma.assistantAction.count({ where: { callId: { startsWith: `home_run:${today}:` }, kind: RUN_KIND, userId } });
   if (used >= HOME_DAILY_RUNS) {
-    return false;
+    return null;
   }
+  const callId = `home_run:${today}:${used}`;
   const made = await prisma.assistantAction.createMany({
-    data: [{ callId: `home_run:${today}:${used}`, createdAt: now, kind: RUN_KIND, payload: {}, userId }],
+    data: [{ callId, createdAt: now, kind: RUN_KIND, payload: {}, userId }],
     skipDuplicates: true,
   });
-  return made.count > 0;
+  return made.count > 0 ? callId : null;
 }
 
 // What the coach says on Today at this visit: the same while they stay, something else when they
@@ -157,13 +156,13 @@ export async function homeMessage(userId: string, now: Date, settings: Assistant
   }
 
   const facts = rank(info.facts, shown.slice(0, 10).map((row) => read(row).key)).slice(0, FACTS_SHOWN);
-  const create = async (index: number, batch: string, fact: HomeFact, text: string, first: boolean, ai: boolean) =>
+  const create = async (index: number, batch: string, fact: HomeFact, text: string, first: boolean) =>
     prisma.assistantAction.create({
       data: {
         callId: `home:${batch}:${index}`,
         createdAt: now,
         kind: HOME_KIND,
-        payload: write({ fact: fact.text, key: fact.key, mood: fact.mood, text, ai, style, version: VERSION, ...(first ? show : {}) }),
+        payload: write({ fact: fact.text, key: fact.key, mood: fact.mood, text, style, version: VERSION, ...(first ? show : {}) }),
         state: first ? "shown" : "ready",
         userId,
       },
@@ -172,8 +171,10 @@ export async function homeMessage(userId: string, now: Date, settings: Assistant
 
   // Right after another, while a meal is being logged, plain words do.
   const hurried = current !== undefined && read(current).version === VERSION && current.state !== "opened" && since(read(current).shownAt) < SETTLE_MS;
-  if (!hurried && (await takeRun(userId, info.today, now))) {
+  const run = hurried ? null : await takeRun(userId, info.today, now);
+  if (run) {
     try {
+      const startedAt = performance.now();
       const texts = facts.map((fact) => fact.text);
       const written = await apiDeps().writeHome({
         day: info.day,
@@ -193,8 +194,13 @@ export async function homeMessage(userId: string, now: Date, settings: Assistant
         return [{ fact: facts[words.fact]!, text }];
       });
       if (good.length > 0) {
+        // Writing these took the coach's time, and counts towards the week's.
+        await prisma.assistantAction.update({
+          data: { payload: { ms: Math.round(performance.now() - startedAt) } },
+          where: { userId_callId: { callId: run, userId } },
+        });
         const made = [];
-        for (const [index, { fact, text }] of good.entries()) made.push(await create(index, batch, fact, text, index === 0, true));
+        for (const [index, { fact, text }] of good.entries()) made.push(await create(index, batch, fact, text, index === 0));
         await prisma.assistantAction.deleteMany({
           where: {
             OR: [{ kind: RUN_KIND }, { kind: HOME_KIND, state: { in: ["ready", "shown"] } }],
@@ -212,7 +218,7 @@ export async function homeMessage(userId: string, now: Date, settings: Assistant
   if (!fact) {
     return null;
   }
-  return view(await create(0, batch, fact, plainText(fact, info.name), true, false));
+  return view(await create(0, batch, fact, plainText(fact, info.name), true));
 }
 
 export type HomeOpener = { at: string; id: string; text: string };

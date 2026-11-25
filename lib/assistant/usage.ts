@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { parseTranscript } from "../agent-turn-model.ts";
 import { prisma } from "../prisma.ts";
 import { readSummaryContext } from "../summary.ts";
@@ -9,12 +10,10 @@ export const FREE_WEEKLY_MINUTES = 30;
 // What one message counts for: the time the coach worked on it, within reason.
 const REPLY_MIN_S = 5;
 const REPLY_MAX_S = 120;
-// A message on Today that the coach wrote.
-export const SUGGESTION_S = 5;
 // Less than this left isn't worth starting a call with.
 export const TALK_MIN_LEFT_S = 15;
 
-export type UsageSplit = { chat: number; suggestions: number; talk: number; voice: number };
+export type UsageSplit = { chat: number; scans: number; suggestions: number; talk: number; voice: number };
 
 export type AssistantUsage = {
   asleep: boolean;
@@ -35,8 +34,8 @@ function replySeconds(durationMs: number): number {
   return Math.min(REPLY_MAX_S, Math.max(REPLY_MIN_S, Math.round(durationMs / 1000)));
 }
 
-// Time spent with the coach this week: chat replies, voice notes, calls and its messages on Today.
-// Logging food by photo, label, barcode, voice or text doesn't go through the coach, and isn't here.
+// Time the AI spent on someone this week: chat replies, voice notes, calls, its messages on Today,
+// and reading meal photos and nutrition labels. Barcodes and typed or spoken food aren't here.
 export async function loadUsage(userId: string, now: Date): Promise<AssistantUsage> {
   const { timezone } = await readSummaryContext(userId, now);
   const week = localWeekRange(now, timezone);
@@ -48,10 +47,10 @@ export async function loadUsage(userId: string, now: Date): Promise<AssistantUsa
     }),
     prisma.assistantAction.findMany({
       orderBy: { createdAt: "asc" },
-      where: { createdAt: { gte: new Date(week.from.getTime() - TALK_MAX_SECONDS * 1000), lt: week.to }, kind: { in: ["home", "talk", "voice"] }, userId },
+      where: { createdAt: { gte: new Date(week.from.getTime() - TALK_MAX_SECONDS * 1000), lt: week.to }, kind: { in: ["home_run", "scan", "talk", "voice"] }, userId },
     }),
   ]);
-  const split: UsageSplit = { chat: 0, suggestions: 0, talk: 0, voice: 0 };
+  const split: UsageSplit = { chat: 0, scans: 0, suggestions: 0, talk: 0, voice: 0 };
 
   const calls: { from: number; to: number }[] = [];
   for (const row of actions) {
@@ -85,13 +84,32 @@ export async function loadUsage(userId: string, now: Date): Promise<AssistantUsa
   }
 
   for (const row of actions) {
-    const { ai, shownAt } = row.payload as { ai?: boolean; shownAt?: string };
-    if (row.kind === "home" && ai && shownAt && Date.parse(shownAt) >= week.from.getTime()) split.suggestions += SUGGESTION_S;
+    if (row.createdAt < week.from) continue;
+    const seconds = ((row.payload as { ms?: number }).ms ?? 0) / 1000;
+    if (row.kind === "home_run") split.suggestions += seconds;
+    if (row.kind === "scan") split.scans += seconds;
   }
 
-  const used = split.chat + split.suggestions + split.talk + split.voice;
+  split.scans = Math.round(split.scans);
+  split.suggestions = Math.round(split.suggestions);
+  const used = split.chat + split.scans + split.suggestions + split.talk + split.voice;
   const limit = weeklyLimitSeconds();
   return { asleep: used >= limit, limit, plan: "free", resetsAt: week.to.toISOString(), split, used };
 }
 
 export const ASLEEP_MESSAGE = "Your coach is asleep: you've used this week's free minutes. Come back next week for more, or upgrade.";
+
+const SCAN_MAX_S = 60;
+
+// Reading a meal photo or a label took this long. Only counted: logging food never stops working.
+export async function recordScan(userId: string, source: "label" | "photo", ms: number, now: Date): Promise<void> {
+  await prisma.assistantAction.create({
+    data: {
+      callId: `scan:${randomUUID()}`,
+      createdAt: now,
+      kind: "scan",
+      payload: { ms: Math.min(SCAN_MAX_S * 1000, Math.round(ms)), source },
+      userId,
+    },
+  });
+}

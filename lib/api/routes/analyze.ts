@@ -1,3 +1,4 @@
+import { recordScan } from "../../assistant/usage.ts";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { recordAchievementEvent } from "../../achievements/events.ts";
@@ -266,6 +267,7 @@ export const analyzeRoutes: RouteDefinition[] = [
 
       const profile = await prisma.userProfile.findUnique({ select: { locale: true }, where: { userId: user.id } });
       const images = "uploadIds" in body ? await loadImages(user.id, body.uploadIds) : [];
+      const startedAt = performance.now();
       let recognized: Awaited<ReturnType<ReturnType<typeof apiDeps>["recognizeFoods"]>>;
       try {
         recognized = await apiDeps().recognizeFoods({
@@ -286,7 +288,13 @@ export const analyzeRoutes: RouteDefinition[] = [
         body.source === "label"
           ? recognized.foods.slice(0, 1).map((food) => estimateItem(food, "label", []))
           : await groundFoods(recognized.foods, country);
-      return json({ items, note: recognized.note ?? null, source: body.source });
+      const { source } = body;
+      if (source !== "text") {
+        const { background, now } = apiDeps();
+        const [at, ms] = [now(), performance.now() - startedAt];
+        background(() => recordScan(user.id, source, ms, at));
+      }
+      return json({ items, note: recognized.note ?? null, source });
     },
     method: "POST",
     path: "/log/analyze",

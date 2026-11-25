@@ -7,7 +7,7 @@ import type { HomeWordsInput } from "../assistant/home-words.ts";
 import { prisma } from "../prisma.ts";
 import { appendAppLanguageReminder } from "../require-write-tools.ts";
 import { setApiDeps } from "./deps.ts";
-import { api, closeDatabase, installFakes, resetDatabase, signIn, type Session } from "./test/harness.ts";
+import { api, closeDatabase, flushBackground, installFakes, resetDatabase, setRecognizer, signIn, type Session } from "./test/harness.ts";
 
 // A Wednesday.
 const NOW = new Date("2026-03-11T14:00:00Z");
@@ -55,12 +55,12 @@ describe("time with the coach", () => {
     await action("talk", before(60), { endedAt: before(57).toISOString(), lines: [] });
     // Answered the call above.
     await turn({ at: before(59), seconds: 30 });
-    await action("home", before(50), { ai: true, shownAt: before(50).toISOString() });
-    await action("home", before(50), { ai: true });
-    await action("home", before(49), { ai: false, shownAt: before(49).toISOString() });
+    await action("home_run", before(50), { ms: 3600 });
+    await action("home_run", before(49), {});
+    await action("scan", before(48), { ms: 7400, source: "photo" });
     const body = await usage();
-    assert.deepEqual(body.split, { chat: 20 + 5 + 120, suggestions: 5, talk: 180, voice: 20 });
-    assert.equal(body.used, 350);
+    assert.deepEqual(body.split, { chat: 20 + 5 + 120, scans: 7, suggestions: 4, talk: 180, voice: 20 });
+    assert.equal(body.used, 356);
     assert.equal(body.limit, FREE_WEEKLY_MINUTES * 60);
     assert.equal(body.asleep, false);
     assert.equal((await api("GET", "/assistant/usage")).status, 401);
@@ -89,6 +89,26 @@ describe("time with the coach", () => {
     assert.equal((await get("/assistant/conversation")).usage.asleep, true);
     setApiDeps({ now: () => new Date("2026-03-16T09:00:00Z") });
     assert.equal((await usage()).asleep, false);
+  });
+
+  it("times photos and labels, not typed food, and keeps reading them when asleep", async () => {
+    setRecognizer(async () => ({ foods: [{ amount: 100, name: "Soup", nutrimentsPer100g: { energyKcal100g: 40 }, searchQueries: [], unit: "g" }] }));
+    const form = new FormData();
+    form.append("file", new File([Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, ...Array(60).fill(1)])], "a.jpg", { type: "image/jpeg" }));
+    const { uploadId } = (await api("POST", "/uploads", { raw: form, token: session.accessToken })).body;
+    const analyze = async (body: object) => {
+      const result = await api("POST", "/log/analyze", { body, token: session.accessToken });
+      await flushBackground();
+      return result.status;
+    };
+    const scans = () => prisma.assistantAction.findMany({ where: { kind: "scan" } });
+    assert.equal(await analyze({ source: "label", uploadIds: [uploadId] }), 200);
+    assert.equal(await analyze({ source: "text", text: "soup" }), 200);
+    assert.equal((await scans()).length, 1);
+    for (let index = 0; index < FREE_WEEKLY_MINUTES / 2; index += 1) await turn({ at: before(200 - index), seconds: 120 });
+    assert.equal((await usage()).asleep, true);
+    assert.equal(await analyze({ source: "photo", uploadIds: [uploadId] }), 200);
+    assert.equal((await scans()).length, 2);
   });
 
   it("lets a call last only as long as what's left", async () => {
