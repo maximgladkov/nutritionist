@@ -29,6 +29,7 @@ export const CHECKED_LABELS: Record<string, string> = {
   list_frequent_foods: "Foods you log often",
   list_meals: "Diary",
   lookup_product: "Food catalog",
+  search_past_chats: "Past chats",
   search_products: "Food catalog",
 };
 
