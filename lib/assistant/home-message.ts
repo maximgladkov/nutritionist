@@ -5,6 +5,7 @@ import { prisma } from "../prisma.ts";
 import { getZonedParts } from "../timezone.ts";
 import { readSummaryContext } from "../summary.ts";
 import { namesWrongMeal } from "./home-day.ts";
+import { chosenLanguage, toneLine, type AssistantSettings, type HomeTopic } from "./settings.ts";
 import { loadHomeFacts, type HomeFact, type HomeMood } from "./home-facts.ts";
 import { acceptWords } from "./home-words.ts";
 
@@ -18,7 +19,8 @@ const SETTLE_MS = 10 * 60_000;
 const READY_MS = 3 * 3_600_000;
 export const HOME_DAILY_RUNS = 8;
 const FACTS_SHOWN = 6;
-const KEEP_MS = 7 * 86_400_000;
+// Past the end of the week, whose minutes they count towards.
+const KEEP_MS = 9 * 86_400_000;
 // What the coach opened with is still what they're answering.
 const TELL_MS = 24 * 3_600_000;
 
@@ -35,6 +37,8 @@ function needsNumber(key: string): boolean {
 }
 
 type Payload = {
+  // Worded by the model, so it counts as time with the coach.
+  ai?: boolean;
   fact: string;
   key: string;
   mood: HomeMood;
@@ -42,6 +46,7 @@ type Payload = {
   seenAt?: string;
   shownAt?: string;
   stamp?: string;
+  style?: string;
   text: string;
   version?: number;
 };
@@ -52,6 +57,32 @@ const write = (payload: Payload) => payload as unknown as Prisma.InputJsonValue;
 function view(row: Pick<AssistantAction, "id" | "payload">): HomeMessage {
   const { mood, text } = read(row);
   return { id: row.id, mood, text };
+}
+
+// What each kind of thing to say is, for those who only want some of them.
+const TOPICS: Record<string, HomeTopic> = {
+  chat: "reminders",
+  dish: "ideas",
+  empty: "reminders",
+  hello: "ideas",
+  kcal_left: "ideas",
+  morning: "cheer",
+  next_badge: "cheer",
+  over: "reminders",
+  protein_done: "cheer",
+  protein_left: "ideas",
+  protein_up: "progress",
+  protein_week: "progress",
+  sparse: "reminders",
+  steps: "progress",
+  streak: "cheer",
+  usual: "ideas",
+  week: "progress",
+  weight: "progress",
+};
+
+function topicOf(key: string): HomeTopic {
+  return TOPICS[key] ?? (key.startsWith("badge:") ? "cheer" : "reminders");
 }
 
 export function plainText(fact: HomeFact, name: string | null): string {
@@ -84,11 +115,17 @@ async function takeRun(userId: string, today: string, now: Date): Promise<boolea
 
 // What the coach says on Today at this visit: the same while they stay, something else when they
 // come back or their day changes.
-export async function homeMessage(userId: string, now: Date): Promise<HomeMessage> {
-  const [info, rows] = await Promise.all([
+export async function homeMessage(userId: string, now: Date, settings: AssistantSettings): Promise<HomeMessage | null> {
+  const [loaded, rows] = await Promise.all([
     loadHomeFacts(userId, now),
     prisma.assistantAction.findMany({ orderBy: { createdAt: "desc" }, take: 60, where: { kind: HOME_KIND, userId } }),
   ]);
+  const info = { ...loaded, facts: loaded.facts.filter((fact) => settings.homeTopics.includes(topicOf(fact.key))) };
+  if (info.facts.length === 0) {
+    return null;
+  }
+  // A change of language or tone is heard from the next message.
+  const style = `${settings.language}:${settings.tone}`;
   const shown = rows
     .filter((row) => read(row).shownAt)
     .sort((a, b) => read(b).shownAt!.localeCompare(read(a).shownAt!));
@@ -99,7 +136,7 @@ export async function homeMessage(userId: string, now: Date): Promise<HomeMessag
   const save = async (row: AssistantAction, change: Partial<Payload>, state = row.state) =>
     prisma.assistantAction.update({ data: { payload: write({ ...read(row), ...change }), state }, where: { id: row.id } });
 
-  if (current && current.state !== "opened" && read(current).version === VERSION && since(read(current).seenAt) < VISIT_GAP_MS) {
+  if (current && current.state !== "opened" && read(current).version === VERSION && info.facts.some((fact) => fact.key === read(current).key) && read(current).style === style && since(read(current).seenAt) < VISIT_GAP_MS) {
     const { fact, shownAt, stamp } = read(current);
     if (stamp === info.stamp || (isTrue(fact) && since(shownAt) < SETTLE_MS)) {
       // Not put back over an opening that happened meanwhile.
@@ -111,7 +148,7 @@ export async function homeMessage(userId: string, now: Date): Promise<HomeMessag
 
   const show = { seenAt: now.toISOString(), shownAt: now.toISOString(), stamp: info.stamp };
   const ready = rows.filter(
-    (row) => row.state === "ready" && read(row).version === VERSION && now.getTime() - row.createdAt.getTime() < READY_MS && isTrue(read(row).fact) && read(row).key !== (current && read(current).key),
+    (row) => row.state === "ready" && read(row).version === VERSION && read(row).style === style && now.getTime() - row.createdAt.getTime() < READY_MS && isTrue(read(row).fact) && read(row).key !== (current && read(current).key),
   );
   if (ready.length > 0) {
     // Newest batch first, and within it the order they were written in.
@@ -120,13 +157,13 @@ export async function homeMessage(userId: string, now: Date): Promise<HomeMessag
   }
 
   const facts = rank(info.facts, shown.slice(0, 10).map((row) => read(row).key)).slice(0, FACTS_SHOWN);
-  const create = async (index: number, batch: string, fact: HomeFact, text: string, first: boolean) =>
+  const create = async (index: number, batch: string, fact: HomeFact, text: string, first: boolean, ai: boolean) =>
     prisma.assistantAction.create({
       data: {
         callId: `home:${batch}:${index}`,
         createdAt: now,
         kind: HOME_KIND,
-        payload: write({ fact: fact.text, key: fact.key, mood: fact.mood, text, version: VERSION, ...(first ? show : {}) }),
+        payload: write({ fact: fact.text, key: fact.key, mood: fact.mood, text, ai, style, version: VERSION, ...(first ? show : {}) }),
         state: first ? "shown" : "ready",
         userId,
       },
@@ -141,9 +178,11 @@ export async function homeMessage(userId: string, now: Date): Promise<HomeMessag
       const written = await apiDeps().writeHome({
         day: info.day,
         facts: texts,
+        language: chosenLanguage(settings),
         lastWords: info.lastWords,
         localTime: info.localTime,
         name: info.name,
+        tone: toneLine(settings.tone),
         recent: shown.slice(0, 10).map((row) => read(row).text),
       });
       const used = new Set<number>();
@@ -155,7 +194,7 @@ export async function homeMessage(userId: string, now: Date): Promise<HomeMessag
       });
       if (good.length > 0) {
         const made = [];
-        for (const [index, { fact, text }] of good.entries()) made.push(await create(index, batch, fact, text, index === 0));
+        for (const [index, { fact, text }] of good.entries()) made.push(await create(index, batch, fact, text, index === 0, true));
         await prisma.assistantAction.deleteMany({
           where: {
             OR: [{ kind: RUN_KIND }, { kind: HOME_KIND, state: { in: ["ready", "shown"] } }],
@@ -169,8 +208,11 @@ export async function homeMessage(userId: string, now: Date): Promise<HomeMessag
       console.error("home message failed", error);
     }
   }
-  const fact = facts.find((row) => row.plain !== null) ?? info.facts.find((row) => row.plain !== null)!;
-  return view(await create(0, batch, fact, plainText(fact, info.name), true));
+  const fact = facts.find((row) => row.plain !== null) ?? info.facts.find((row) => row.plain !== null);
+  if (!fact) {
+    return null;
+  }
+  return view(await create(0, batch, fact, plainText(fact, info.name), true, false));
 }
 
 export type HomeOpener = { at: string; id: string; text: string };
