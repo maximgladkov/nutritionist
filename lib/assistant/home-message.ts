@@ -33,7 +33,7 @@ const VERSION = 3;
 const NO_FIGURE = ["chat", "empty", "hello", "morning", "over", "usual"];
 
 function needsNumber(key: string): boolean {
-  return !NO_FIGURE.includes(key) && !key.startsWith("badge:") && !key.startsWith("comments:");
+  return !NO_FIGURE.includes(key) && !key.startsWith("comments:");
 }
 
 type Payload = {
@@ -80,7 +80,7 @@ const TOPICS: Record<string, HomeTopic> = {
 };
 
 function topicOf(key: string): HomeTopic {
-  return TOPICS[key] ?? (key.startsWith("badge:") ? "cheer" : "reminders");
+  return TOPICS[key] ?? "reminders";
 }
 
 export function plainText(fact: HomeFact, name: string | null): string {
