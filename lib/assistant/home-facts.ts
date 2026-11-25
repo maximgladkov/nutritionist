@@ -7,9 +7,11 @@ import type { ProductNutriments } from "../open-food-facts.ts";
 import { prisma } from "../prisma.ts";
 import { listRecipes } from "../recipes.ts";
 import { loadNutritionDays, readSummaryContext } from "../summary.ts";
-import { formatDateInTimeZone, getZonedParts, shiftYmd } from "../timezone.ts";
+import { formatDateInTimeZone, getZonedParts, localDayRange, shiftYmd } from "../timezone.ts";
+import { listMeals } from "../meals.ts";
 import { frequentFoods } from "./frequent-foods.ts";
 import { coverage } from "./home-card.ts";
+import { dayInWords, mealNamed, nextMeal, type MainMeal } from "./home-day.ts";
 
 export type HomeMood = "happy" | "idle" | "thinking";
 
@@ -27,11 +29,14 @@ export type HomeFact = {
 };
 
 export type HomeFacts = {
+  // What they've had today and what comes next.
+  day: string;
   facts: HomeFact[];
   // What they last wrote, to match its language; newest last.
   lastWords: string[];
   localTime: string;
   name: string | null;
+  next: MainMeal | null;
   // Changes when what they logged or were told changes.
   stamp: string;
   today: string;
@@ -69,12 +74,12 @@ async function dishes(userId: string) {
     prisma.savedMeal.findMany({ include: { items: true }, take: 20, where: { userId } }),
   ]);
   return [
-    ...recipes.map((recipe) => ({ kcal: recipe.perServing.energyKcal, name: recipe.name, proteins: recipe.perServing.proteins, what: "saved recipe" })),
+    ...recipes.map((recipe) => ({ foods: recipe.items.map((item) => item.name), kcal: recipe.perServing.energyKcal, name: recipe.name, proteins: recipe.perServing.proteins, what: "saved recipe" })),
     ...meals.map((meal) => {
       const totals = sumNutrients(
         meal.items.map((item) => computeItemNutrition({ amount: item.amount, nutriments: item.nutrimentsPer100g as ProductNutriments, unit: item.unit }).metrics),
       );
-      return { kcal: totals.energyKcal, name: meal.name, proteins: totals.proteins, what: "saved meal" };
+      return { foods: meal.items.map((item) => item.name), kcal: totals.energyKcal, name: meal.name, proteins: totals.proteins, what: "saved meal" };
     }),
   ];
 }
@@ -111,7 +116,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
   const { goals, timezone, today } = await readSummaryContext(userId, now);
   const clock = getZonedParts(now, timezone);
   const { hour } = clock;
-  const [user, profile, progress, comments, history, foods, kept, usual, badges, weights, activity, words, latestItem] = await Promise.all([
+  const [user, profile, progress, comments, history, foods, kept, usual, badges, weights, activity, words, latestItem, logged] = await Promise.all([
     prisma.user.findUnique({ select: { name: true }, where: { id: userId } }),
     prisma.userProfile.findUnique({ select: { goalWeightKg: true }, where: { userId } }),
     loadTodayNutritionProgress(userId, now),
@@ -129,7 +134,20 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
     prisma.dailyActivity.findMany({ orderBy: { date: "desc" }, where: { date: { gte: shiftYmd(today, -8), lt: today }, userId } }),
     recentWords(userId, now),
     prisma.mealItem.findFirst({ orderBy: { createdAt: "desc" }, select: { id: true }, where: { meal: { userId } } }),
+    listMeals({ userId, ...localDayRange(now, timezone) }),
   ]);
+  const todays = logged.meals
+    .filter((meal) => meal.items.length > 0)
+    .map((meal) => ({
+      at: getZonedParts(new Date(meal.eatenAt), timezone),
+      foods: meal.items.map((item) => item.name),
+      label: meal.label,
+    }))
+    .sort((a, b) => a.at.hour * 60 + a.at.minute - (b.at.hour * 60 + b.at.minute));
+  const next = nextMeal(hour, new Set<string>(todays.map((meal) => meal.label)));
+  const had = new Set(todays.flatMap((meal) => meal.foods.map((food) => food.trim().toLowerCase())));
+  // Not what they've already had, nor food for a day that's over.
+  const isNew = (food: string) => !had.has(food.trim().toLowerCase());
 
   const facts: HomeFact[] = [];
   const add = (key: string, score: number, mood: HomeMood, text: string, plain: string | null) => facts.push({ key, mood, plain, score, text });
@@ -147,7 +165,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
     add("sparse", 92, "thinking", `Only ${n(eaten)} kcal is logged today and it's evening. Probably something is missing from the diary. Ask, don't praise.`, `only ${n(eaten)} kcal is logged today. Is anything missing?`);
   } else if (eaten > 0) {
     if (proteinLeft !== null && proteinLeft >= 15 && hour >= 10) {
-      const best = foods.filter((food) => (food.proteins ?? 0) > 0).sort((a, b) => (b.proteins ?? 0) - (a.proteins ?? 0))[0];
+      const best = (next ? foods : []).filter((food) => (food.proteins ?? 0) > 0 && isNew(food.name)).sort((a, b) => (b.proteins ?? 0) - (a.proteins ?? 0))[0];
       const share = best ? coverage(best.proteins ?? 0, proteinLeft) : null;
       const idea = best && share ? ` ${best.name}, which they often log, ${share}.` : "";
       add(
@@ -160,15 +178,20 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
     }
     if (kcalLeft !== null && kcalLeft >= 150 && hour >= 11) {
       const dish = kept
-        .filter((row) => row.kcal !== null && row.kcal >= 100 && row.kcal <= kcalLeft)
+        .filter((row) => {
+          const meant = mealNamed(row.name);
+          const repeated = row.foods.filter((food) => !isNew(food)).length * 2 > row.foods.length;
+          // One sitting, at the right time, and not the day's food over again.
+          return next !== null && (meant === null || meant === next) && !repeated && row.kcal !== null && row.kcal >= 100 && row.kcal <= Math.min(kcalLeft, kcalGoal! * 0.45);
+        })
         .sort((a, b) => (b.proteins ?? 0) - (a.proteins ?? 0))[0];
       if (dish) {
         add(
           "dish",
           80,
           "happy",
-          `${n(eaten)} of ${n(kcalGoal!)} kcal eaten so far today, so ${n(kcalLeft)} kcal are left. Their ${dish.what} "${dish.name}" fits: ${n(dish.kcal!)} kcal${dish.proteins ? ` and ${n(dish.proteins)} grams of protein` : ""} a serving.`,
-          `you have ${n(kcalLeft)} kcal left. Your ${dish.name} fits.`,
+          `${n(eaten)} of ${n(kcalGoal!)} kcal eaten so far today, so ${n(kcalLeft)} kcal are left. Their ${dish.what} "${dish.name}" (${dish.foods.slice(0, 4).join(", ")}) fits for ${next}: ${n(dish.kcal!)} kcal${dish.proteins ? ` and ${n(dish.proteins)} grams of protein` : ""} a serving.`,
+          `you have ${n(kcalLeft)} kcal left. Your ${dish.name} fits for ${next}.`,
         );
       } else {
         add("kcal_left", 60, "idle", `${n(eaten)} of ${n(kcalGoal!)} kcal eaten so far today, so ${n(kcalLeft)} kcal are left.`, `you have ${n(kcalLeft)} kcal left today.`);
@@ -264,10 +287,12 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
   if (facts.filter((fact) => fact.plain !== null).length < 3) add("hello", 5, "happy", "Nothing in particular to report. Offer help with a meal idea, or logging by text, voice or photo.", "ask me for a meal idea, or send a photo of what you're eating.");
 
   return {
+    day: dayInWords(todays, next),
     facts: facts.sort((a, b) => b.score - a.score),
     lastWords: words.map((row) => row.text),
     localTime: `${new Intl.DateTimeFormat("en", { timeZone: timezone, weekday: "long" }).format(now)}, ${clock.hour}:${String(clock.minute).padStart(2, "0")}`,
     name: firstName(user?.name),
+    next,
     stamp: [today, latestItem?.id ?? "", Math.round(eaten), comments.length].join("|"),
     today,
   };

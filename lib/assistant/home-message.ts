@@ -4,6 +4,7 @@ import { apiDeps } from "../api/deps.ts";
 import { prisma } from "../prisma.ts";
 import { getZonedParts } from "../timezone.ts";
 import { readSummaryContext } from "../summary.ts";
+import { namesWrongMeal } from "./home-day.ts";
 import { loadHomeFacts, type HomeFact, type HomeMood } from "./home-facts.ts";
 import { acceptWords } from "./home-words.ts";
 
@@ -24,7 +25,7 @@ const TELL_MS = 24 * 3_600_000;
 export type HomeMessage = { id: string; mood: HomeMood; text: string };
 
 // Raised when older messages shouldn't be shown any more.
-const VERSION = 2;
+const VERSION = 3;
 
 // Said without a figure and still clear.
 const NO_FIGURE = ["chat", "empty", "hello", "morning", "over", "usual"];
@@ -138,6 +139,7 @@ export async function homeMessage(userId: string, now: Date): Promise<HomeMessag
     try {
       const texts = facts.map((fact) => fact.text);
       const written = await apiDeps().writeHome({
+        day: info.day,
         facts: texts,
         lastWords: info.lastWords,
         localTime: info.localTime,
@@ -147,7 +149,7 @@ export async function homeMessage(userId: string, now: Date): Promise<HomeMessag
       const used = new Set<number>();
       const good = written.slice(0, 3).flatMap((words) => {
         const text = used.has(words.fact) ? null : acceptWords(words, texts, info.name, needsNumber(facts[words.fact]?.key ?? ""));
-        if (text === null) return [];
+        if (text === null || namesWrongMeal(text, info.next)) return [];
         used.add(words.fact);
         return [{ fact: facts[words.fact]!, text }];
       });
