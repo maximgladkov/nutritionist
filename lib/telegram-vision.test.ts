@@ -1,18 +1,18 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { mediaRef } from "./media-ref.ts";
 import { isImageMediaType, looksLikeImageFilename, sniffImageMediaType } from "./image-bytes.ts";
 import {
   filesForTurnMediaPersist,
 } from "./persist-turn-media.ts";
 import {
   attachTelegramVision,
-  inlineTelegramImages,
   isAudioMediaType,
   isVideoMediaType,
   looksLikeAudioFilename,
   looksLikeVideoFilename,
   persistScopeFromDeliver,
-  withSniffedImageType,
+  referToTelegramFiles,
 } from "./telegram-vision.ts";
 
 const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
@@ -49,132 +49,41 @@ describe("image filename and media type helpers", () => {
   });
 });
 
-describe("withSniffedImageType", () => {
-  it("replaces octet-stream with the sniffed image type", () => {
-    assert.deepEqual(withSniffedImageType({ bytes: jpeg, mediaType: "application/octet-stream" }), {
-      bytes: jpeg,
-      mediaType: "image/jpeg",
-    });
+describe("referToTelegramFiles", () => {
+  it("names photos, voice notes and videos, and leaves the rest to eve", () => {
+    const pdf = { data: "eve-url:telegram-file:doc", filename: "label.pdf", mediaType: "application/pdf", type: "file" as const };
+    const content = referToTelegramFiles([
+      { text: "Add 100 ml", type: "text" },
+      { data: new URL("telegram-file:photo1?filename=photo.jpg"), filename: "photo.jpg", mediaType: "application/octet-stream", type: "file" },
+      { data: "eve-url:telegram-file:voice1", filename: "voice.ogg", mediaType: "audio/ogg", type: "file" },
+      { data: "telegram-file:video1", filename: "plate.mp4", mediaType: "video/mp4", type: "file" },
+      pdf,
+    ]);
+    assert.deepEqual(content, [
+      { text: "Add 100 ml", type: "text" },
+      { data: mediaRef("telegram", "photo1"), filename: "photo.jpg", mediaType: "image/jpeg", type: "file" },
+      { data: mediaRef("telegram", "voice1"), filename: "voice.ogg", mediaType: "audio/ogg", type: "file" },
+      { data: mediaRef("telegram", "video1"), filename: "plate.mp4", mediaType: "video/mp4", type: "file" },
+      pdf,
+    ]);
+    assert.deepEqual(JSON.parse(JSON.stringify(content)), content);
   });
 
-  it("keeps an existing specific image type", () => {
-    assert.deepEqual(withSniffedImageType({ bytes: jpeg, mediaType: "image/jpeg" }), {
-      bytes: jpeg,
-      mediaType: "image/jpeg",
-    });
+  it("remembers the files so the turn keeps them", async () => {
+    const channel = { adapter: { deliver: async (payload: Record<string, unknown>) => payload } };
+    attachTelegramVision(channel);
+    await channel.adapter.deliver(
+      { message: [{ data: "telegram-file:kept", filename: "photo.jpg", mediaType: "image/jpeg", type: "file" }] },
+      // @ts-expect-error the adapter passes the context second
+      { session: { id: "sess-deliver" } },
+    );
+    assert.deepEqual(filesForTurnMediaPersist("sess-deliver", [{ type: "file", mediaType: "image/jpeg" }]), [
+      { fileId: "kept", filename: "photo.jpg", index: 0, mediaType: "image/jpeg" },
+    ]);
   });
 });
 
-describe("inlineTelegramImages", () => {
-  it("converts telegram file parts into inline image file parts", async () => {
-    const url = "telegram-file:AgACAgIAphoto?filename=photo.jpg&mediaType=image%2Fjpeg";
-    const content = await inlineTelegramImages(
-      [
-        { type: "text", text: "Add 100 ml" },
-        { type: "file", mediaType: "image/jpeg", filename: "photo.jpg", data: `eve-url:${url}` },
-      ],
-      async (requested) => {
-        assert.equal(requested, url);
-        return { bytes: jpeg, mediaType: "application/octet-stream" };
-      },
-    );
-
-    assert.deepEqual(content, [
-      { type: "text", text: "Add 100 ml" },
-      {
-        type: "image",
-        mediaType: "image/jpeg",
-        image: jpeg.toString("base64"),
-      },
-    ]);
-  });
-
-  it("leaves pdf file parts unchanged", async () => {
-    const part = {
-      type: "file" as const,
-      mediaType: "application/pdf",
-      filename: "label.pdf",
-      data: "eve-url:telegram-file:file-pdf",
-    };
-    const content = await inlineTelegramImages([part], async () => {
-      throw new Error("should not fetch pdf");
-    });
-    assert.deepEqual(content, [part]);
-  });
-
-  it("keeps the file part when fetch fails", async () => {
-    const part = {
-      type: "file" as const,
-      mediaType: "image/jpeg",
-      filename: "photo.jpg",
-      data: "telegram-file:missing",
-    };
-    const content = await inlineTelegramImages([part], async () => {
-      throw new Error("unavailable");
-    });
-    assert.deepEqual(content, [part]);
-  });
-
-  it("remembers inlined telegram files for later persist when a session id is present", async () => {
-    const content = await inlineTelegramImages(
-      [
-        { type: "text", text: "lunch" },
-        {
-          type: "file",
-          mediaType: "image/jpeg",
-          filename: "photo.jpg",
-          data: "telegram-file:AgACinlineSess",
-        },
-      ],
-      async () => ({ bytes: jpeg, mediaType: "image/jpeg" }),
-      "sess-inline",
-    );
-    assert.equal(Array.isArray(content) ? content[1]?.type : undefined, "image");
-    assert.deepEqual(filesForTurnMediaPersist("sess-inline", [{ type: "file", mediaType: "image/jpeg" }]), [
-      {
-        bytesBase64: jpeg.toString("base64"),
-        fileId: "AgACinlineSess",
-        filename: "photo.jpg",
-        index: 1,
-        mediaType: "image/jpeg",
-      },
-    ]);
-  });
-
-  it("inlines images on channel deliver before the harness stages files", async () => {
-    const channel = {
-      adapter: {
-        async deliver(payload: Record<string, unknown>) {
-          return payload;
-        },
-        async fetchFile() {
-          return { bytes: jpeg, mediaType: "application/octet-stream" };
-        },
-      },
-    };
-
-    attachTelegramVision(channel, async () => null);
-    const result = await channel.adapter.deliver(
-      {
-        message: [
-          {
-            type: "file",
-            mediaType: "image/jpeg",
-            filename: "photo.jpg",
-            data: "telegram-file:AgACdeliverSess",
-          },
-        ],
-      },
-      { session: { id: "sess-deliver" } },
-    );
-
-    const message = (result as { message: Array<{ type: string; image?: string; mediaType?: string }> }).message[0];
-    assert.equal(message?.type, "image");
-    assert.equal(message?.mediaType, "image/jpeg");
-    assert.equal(message?.image, jpeg.toString("base64"));
-    assert.equal(filesForTurnMediaPersist("sess-deliver", [{ type: "file", mediaType: "image/jpeg" }])[0]?.fileId, "AgACdeliverSess");
-  });
-
+describe("persistScopeFromDeliver", () => {
   it("builds a persist scope from telegram deliver context without a turn id", () => {
     const pending = persistScopeFromDeliver({
       session: {
@@ -194,97 +103,4 @@ describe("inlineTelegramImages", () => {
     assert.equal(withTurn?.turnId, "turn_9");
     assert.equal(persistScopeFromDeliver({}), null);
   });
-
-  it("emits JSON-serializable file parts so eve can snapshot the turn", async () => {
-    const content = await inlineTelegramImages(
-      [
-        {
-          type: "file",
-          mediaType: "image/jpeg",
-          filename: "photo.jpg",
-          data: "telegram-file:AgACAgIAphoto",
-        },
-      ],
-      async () => ({ bytes: jpeg, mediaType: "image/jpeg" }),
-    );
-
-    assert.deepEqual(JSON.parse(JSON.stringify(content)), content);
-    assert.equal(isJsonValue(content), true);
-  });
-
-  it("fetches image parts concurrently", async () => {
-    const started: string[] = [];
-    let release: (() => void) | undefined;
-    const gate = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    const pending = inlineTelegramImages(
-      [
-        { type: "file", mediaType: "image/jpeg", filename: "a.jpg", data: "telegram-file:a" },
-        { type: "file", mediaType: "image/jpeg", filename: "b.jpg", data: "telegram-file:b" },
-      ],
-      async (url) => {
-        started.push(url);
-        await gate;
-        return { bytes: jpeg, mediaType: "image/jpeg" };
-      },
-    );
-    await Promise.resolve();
-    await Promise.resolve();
-    assert.equal(started.length, 2);
-    release?.();
-    await pending;
-  });
-
-  it("inlines telegram audio and video file parts", async () => {
-    const ogg = Buffer.from("ogg-bytes");
-    const mp4 = Buffer.from("mp4-bytes");
-    const content = await inlineTelegramImages(
-      [
-        { type: "file", mediaType: "audio/ogg", filename: "voice.ogg", data: "telegram-file:AwACVoice" },
-        { type: "file", mediaType: "video/mp4", filename: "plate.mp4", data: "telegram-file:BAACVideo" },
-      ],
-      async (url) => {
-        if (url.includes("AwACVoice")) {
-          return { bytes: ogg, mediaType: "audio/ogg" };
-        }
-        return { bytes: mp4, mediaType: "video/mp4" };
-      },
-    );
-
-    assert.deepEqual(content, [
-      {
-        type: "file",
-        mediaType: "audio/ogg",
-        filename: "voice.ogg",
-        data: { type: "data", data: ogg.toString("base64") },
-      },
-      {
-        type: "file",
-        mediaType: "video/mp4",
-        filename: "plate.mp4",
-        data: { type: "data", data: mp4.toString("base64") },
-      },
-    ]);
-  });
 });
-
-function isJsonValue(value: unknown): boolean {
-  if (value === null || typeof value === "boolean" || typeof value === "string") {
-    return true;
-  }
-  if (typeof value === "number") {
-    return Number.isFinite(value);
-  }
-  if (Array.isArray(value)) {
-    return value.every(isJsonValue);
-  }
-  if (typeof value !== "object") {
-    return false;
-  }
-  const proto = Object.getPrototypeOf(value);
-  if (proto !== null && proto !== Object.prototype) {
-    return false;
-  }
-  return Object.values(value).every((entry) => entry === undefined || isJsonValue(entry));
-}

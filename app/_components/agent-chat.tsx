@@ -15,7 +15,8 @@ import {
 import { Alert } from "@heroui/react";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { FileUIPart, UserContent } from "ai";
+import type { FileUIPart } from "ai";
+import { failure, turns } from "eve/events";
 import { useEveAgent } from "eve/react";
 import { useEffect, useState } from "react";
 import { AgentMessage } from "./agent-message";
@@ -71,18 +72,19 @@ export function AgentChat({
     },
   });
 
-  const isBusy = agent.status === "submitted" || agent.status === "streaming";
+  // A turn waiting for an answer is open, but not working.
+  const isBusy = agent.status === "busy";
   const isResuming = agent.status === "resuming";
-  const isEmpty = agent.data.messages.length === 0;
-  const lastMessage = agent.data.messages.at(-1);
+  const isEmpty = agent.messages.length === 0;
+  const lastMessage = agent.messages.at(-1);
   const isPendingAssistantShell =
     lastMessage?.role === "assistant" &&
-    lastMessage.parts.every((part) => part.type === "step-start");
+    lastMessage.parts.length === 0;
   const showPendingThinking =
     isBusy &&
-    (agent.status === "submitted" || lastMessage?.role !== "assistant" || isPendingAssistantShell);
+    (lastMessage?.role !== "assistant" || isPendingAssistantShell);
   const turnFailure =
-    isBusy || isResuming ? undefined : getLatestTurnFailure(agent.events, t(MODEL_UNAVAILABLE));
+    isBusy || isResuming ? undefined : getLatestTurnFailure(agent.view, t(MODEL_UNAVAILABLE));
   const errorMessage = cancellationError ?? agent.error?.message ?? turnFailure;
   const hasConversationContent = sessionless || !isEmpty || errorMessage !== undefined;
   const showConversationLayout = isResuming || hasConversationContent;
@@ -91,16 +93,16 @@ export function AgentChat({
     isResuming || isPreparing
       ? "submitted"
       : isBusy && !canSubmit
-        ? agent.status === "streaming"
+        ? lastMessage?.role === "assistant"
           ? "streaming"
           : "submitted"
         : "ready";
 
   useEffect(() => {
-    if (!agent.data.messages.some((message) => message.metadata?.optimistic)) {
+    if (!agent.messages.some((message) => message.metadata?.optimistic)) {
       setOptimisticFiles([]);
     }
-  }, [agent.data.messages]);
+  }, [agent.messages]);
 
   const requestCancellation = () => {
     setCancellationError(undefined);
@@ -158,7 +160,7 @@ export function AgentChat({
       return;
     }
 
-    const parts: UserContent = [];
+    const parts: ({ text: string; type: "text" } | { data: string; filename: string; mediaType: string; type: "file" })[] = [];
     if (text.length > 0) {
       parts.push({ text, type: "text" });
     }
@@ -272,7 +274,7 @@ export function AgentChat({
                   : "mx-auto w-full max-w-3xl flex-col gap-8 px-4 pt-6 pb-8 sm:px-6"
               }
             >
-              {agent.data.messages.map((message, index) =>
+              {agent.messages.map((message, index) =>
                 showPendingThinking &&
                   isPendingAssistantShell &&
                   message.id === lastMessage.id ? null : (
@@ -284,13 +286,16 @@ export function AgentChat({
                         : undefined
                     }
                     isStreaming={
-                      agent.status === "streaming" && index === agent.data.messages.length - 1
+                      isBusy && index === agent.messages.length - 1
                     }
                     key={message.id}
                     message={message}
                     onInputResponses={(inputResponses) => {
                       setCancellationError(undefined);
-                      return agent.respond(inputResponses);
+                      return agent.respond(inputResponses).then(
+                        () => undefined,
+                        (error: unknown) => setCancellationError(toErrorMessage(error, t(MODEL_UNAVAILABLE))),
+                      );
                     }}
                   />
                 ),
@@ -392,24 +397,10 @@ function toErrorMessage(error: unknown, fallback: string): string {
 }
 
 function getLatestTurnFailure(
-  events: ReturnType<typeof useEveAgent>["events"],
+  view: ReturnType<typeof useEveAgent>["view"],
   modelUnavailable: string,
 ): string | undefined {
-  for (let index = events.length - 1; index >= 0; index -= 1) {
-    const event = events[index];
-
-    if (event.type === "turn.failed") {
-      return event.data.code === "MODEL_CALL_FAILED" ? modelUnavailable : event.data.message;
-    }
-
-    if (event.type === "turn.completed" || event.type === "turn.cancelled") {
-      return undefined;
-    }
-
-    if (event.type === "message.received") {
-      return undefined;
-    }
-  }
-
-  return undefined;
+  const latest = turns(view).at(-1);
+  const error = latest?.status === "settled" ? failure(view, latest.turnId) : undefined;
+  return error?.code === "MODEL_CALL_FAILED" ? modelUnavailable : error?.message;
 }

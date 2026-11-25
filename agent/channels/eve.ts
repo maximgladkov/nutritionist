@@ -1,4 +1,3 @@
-import type { UserContent } from "ai";
 import {
   defaultEveAuth,
   eveChannel,
@@ -9,12 +8,13 @@ import {
   type AuthFn,
   vercelOidc,
 } from "eve/channels/auth";
-import type { ChannelReceiveContext } from "eve/channels";
+import type { ChannelReceiveContext, MessageContent } from "eve/channels";
 import { appPrincipal } from "../../lib/principal";
 import { ASSISTANT_MAX_REQUEST_BYTES, assistantLimit } from "../../lib/assistant/limits";
 import { openingNotes } from "../../lib/assistant/home-message";
-import { requireOwnPhotos } from "../../lib/assistant/photos";
+import { referToPhotos, requireOwnPhotos } from "../../lib/assistant/photos";
 import { ASLEEP_MESSAGE, loadUsage } from "../../lib/assistant/usage";
+import { replaceDelivered } from "../../lib/media-ref";
 import { prisma } from "../../lib/prisma";
 import { eveSessionIdFromPath, getUserFromRequest } from "../../lib/session";
 import { formatToolCategoriesContext } from "../../lib/tool-categories";
@@ -75,27 +75,32 @@ async function requireAssistantCapacity(request: Request, userId: string): Promi
   }
 }
 
-const channel = eveChannel({
-  auth: [appSession(), vercelOidc(), localDev()],
-  async onMessage(ctx, message) {
-    const caller = ctx.eve.caller;
-    const inApp = caller?.attributes?.channel === "app";
-    const [context] = await Promise.all([
-      inApp ? openingNotes(caller.principalId, new Date()).catch(() => []) : undefined,
-      requireOwnPhotos(message, {
-        channel: String(caller?.attributes?.channel ?? ""),
-        userId: caller?.principalId ?? "",
-      }),
-    ]);
-    return { auth: defaultEveAuth(ctx), context };
-  },
-});
+const channel = replaceDelivered(
+  eveChannel({
+    auth: [appSession(), vercelOidc(), localDev()],
+    // Having its own files is what lets a channel replace what's delivered; uploads never get here.
+    fetchFile: async () => null,
+    async onMessage(ctx, message) {
+      const caller = ctx.eve.caller;
+      const inApp = caller?.attributes?.channel === "app";
+      const [context] = await Promise.all([
+        inApp ? openingNotes(caller.principalId, new Date()).catch(() => []) : undefined,
+        requireOwnPhotos(message, {
+          channel: String(caller?.attributes?.channel ?? ""),
+          userId: caller?.principalId ?? "",
+        }),
+      ]);
+      return { auth: defaultEveAuth(ctx), context };
+    },
+  }),
+  referToPhotos,
+);
 
 Object.assign(channel, {
   async receive(
     input: {
       readonly auth: ReturnType<typeof appPrincipal> | null;
-      readonly message: string | UserContent;
+      readonly message: MessageContent;
       readonly target: Readonly<{ sessionId?: string }>;
     },
     ctx: ChannelReceiveContext,

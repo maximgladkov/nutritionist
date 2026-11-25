@@ -5,6 +5,7 @@ import {
   summarizeTranscript,
   type AgentTurnStatus,
   type AgentTurnTranscript,
+  waitedForAnswersMs,
 } from "./agent-turn-model.ts";
 import { prisma } from "./prisma.ts";
 
@@ -179,7 +180,7 @@ export async function finalizeAgentTurn(input: {
   if (!existing) {
     return;
   }
-  const durationMs = Math.max(0, input.endedAt.getTime() - existing.startedAt.getTime());
+  const durationMs = Math.max(0, input.endedAt.getTime() - existing.startedAt.getTime() - waitedForAnswersMs(parseTranscript(existing.messages).items));
   await agentTurns().update({
     data: {
       durationMs,

@@ -14,6 +14,9 @@ import type { TalkLine, TalkPayload } from "./talk.ts";
 export const CONVERSATION_PAGE = 30;
 // eve retires a session after 30 days; start a fresh one before then.
 const SESSION_MAX_AGE_MS = 25 * 24 * 60 * 60_000;
+// Sessions begun on eve before 1.0 stay on the deployment that began them, which can't be talked to
+// as the app does now.
+const FIRST_SESSION_AT = new Date("2026-11-26T00:00:00Z");
 // No call lasts longer than this.
 const TALK_OVERLAP_MS = 15 * 60_000;
 // A reply that hasn't finished by now never will.
@@ -35,6 +38,11 @@ export const CHECKED_LABELS: Record<string, string> = {
 
 export type AssistantVoice = { durationMs: number; levels: number[] };
 
+export type AssistantOption = { description?: string; label: string; suggested?: boolean };
+
+// What they can answer with, besides words of their own.
+export type AssistantQuestion = { multiple: boolean; options: AssistantOption[] };
+
 export type AssistantTurnView = {
   at: string;
   cards: AssistantCard[];
@@ -43,6 +51,8 @@ export type AssistantTurnView = {
   id: string;
   // What they attached. Show with the owner's token.
   photos: { id: string; url: string }[];
+  // Waiting for their answer, which is whatever they send next; null otherwise.
+  question: AssistantQuestion | null;
   reply: string;
   status: "cancelled" | "completed" | "failed" | "running";
   text: string;
@@ -83,9 +93,48 @@ export type ConversationView = {
 
 // The words meant for the person: what the model says just before using a tool is narration.
 function replyText(items: readonly AgentTurnMessage[]): string {
-  const spoken = items.flatMap((item) => (item.type === "assistant" ? [item] : []));
-  const final = spoken.filter((item) => item.finishReason !== "tool-calls");
-  return final.map((item) => item.text).join("\n\n");
+  return items
+    .flatMap((item) => {
+      if (item.type === "assistant") return item.finishReason === "tool-calls" ? [] : [item.text];
+      const asked = askedIn(item);
+      return asked ? [asked.question] : [];
+    })
+    .join("\n\n");
+}
+
+// A question the coach put to them. Their answer belongs to the turn that asked.
+function askedIn(item: AgentTurnMessage): (AssistantQuestion & { answer: string | null; question: string }) | null {
+  if (item.type !== "tool" || item.toolName !== "ask_question") return null;
+  if (item.isError) return null;
+  const { multiple, options, question } = (item.input ?? {}) as { multiple?: boolean; options?: AssistantOption[]; question?: unknown };
+  const answer = (item.output as { answer?: unknown } | undefined)?.answer;
+  return typeof question === "string" ? { answer: typeof answer === "string" ? answer : null, multiple: multiple === true, options: options ?? [], question } : null;
+}
+
+// A turn that asked something goes on with their answer: shown as one exchange, and then another.
+function exchangesIn(items: readonly AgentTurnMessage[]): AgentTurnMessage[][] {
+  const exchanges: AgentTurnMessage[][] = [[]];
+  let answer: string | null = null;
+  for (const item of items) {
+    if (answer) {
+      exchanges.push([{ at: item.at, text: answer, type: "user" }]);
+      answer = null;
+    }
+    exchanges.at(-1)!.push(item);
+    answer = askedIn(item)?.answer ?? answer;
+  }
+  return exchanges;
+}
+
+// Nothing is left to wait for while the coach waits for them.
+function waitsForAnswer(items: readonly AgentTurnMessage[]): boolean {
+  return openQuestion(items) !== null;
+}
+
+function openQuestion(items: readonly AgentTurnMessage[]): AssistantQuestion | null {
+  const item = items.findLast((each) => askedIn(each) !== null);
+  const asked = item?.type === "tool" && item.output === undefined ? askedIn(item) : null;
+  return asked && { multiple: asked.multiple, options: asked.options };
 }
 
 type VoicePayload = AssistantVoice & { text: string };
@@ -208,7 +257,7 @@ export async function loadConversation(input: { before?: Date; now: Date; userId
       ? null
       : prisma.agentSession.findFirst({
           orderBy: { createdAt: "desc" },
-          where: { channel: "app", createdAt: { gt: new Date(now.getTime() - SESSION_MAX_AGE_MS) }, userId },
+          where: { channel: "app", createdAt: { gt: new Date(Math.max(now.getTime() - SESSION_MAX_AGE_MS, FIRST_SESSION_AT.getTime())) }, userId },
         }),
   ]);
   const byCall = new Map(actions.map((row) => [row.callId, row]));
@@ -223,8 +272,8 @@ export async function loadConversation(input: { before?: Date; now: Date; userId
     return { durationMs: payload.durationMs, levels: payload.levels };
   };
 
-  const turns = page.map((row): AssistantTurnView => {
-    const items = transcripts.get(row.id) ?? [];
+  const turns = page.flatMap((row) => exchangesIn(transcripts.get(row.id) ?? []).map((items, index, all): AssistantTurnView => {
+    const last = index === all.length - 1;
     const said = items.flatMap((item) => (item.type === "user" ? [item] : []));
     const photos = said.flatMap((item) => photosIn(item.parts));
     const text = said
@@ -238,7 +287,7 @@ export async function loadConversation(input: { before?: Date; now: Date; userId
     const tools = items.flatMap((item) => (item.type === "tool" ? [item] : []));
     const stale = row.status === "running" && now.getTime() - row.startedAt.getTime() > TURN_STALE_MS;
     return {
-      at: row.startedAt.toISOString(),
+      at: (index > 0 && items[0]?.at) || row.startedAt.toISOString(),
       cards: cardsOf(tools.flatMap((tool) => byCall.get(tool.callId) ?? [])),
       checked: [
         ...new Set(
@@ -246,14 +295,15 @@ export async function loadConversation(input: { before?: Date; now: Date; userId
         ),
       ],
       displays: displaysOf(tools.flatMap((tool) => byCall.get(tool.callId) ?? [])),
-      id: `${row.sessionId}:${row.turnId}`,
+      id: `${row.sessionId}:${row.turnId}${index > 0 ? `:${index}` : ""}`,
       photos,
+      question: last && row.status === "running" ? openQuestion(items) : null,
       reply: replyText(items),
-      status: stale ? "failed" : row.status,
+      status: !last || (row.status === "running" && waitsForAnswer(items)) ? "completed" : stale ? "failed" : row.status,
       text,
       voice: takeVoice(row.sessionId, text),
     };
-  });
+  }));
 
   // A page reaches back to its oldest turn, or to the beginning when it's the last one. Calls reach a
   // little further, so one that began just before the page still covers its turns here.

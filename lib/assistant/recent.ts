@@ -15,6 +15,8 @@ const REFERRED_TO = new Set(["save_suggested_recipe", "show_foods", "suggest_mea
 export const OLD_RESULT = "[An older result, left out. Call the tool again for current data.]";
 const MEMORIES = "# Persistent memories for";
 const CLOCK = "Current local time:";
+// What the app says about one message, which eve puts before the whole conversation.
+const CLIENT_CONTEXT = "Client context:";
 
 type UserMessage = Extract<LanguageModelV4Message, { role: "user" }>;
 type ToolMessage = Extract<LanguageModelV4Message, { role: "tool" }>;
@@ -24,8 +26,13 @@ function says(message: LanguageModelV4Message, words: string): boolean {
   return message.content.some((part) => part.type === "text" && part.text.includes(words));
 }
 
+function isClientContext(message: LanguageModelV4Message): boolean {
+  const first = message.role === "user" && message.content.length === 1 ? message.content[0] : undefined;
+  return first?.type === "text" && first.text.startsWith(CLIENT_CONTEXT);
+}
+
 function userIndexes(prompt: LanguageModelV4Prompt): number[] {
-  return prompt.flatMap((message, index) => (message.role === "user" && !says(message, MEMORIES) ? [index] : []));
+  return prompt.flatMap((message, index) => (message.role === "user" && !says(message, MEMORIES) && !isClientContext(message) ? [index] : []));
 }
 
 // System messages, what's remembered about them, and the last few exchanges.
@@ -62,7 +69,12 @@ export function shortenOldResults(prompt: LanguageModelV4Prompt): LanguageModelV
 // comes before them the same.
 export function changingPartsLast(prompt: LanguageModelV4Prompt): LanguageModelV4Prompt {
   const moved: string[] = [];
-  const kept = prompt.map((message): LanguageModelV4Message => {
+  const said = prompt.filter((message) => {
+    if (!isClientContext(message)) return true;
+    moved.push(textOf(message));
+    return false;
+  });
+  const kept = said.map((message): LanguageModelV4Message => {
     if (message.role !== "system") return message;
     const lines = message.content.split("\n");
     const rest: string[] = [];
@@ -87,9 +99,13 @@ export function changingPartsLast(prompt: LanguageModelV4Prompt): LanguageModelV
   return kept;
 }
 
+function textOf(message: LanguageModelV4Message): string {
+  return message.role === "user" ? message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n") : "";
+}
+
 export function leaner(prompt: LanguageModelV4Prompt): LanguageModelV4Prompt {
   const inApp = prompt.some((message) => message.role === "system" && message.content.includes(APP_INSTRUCTIONS_HEADING));
-  return inApp ? changingPartsLast(shortenOldResults(keepRecent(prompt))) : prompt;
+  return inApp ? shortenOldResults(keepRecent(changingPartsLast(prompt))) : prompt;
 }
 
 // After what's wanted is worked out, so that goes last too.

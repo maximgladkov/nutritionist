@@ -75,8 +75,8 @@ export type ApiDeps = {
   sendPush: (messages: readonly PushMessage[]) => Promise<void>;
   // A one-time key for the phone to open a live voice session; null when talking isn't set up.
   talk: { available: () => boolean; mintSecret: () => Promise<{ expiresAt: number; token: string }> };
-  // Queues the FatSecret history import as a background workflow.
-  startFatSecretImport: (userId: string) => Promise<void>;
+  // Stands in for the background workflow that imports the FatSecret history.
+  startFatSecretImport: ((userId: string) => Promise<void>) | null;
   telegram: TelegramProfileClient;
   transcribe: AudioTranscriber;
   verifyAppleToken: (identityToken: string) => Promise<AppleIdentity>;
@@ -174,14 +174,6 @@ function runAfterResponse(task: () => Promise<void>): void {
     .catch(() => task().catch(logBackgroundFailure));
 }
 
-async function startFatSecretImportWorkflow(userId: string): Promise<void> {
-  const [{ start }, { fatSecretImportWorkflow }] = await Promise.all([
-    import("workflow/api"),
-    import("../../workflows/fatsecret-import.ts"),
-  ]);
-  await start(fatSecretImportWorkflow, [userId]);
-}
-
 async function transcribeWithModel(input: Parameters<AudioTranscriber>[0]) {
   const { transcribeWithGateway } = await import("./transcribe-audio.ts");
   return transcribeWithGateway(input);
@@ -208,7 +200,7 @@ const defaults: ApiDeps = {
   recognizeFoods: recognizeWithModel,
   sendEmailCode: sendEmailCodeWithResend,
   sendPush: sendExpoPush,
-  startFatSecretImport: startFatSecretImportWorkflow,
+  startFatSecretImport: null,
   talk: { available: () => talkKey() !== null, mintSecret: mintTalkSecret },
   telegram: telegramProfileClient,
   transcribe: transcribeWithModel,

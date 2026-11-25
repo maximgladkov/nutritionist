@@ -109,13 +109,8 @@ export function parseTranscript(value: unknown): AgentTurnTranscript {
 }
 
 export function normalizeChannelKind(kind: string | undefined): string {
-  if (kind === undefined || kind === "eve" || kind === "http") {
-    return "web";
-  }
-  if (kind.startsWith("channel:")) {
-    return kind.slice("channel:".length);
-  }
-  return kind;
+  const name = kind?.replace(/^channel:/u, "");
+  return name === undefined || name === "eve" || name === "http" ? "web" : name;
 }
 
 // The app talks over the same eve channel as the web; its principal says which one it is.
@@ -370,76 +365,14 @@ export function summarizeTranscript(transcript: AgentTurnTranscript): AgentTurnU
   };
 }
 
-export function toolCallsFromActions(actions: unknown): readonly {
-  readonly callId: string;
-  readonly toolInput?: unknown;
-  readonly toolName: string;
-}[] {
-  if (!Array.isArray(actions)) {
-    return [];
-  }
-  const calls: { callId: string; toolInput?: unknown; toolName: string }[] = [];
-  for (const action of actions) {
-    if (action === null || typeof action !== "object") {
-      continue;
-    }
-    const record = action as {
-      callId?: unknown;
-      input?: unknown;
-      kind?: unknown;
-      name?: unknown;
-      toolName?: unknown;
-    };
-    if (typeof record.callId !== "string") {
-      continue;
-    }
-    const toolName =
-      typeof record.toolName === "string"
-        ? record.toolName
-        : typeof record.name === "string"
-          ? record.name
-          : typeof record.kind === "string"
-            ? record.kind
-            : "action";
-    calls.push({ callId: record.callId, toolInput: record.input, toolName });
-  }
-  return calls;
-}
-
-export function toolResultFromAction(result: unknown): {
-  readonly callId: string;
-  readonly isError?: boolean;
-  readonly output?: unknown;
-  readonly toolName: string;
-} | null {
-  if (result === null || typeof result !== "object") {
-    return null;
-  }
-  const record = result as {
-    callId?: unknown;
-    isError?: unknown;
-    name?: unknown;
-    output?: unknown;
-    subagentName?: unknown;
-    toolName?: unknown;
-  };
-  if (typeof record.callId !== "string") {
-    return null;
-  }
-  const toolName =
-    typeof record.toolName === "string"
-      ? record.toolName
-      : typeof record.subagentName === "string"
-        ? record.subagentName
-        : typeof record.name === "string"
-          ? record.name
-          : "action";
-  return {
-    callId: record.callId,
-    isError: record.isError === true,
-    output: record.output,
-    toolName,
-  };
+// How long a turn stood still until the person answered what it asked. Until whatever came next, so
+// the first words after an answer count as waiting too.
+export function waitedForAnswersMs(items: readonly AgentTurnMessage[]): number {
+  return items.reduce((sum, item, index) => {
+    const next = items[index + 1];
+    if (item.type !== "tool" || item.toolName !== "ask_question" || !next) return sum;
+    return sum + Math.max(0, Date.parse(next.at) - Date.parse(item.at));
+  }, 0);
 }
 
 export function ackLlmOutput(message: AgentTurnAckMessage): unknown {

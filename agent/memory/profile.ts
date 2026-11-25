@@ -8,5 +8,5 @@ export default defineMemory({
   async scope(ctx) {
     return (await getLiveUserId(ctx)) ?? null;
   },
-  visibility: "scope",
+  supersede: "append",
 });

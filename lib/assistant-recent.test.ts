@@ -56,6 +56,12 @@ describe("what the model reads in the app", () => {
     assert.ok((lean[0] as { content: string }).content.includes(APP_INSTRUCTIONS));
   });
 
+  it("puts what the app says about a message last too, however long the conversation", () => {
+    const lean = leaner([system(), user("Client context:\nSpoken aloud."), ...exchanges(20), user("now")]);
+    assert.equal(texts(lean).filter((text) => text.includes("Spoken aloud.")).length, 1);
+    assert.match(texts(lean.slice(-1))[1]!, /^\[App note, not from the user:\nClient context:\nSpoken aloud\./);
+  });
+
   it("is untouched elsewhere", () => {
     const prompt = [{ content: "Telegram. Current local time: now", role: "system" as const }, ...exchanges(30)];
     assert.equal(leaner(prompt), prompt);

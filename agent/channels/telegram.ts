@@ -1,4 +1,4 @@
-import { createTelegramFetchFile, telegramChannel } from "eve/channels/telegram";
+import { telegramChannel } from "eve/channels/telegram";
 import type { TelegramContext, TelegramMessage } from "eve/channels/telegram";
 import { handleChannelLink, resolveChannelUser, saveChannelThreadId } from "../lib/channel-identity";
 import { telegramGroupInviteUrl, telegramSummaryMiniAppUrl } from "../../lib/app-url";
@@ -32,53 +32,43 @@ const credentials = {
   botToken: () => process.env.TELEGRAM_BOT_TOKEN!,
 };
 
-const fetchFile = createTelegramFetchFile({
-  credentials,
-  policy: { allowedMediaTypes: "*", maxBytes: 25 * 1024 * 1024 },
-});
-
 export default wrapTelegramLastMessageChannel(
   attachTelegramVision(
     telegramChannel({
       credentials,
       turnPolicy: "queue",
       events: {
-        async "message.completed"(data, channel, ctx) {
-          if (!data.message) {
+        async "content.completed"(event, ctx) {
+          const text = event.data.kind === "text" && typeof event.data.value === "string" ? event.data.value : "";
+          if (!text.trim()) {
             return;
           }
-          if (data.finishReason === "tool-calls") {
-            if (telegramAckPostedRecently(ctx.session.id, ctx.session.turn.id)) {
-              return;
-            }
-            const html = markdownToTelegramHtml(data.message);
-            try {
-              await channel.telegram.post(telegramHtmlMessage(html));
-            } catch {
-              await channel.telegram.post(data.message);
-            }
+          const { channel } = ctx;
+          const turnId = event.scope?.turnId ?? "";
+          const isReply = event.data.phase === "reply";
+          if (!isReply && telegramAckPostedRecently(ctx.session.id, turnId)) {
             return;
           }
-          const html = markdownToTelegramHtml(data.message);
           try {
-            await channel.telegram.post(telegramHtmlMessage(html));
+            await channel.telegram.post(telegramHtmlMessage(markdownToTelegramHtml(text)));
           } catch {
-            await channel.telegram.post(data.message);
+            await channel.telegram.post(text);
           }
-          markTelegramTurnReplyPosted(ctx.session.id, ctx.session.turn.id);
+          if (!isReply) {
+            return;
+          }
+          markTelegramTurnReplyPosted(ctx.session.id, turnId);
           const caller = ctx.session.auth.current ?? ctx.session.auth.initiator;
           await persistTelegramConversationMessage({
             role: "assistant",
             sessionId: ctx.session.id,
-            text: data.message,
+            text,
             userId: (await getLiveUserId(ctx)) ?? (caller?.principalType === "user" ? caller.principalId : undefined),
           });
         },
-        "session.waiting"(_data, channel) {
-          settleTelegramTurn(channel.continuation?.token);
-        },
-        "session.failed"(_data, channel) {
-          settleTelegramTurn(channel.continuation?.token);
+        // A control, like clearing the history, is applied; only messages count.
+        "delivery.settled"(event, ctx) {
+          if (event.data.outcome !== "applied") settleTelegramTurn(ctx.channel.continuation?.token);
         },
       },
       async onMessage(ctx, message) {
@@ -166,7 +156,6 @@ export default wrapTelegramLastMessageChannel(
         };
       },
     }),
-    fetchFile,
   ),
 );
 

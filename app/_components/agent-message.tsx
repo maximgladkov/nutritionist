@@ -18,12 +18,14 @@ import {
 import { Markdown } from "@heroui-pro/react/markdown";
 import { ChatTool } from "@heroui-pro/react/chat-tool";
 import type { ToolPartState } from "@heroui-pro/react/chat-tool";
-import type {
-  EveAuthorizationPart,
-  EveDynamicToolPart,
-  EveMessage,
-  EveMessageInputRequest,
-  EveMessagePart,
+import { showsActivity } from "eve/events";
+import {
+  signInEnding,
+  type EveInteractionPart,
+  type EveMessage,
+  type EveMessagePart,
+  type EveToolPart,
+  type Interaction,
 } from "eve/react";
 import { useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
@@ -32,8 +34,8 @@ import { productImagePreviews } from "@/lib/product-image-preview";
 import { userFacingAttachmentUrl } from "@/lib/user-attachments-query";
 
 export type AgentInputResponse = {
+  readonly interactionId: string;
   readonly optionId?: string;
-  readonly requestId: string;
   readonly text?: string;
 };
 
@@ -56,7 +58,7 @@ export function AgentMessage({
     message.parts.some((part) => part.type === "text" && part.text.length > 0);
   const contentParts: { index: number; part: EveMessagePart }[] = [];
   for (const [index, part] of message.parts.entries()) {
-    if (part.type === "file" || part.type === "step-start") {
+    if (part.type === "file") {
       continue;
     }
     if (hasAssistantText && part.type === "reasoning") {
@@ -197,8 +199,6 @@ function AgentMessagePart({
 }) {
   const { t } = useLingui();
   switch (part.type) {
-    case "step-start":
-      return null;
     case "text":
       return <Markdown>{part.text}</Markdown>;
     case "reasoning":
@@ -216,18 +216,19 @@ function AgentMessagePart({
       );
     case "file":
       return null;
-    case "authorization":
-      return <AuthorizationPrompt part={part} />;
-    case "dynamic-tool": {
-      const inputRequest = part.toolMetadata?.eve?.inputRequest;
-      if (inputRequest?.kind === "question") {
+    case "interaction":
+      return part.request.kind === "sign-in" ? (
+        <AuthorizationPrompt part={part} />
+      ) : (
+        <QuestionRequest canRespond={canRespond} interaction={part} onInputResponses={onInputResponses} />
+      );
+    case "tool": {
+      if (!showsActivity(part)) {
+        return null;
+      }
+      if (part.interaction?.request.kind === "question") {
         return (
-          <QuestionRequest
-            canRespond={canRespond}
-            inputRequest={inputRequest}
-            inputResponse={part.toolMetadata?.eve?.inputResponse}
-            onInputResponses={onInputResponses}
-          />
+          <QuestionRequest canRespond={canRespond} interaction={part.interaction} onInputResponses={onInputResponses} />
         );
       }
 
@@ -235,14 +236,12 @@ function AgentMessagePart({
         <>
           <ProductToolPreview output={part.output} />
           <ChatTool
-            argsText={stringifyUnknown(part.input)}
-            defaultExpanded={
-              part.state === "approval-requested" || part.state === "approval-responded"
-            }
-            errorText={part.errorText}
+            argsText={part.state === "streaming" ? part.inputText : stringifyUnknown(part.input)}
+            defaultExpanded={part.state === "approval"}
+            errorText={part.error?.message}
             output={part.output}
             state={toChatToolState(part.state)}
-            toolName={part.toolName}
+            toolName={part.name}
             triggerPrefix={t`Used tool: `}
           />
           <InputRequestActions
@@ -253,6 +252,8 @@ function AgentMessagePart({
         </>
       );
     }
+    default:
+      return null;
   }
 }
 
@@ -275,26 +276,25 @@ function ProductToolPreview({ output }: { readonly output: unknown }) {
 
 function QuestionRequest({
   canRespond,
-  inputRequest,
-  inputResponse,
+  interaction,
   onInputResponses,
 }: {
   readonly canRespond: boolean;
-  readonly inputRequest: EveMessageInputRequest;
-  readonly inputResponse?: AgentInputResponse;
+  readonly interaction: Interaction;
   readonly onInputResponses: (responses: readonly AgentInputResponse[]) => void | Promise<void>;
 }) {
   const { t } = useLingui();
+  const { answer: inputResponse, request: inputRequest } = interaction;
   const hasOptions = (inputRequest.options?.length ?? 0) > 0;
   const acceptsFreeform = inputRequest.allowFreeform === true || !hasOptions;
   const [text, setText] = useState(inputResponse?.text ?? "");
-  const disabled = !canRespond || inputResponse !== undefined;
+  const disabled = !canRespond || interaction.status !== "open" || inputResponse !== undefined;
 
   const submitOption = (optionId: string) =>
     onInputResponses([
       {
+        interactionId: interaction.interactionId,
         optionId,
-        requestId: inputRequest.requestId,
       },
     ]);
 
@@ -305,7 +305,7 @@ function QuestionRequest({
     }
     return onInputResponses([
       {
-        requestId: inputRequest.requestId,
+        interactionId: interaction.interactionId,
         text: trimmed,
       },
     ]);
@@ -369,81 +369,40 @@ function QuestionRequest({
   );
 }
 
-function AuthorizationPrompt({ part }: { readonly part: EveAuthorizationPart }) {
-  const isAuthorized = part.state === "completed" && part.outcome === "authorized";
-  const isCompleted = part.state === "completed";
-  const status = isAuthorized ? "success" : isCompleted ? "danger" : "accent";
-  const Icon = isAuthorized ? CircleCheck : isCompleted ? CircleExclamation : Key;
-  const instructions = part.authorization?.instructions;
-  const shouldShowInstructions = instructions !== undefined && instructions !== part.description;
+function AuthorizationPrompt({ part }: { readonly part: EveInteractionPart }) {
+  const signIn = part.request.signIn;
+  const isOpen = part.status === "open";
+  const isAuthorized = part.outcome === "accepted";
+  const name = signIn?.displayName ?? signIn?.name ?? part.request.title ?? "";
+  const ending = part.outcome === undefined ? undefined : signInEnding(part.outcome);
+  const Icon = isOpen ? Key : isAuthorized ? CircleCheck : CircleExclamation;
 
   return (
-    <Alert status={status}>
+    <Alert status={isOpen ? "accent" : isAuthorized ? "success" : "danger"}>
       <Alert.Indicator>
         <Icon />
       </Alert.Indicator>
       <Alert.Content>
-        <Alert.Title>{authorizationTitle(part)}</Alert.Title>
+        <Alert.Title>{isOpen ? `Connect ${name}` : `${name} ${ending ?? ""}`}</Alert.Title>
         <Alert.Description>
-          {authorizationDescription(part)}
-          {shouldShowInstructions ? ` ${instructions}` : ""}
+          {part.request.prompt}
+          {signIn?.instructions ? ` ${signIn.instructions}` : ""}
         </Alert.Description>
-        {part.state === "required" && part.authorization?.userCode ? (
+        {isOpen && signIn?.userCode ? (
           <p className="mt-2 text-sm">
             Code{" "}
-            <code className="bg-background rounded-md px-2 py-1 font-mono">
-              {part.authorization.userCode}
-            </code>
+            <code className="bg-background rounded-md px-2 py-1 font-mono">{signIn.userCode}</code>
           </p>
         ) : null}
-        {part.state === "required" && part.authorization?.url ? (
-          <Link
-            className="mt-2 inline-flex"
-            href={part.authorization.url}
-            rel="noreferrer"
-            target="_blank"
-          >
+        {isOpen && signIn?.url ? (
+          <Link className="mt-2 inline-flex" href={signIn.url} rel="noreferrer" target="_blank">
             <ArrowUpRightFromSquare className="size-4" />
-            Sign in with {part.displayName}
+            Sign in with {name}
           </Link>
         ) : null}
       </Alert.Content>
     </Alert>
   );
-}
-
-function authorizationTitle(part: EveAuthorizationPart): string {
-  if (part.state === "required") {
-    return `Connect ${part.displayName}`;
-  }
-  if (part.outcome === "authorized") {
-    return `${part.displayName} connected`;
-  }
-  return `${part.displayName} authorization ${formatAuthorizationOutcome(part.outcome)}`;
-}
-
-function authorizationDescription(part: EveAuthorizationPart): string {
-  if (part.state === "required") {
-    return part.description;
-  }
-  if (part.outcome === "authorized") {
-    return `${part.displayName} connected.`;
-  }
-  const tail = part.reason !== undefined ? ` (${part.reason})` : "";
-  return `${part.displayName} authorization ${formatAuthorizationOutcome(part.outcome)}${tail}.`;
-}
-
-function formatAuthorizationOutcome(outcome: NonNullable<EveAuthorizationPart["outcome"]>): string {
-  switch (outcome) {
-    case "authorized":
-      return "authorized";
-    case "declined":
-      return "declined";
-    case "failed":
-      return "failed";
-    case "timed-out":
-      return "timed out";
-  }
 }
 
 function InputRequestActions({
@@ -453,14 +412,14 @@ function InputRequestActions({
 }: {
   readonly canRespond: boolean;
   readonly onInputResponses: (responses: readonly AgentInputResponse[]) => void | Promise<void>;
-  readonly part: EveDynamicToolPart;
+  readonly part: EveToolPart;
 }) {
-  const inputRequest = part.toolMetadata?.eve?.inputRequest;
-  if (!inputRequest) {
+  const interaction = part.interaction;
+  if (!interaction) {
     return null;
   }
 
-  const inputResponse = part.toolMetadata?.eve?.inputResponse;
+  const { answer: inputResponse, request: inputRequest } = interaction;
   const selectedOption = inputRequest.options?.find(
     (option) => option.id === inputResponse?.optionId,
   );
@@ -487,8 +446,8 @@ function InputRequestActions({
                 onPress={() => {
                   void onInputResponses([
                     {
+                      interactionId: interaction.interactionId,
                       optionId: option.id,
-                      requestId: inputRequest.requestId,
                     },
                   ]);
                 }}
@@ -503,17 +462,17 @@ function InputRequestActions({
   );
 }
 
-function toChatToolState(state: EveDynamicToolPart["state"]): ToolPartState {
+function toChatToolState(state: EveToolPart["state"]): ToolPartState {
   switch (state) {
-    case "input-streaming":
+    case "streaming":
       return "input-streaming";
-    case "input-available":
-      return "input-available";
-    case "output-available":
+    case "completed":
       return "output-available";
-    case "output-error":
+    case "failed":
+    case "rejected":
+    case "cancelled":
       return "output-error";
-    case "approval-requested":
+    case "approval":
       return "requires-action";
     default:
       return "input-available";
@@ -533,10 +492,13 @@ function stringifyUnknown(value: unknown): string | undefined {
 
 function partKey(part: EveMessagePart, index: number): string {
   switch (part.type) {
-    case "authorization":
-      return `authorization:${part.turnId}:${part.stepIndex}:${part.name}`;
-    case "dynamic-tool":
-      return part.toolCallId;
+    case "interaction":
+      return part.interactionId;
+    case "tool":
+      return part.callId;
+    case "text":
+    case "reasoning":
+      return part.id ?? `${part.type}:${index}`;
     default:
       return `${part.type}:${index}`;
   }

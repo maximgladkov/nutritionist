@@ -137,24 +137,6 @@ export function prismaMemoryProvider() {
           ],
         };
       },
-      async "compaction.completed"(ctx: {
-        abortSignal: AbortSignal;
-        memory: { scope: { value: string | readonly string[] }; slot: string };
-      }) {
-        const userId = scopeUserId(ctx.memory.scope.value);
-        if (!userId) {
-          return null;
-        }
-        const stored = await readFile(userId, ctx.memory.slot, ctx.abortSignal);
-        return {
-          messages: [
-            {
-              content: formatRecall(ctx.memory.slot, stored?.file ?? emptyMemoryFile()),
-              id: "profile-memory-document",
-            },
-          ],
-        };
-      },
     },
   });
 }

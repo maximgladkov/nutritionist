@@ -1,5 +1,4 @@
-import type { UserContent } from "ai";
-import type { ChannelSendOptions, ChannelSource } from "eve/channels";
+import type { ChannelSendOptions, ChannelSource, MessageContent } from "eve/channels";
 
 export type TelegramTurnTracker = {
   begin(address: string): boolean;
@@ -56,7 +55,7 @@ export function settleTelegramTurn(address: string | undefined) {
 
 export async function sendTelegramLastMessageTurn<TState>(
   source: ChannelSource<TState>,
-  message: string | UserContent,
+  message: MessageContent,
   options: ChannelSendOptions<TState>,
   extras?: {
     overlapping?: boolean;

@@ -6,6 +6,7 @@ import { apiDeps } from "../deps.ts";
 import { ApiError, invalid } from "../errors.ts";
 import { readJson } from "../http.ts";
 import type { RouteDefinition } from "../router.ts";
+import { startFatSecretImport } from "../start-fatsecret-import.ts";
 
 // Where FatSecret may send the user back to: the app's own links (and Expo's in development).
 const RETURN_URL_PREFIXES = ["heroui-native-app://", "btrme://", "exp://", "exps://"];
@@ -82,7 +83,7 @@ async function queueImport(userId: string): Promise<void> {
     where: { userId },
   });
   try {
-    await apiDeps().startFatSecretImport(userId);
+    await (apiDeps().startFatSecretImport ?? startFatSecretImport)(userId);
   } catch (error) {
     await prisma.fatSecretConnection.update({
       data: { importError: "The import couldn't start.", importStatus: "failed" },

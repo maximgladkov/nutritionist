@@ -1,4 +1,4 @@
-import type { UserContent } from "ai";
+import type { MessageContent } from "eve/channels";
 import { localCalendarDateRange, parseYmd } from "./timezone.ts";
 
 export const CONVERSATION_SEARCH_DEFAULT_LIMIT = 10;
@@ -111,7 +111,7 @@ export function isTelegramConversationChannel(kind: string | undefined) {
   return kind === TELEGRAM_CONVERSATION_CHANNEL || kind === `channel:${TELEGRAM_CONVERSATION_CHANNEL}`;
 }
 
-export function conversationMessageText(message: string | UserContent) {
+export function conversationMessageText(message: MessageContent) {
   if (typeof message === "string") {
     return message.trim();
   }
@@ -128,9 +128,6 @@ export function conversationMessageText(message: string | UserContent) {
       const mediaType = part.mediaType;
       parts.push(`[file: ${part.filename ?? mediaType} (${mediaType})]`);
       continue;
-    }
-    if (part.type === "image") {
-      parts.push(`[image: ${part.mediaType ?? "image"}]`);
     }
   }
   return parts.join("\n").trim();

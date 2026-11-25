@@ -3,6 +3,7 @@ import { after, beforeEach, describe, it } from "node:test";
 import { turnChannel } from "../agent-turn-model.ts";
 import { recordIdea, recordLogged, withItemIds } from "../assistant/actions.ts";
 import { ASSISTANT_BURST, assistantLimit } from "../assistant/limits.ts";
+import { loadConversation } from "../assistant/conversation.ts";
 import { coverage } from "../assistant/home-card.ts";
 import { TALK_HOURLY_CALLS } from "../assistant/talk.ts";
 import { copyMeal, upsertMealItems } from "../meals.ts";
@@ -110,19 +111,39 @@ describe("assistant conversation", () => {
   });
 
   it("continues the latest app session, not a web, old or foreign one", async () => {
-    const sessionId = async () => (await api("GET", "/assistant/conversation", { token: session.accessToken })).body.sessionId;
+    const now = new Date("2026-12-10T12:00:00Z");
+    const sessionId = async () => (await loadConversation({ now, userId: session.userId })).sessionId;
     await prisma.agentSession.createMany({
       data: [
         { channel: "web", eveSessionId: "web", userId: session.userId },
         { channel: "app", eveSessionId: "theirs", userId: other.userId },
-        { channel: "app", createdAt: new Date(Date.now() - 26 * 86_400_000), eveSessionId: "old", userId: session.userId },
+        { channel: "app", createdAt: new Date(now.getTime() - 26 * 86_400_000), eveSessionId: "old", userId: session.userId },
+        { channel: "app", createdAt: new Date("2026-11-25T12:00:00Z"), eveSessionId: "before eve 1.0", userId: session.userId },
       ],
     });
     assert.equal(await sessionId(), null);
-    await prisma.agentSession.create({ data: { channel: "app", eveSessionId: "mine", userId: session.userId } });
+    await prisma.agentSession.create({ data: { channel: "app", createdAt: now, eveSessionId: "mine", userId: session.userId } });
     assert.equal(await sessionId(), "mine");
     // Nor does the app's session take check-ins away from the web one.
     assert.deepEqual(await resolveReachTarget(session.userId), { channel: "web", sessionId: "web" });
+  });
+
+  it("shows a question the coach asked, and their answer as the next exchange", async () => {
+    const question = { callId: "q", input: { options: [{ description: "Midday.", label: "Lunch" }], question: "Which meal is it?" }, stepIndex: 0, toolName: "ask_question", type: "tool" };
+    const save = (items: unknown[]) =>
+      prisma.agentTurn.upsert({
+        create: { channel: "app", messages: { items, steps: [] } as object, sessionId: "s1", startedAt: new Date(), status: "running", turnId: "ask", turnSequence: 0, userId: session.userId },
+        update: { messages: { items, steps: [] } as object },
+        where: { sessionId_turnId: { sessionId: "s1", turnId: "ask" } },
+      });
+    const shown = async () =>
+      (await loadConversation({ now: new Date(), userId: session.userId })).turns.map((turn) => [turn.text, turn.reply, turn.status, turn.question]);
+    await save([{ text: "Log the soup", type: "user" }, question]);
+    assert.deepEqual(await shown(), [["Log the soup", "Which meal is it?", "completed", { multiple: false, options: [{ description: "Midday.", label: "Lunch" }] }]]);
+    const answered = { ...question, output: { answer: "Dinner", status: "answered" } };
+    const reply = { finishReason: "stop", text: "Logged.", type: "assistant" };
+    await save([{ text: "Log the soup", type: "user" }, answered, reply]);
+    assert.deepEqual(await shown(), [["Log the soup", "Which meal is it?", "completed", null], ["Dinner", "Logged.", "running", null]]);
   });
 
   it("greets once a day, with what was left at the time", async () => {
