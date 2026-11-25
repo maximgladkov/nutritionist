@@ -44,7 +44,7 @@ function badgeView(badge: Achievement, family: AchievementFamily, metrics: Metri
     name: badge.name,
     // Passed before but not now (a streak that has since broken) shows where it stands now.
     progress: earnedOn ? 1 : Math.min(0.99, value / badge.target),
-    progressText: earnedOn ? (badge.unit ? `${badge.target.toLocaleString("en-US")} ${badge.unit}` : "Done") : progressText,
+    progressText: earnedOn ? (badge.unit ? `${badge.target.toLocaleString("en-US")} ${badge.unit}` : "Unlocked") : progressText,
     target: badge.target,
     tier: badge.tier,
     title: badge.title,
