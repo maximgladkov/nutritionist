@@ -24,7 +24,8 @@ const RULES = [
   "Write three alternatives, best first, each about a different fact from the list, giving its number. They'll be shown one at a time on separate visits.",
   "Each is one or two short, warm, natural sentences, 110 characters at most. Plain text: no emoji, markdown, quotation marks or exclamation in every line.",
   "Sound like a person who knows them, not a report. Don't restate the fact: say what it means for them now, or the next easy step. Use one number at most unless two are the point. Contractions are good; 'you have', 'fits with', 'you are only' and 'let me know' are stiff.",
-  "Style only, never their content: 'Kira, dinner's sorted: your salmon bowl fits with room to spare.' 'Kira, two good days behind you. What's the plan for lunch?' 'Kira, 30 grams of protein to go. Cottage cheese tonight?' 'Quiet diary today. Did lunch slip by?'",
+  "Style only, never their content: 'Kira, dinner's sorted: your salmon bowl fits with room to spare.' 'Kira, yesterday went well. What's the plan for lunch?' 'Kira, 30 grams of protein to go. Cottage cheese tonight?' 'Quiet diary today. Did lunch slip by?'",
+  "A number keeps its meaning: protein left to eat, protein in a dish and calories left are different things. Don't suggest eating just to keep a streak or earn a badge.",
   "Where a fact carries advice to you (ask, be kind, only if), follow it and never repeat it.",
   "Vary the kind: a concrete suggestion, a small summary, encouragement, a gentle heads-up, or a question they'd want to answer.",
   "Use only what the fact says. Never add, change, round or work out a number, and write numbers as digits exactly as given. Never invent a food, habit, feeling or event.",
@@ -65,6 +66,16 @@ export function numbersIn(text: string): string[] {
   );
 }
 
+const WORDS = ["two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
+
+// Numbers spelled out in English, which the model sometimes does anyway.
+function spelledIn(text: string): string[] {
+  return (text.toLowerCase().match(/[a-z]+/gu) ?? []).flatMap((word) => {
+    const at = WORDS.indexOf(word);
+    return at < 0 ? [] : [String(at + 2)];
+  });
+}
+
 // What the model wrote, if it's fit to show: the right length, a fact that exists, and no number
 // that isn't in it.
 export function acceptWords(words: HomeWords, facts: readonly string[], name: string | null, wantsName: boolean): string | null {
@@ -74,5 +85,5 @@ export function acceptWords(words: HomeWords, facts: readonly string[], name: st
   if (/[*_#`<>{}[\]]|https?:/u.test(text)) return null;
   if (name && wantsName && !text.toLowerCase().includes(name.toLowerCase())) return null;
   const known = new Set(numbersIn(`${fact} ${name ?? ""}`));
-  return numbersIn(text).every((number) => known.has(number)) ? text : null;
+  return [...numbersIn(text), ...spelledIn(text)].every((number) => known.has(number)) ? text : null;
 }
