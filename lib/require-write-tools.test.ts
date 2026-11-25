@@ -395,3 +395,85 @@ describe("appendAppLanguageReminder", () => {
     assert.equal(appendAppLanguageReminder(prompt), prompt);
   });
 });
+
+describe("in the app, sorting alongside the answer", () => {
+  const text = (delta: string): LanguageModelV4StreamPart => ({ delta, id: "t", type: "text-delta" });
+  const call = (toolName: string): LanguageModelV4StreamPart => ({ input: "{}", toolCallId: "c", toolName, type: "tool-call" });
+  const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  const stream = (parts: LanguageModelV4StreamPart[], ms = 0) => ({
+    stream: new ReadableStream<LanguageModelV4StreamPart>({
+      async start(controller) {
+        for (const part of parts) {
+          if (ms) await wait(ms);
+          controller.enqueue(part);
+        }
+        controller.close();
+      },
+    }),
+  });
+
+  async function run(input: { answer: LanguageModelV4StreamPart[]; categories: "meal" | "none"; classifyMs: number; partMs?: number }) {
+    const log: string[] = [];
+    const middleware = createRequireWriteToolsMiddleware({
+      classify: async () => {
+        await wait(input.classifyMs);
+        return [input.categories];
+      },
+    });
+    const prompt: LanguageModelV4Prompt = [{ content: APP_INSTRUCTIONS, role: "system" }, ...userPrompt("I had yogurt")];
+    const model = {
+      doStream: async (options: LanguageModelV4CallOptions) => {
+        log.push(`again ${options.toolChoice?.type}`);
+        return stream([call("log_meal")]);
+      },
+    } as unknown as LanguageModelV4;
+    const startedAt = Date.now();
+    const transformed = await middleware.transformParams!({ model, params: params(prompt), type: "stream" });
+    const sortedFirst = Date.now() - startedAt;
+    const result = await middleware.wrapStream!({
+      doGenerate: async () => {
+        throw new Error("unused");
+      },
+      doStream: async () => stream(input.answer, input.partMs),
+      model,
+      params: transformed,
+    });
+    const parts: LanguageModelV4StreamPart[] = [];
+    const reader = result.stream.getReader();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      parts.push(value);
+    }
+    return { log, ms: Date.now() - startedAt, parts, sortedFirst };
+  }
+
+  it("doesn't wait to start, and lets a plain answer through whole", async () => {
+    const answer = ["a", "b", "c", "d"].map(text);
+    const { log, ms, parts, sortedFirst } = await run({ answer, categories: "none", classifyMs: 200, partMs: 40 });
+    assert.deepEqual(parts, answer);
+    assert.deepEqual(log, []);
+    assert.ok(sortedFirst < 100, String(sortedFirst));
+    // Side by side, not one after the other.
+    assert.ok(ms < 330, String(ms));
+  });
+
+  it("keeps the order when the answer is slower than the sorting", async () => {
+    const answer = ["a", "b", "c", "d", "e"].map(text);
+    const { parts } = await run({ answer, categories: "none", classifyMs: 10, partMs: 25 });
+    assert.deepEqual(parts, answer);
+  });
+
+  it("asks again when something had to be logged and wasn't", async () => {
+    const { log, parts } = await run({ answer: [text("Logged!")], categories: "meal", classifyMs: 30 });
+    assert.deepEqual(log, ["again required"]);
+    assert.deepEqual(parts, [call("log_meal")]);
+  });
+
+  it("goes on at once when it's already doing something", async () => {
+    const { log, ms, parts } = await run({ answer: [call("list_meals")], categories: "meal", classifyMs: 600 });
+    assert.deepEqual(parts, [call("list_meals")]);
+    assert.deepEqual(log, []);
+    assert.ok(ms < 400, String(ms));
+  });
+});

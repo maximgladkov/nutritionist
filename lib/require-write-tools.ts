@@ -147,7 +147,7 @@ export function prependSystemLine(prompt: LanguageModelV4Prompt, line: string): 
 
 // Only in the app, where every turn answers something the person just said.
 export function appendAppLanguageReminder(prompt: LanguageModelV4Prompt): LanguageModelV4Prompt {
-  const inApp = prompt.some((message) => message.role === "system" && message.content.includes(APP_INSTRUCTIONS_HEADING));
+  const inApp = isInApp(prompt);
   const index = lastUserIndex(prompt);
   const message = prompt[index];
   if (!inApp || message?.role !== "user") {
@@ -161,6 +161,10 @@ export function appendAppLanguageReminder(prompt: LanguageModelV4Prompt): Langua
   const text = chosen ? `[App note, not from the user: reply in ${chosen}, whatever language anything else is in.]` : APP_LANGUAGE_REMINDER;
   next[index] = { ...message, content: [...message.content, { text, type: "text" }] };
   return next;
+}
+
+function isInApp(prompt: LanguageModelV4Prompt): boolean {
+  return prompt.some((message) => message.role === "system" && message.content.includes(APP_INSTRUCTIONS_HEADING));
 }
 
 export function injectToolCategoriesContext(
@@ -218,9 +222,19 @@ export function createRequireWriteToolsMiddleware(options?: {
 }): LanguageModelMiddleware {
   const classify = options?.classify;
   const classified = new Map<string, ClassifyToolPlan>();
+  // What the person wants, being worked out while the model is already answering. By the prompt it's for.
+  const pending = new WeakMap<LanguageModelV4Prompt, Promise<ClassifyToolPlan>>();
   return {
     specificationVersion: "v4",
     async transformParams({ params }) {
+      // In the app someone is watching or listening for the answer, so it isn't kept waiting.
+      if (isInApp(params.prompt) && isUnclassified(params.prompt, classify, classified)) {
+        const prompt = appendAppLanguageReminder(params.prompt);
+        const plan = resolveCategories(params.prompt, classify, classified);
+        plan.catch(() => undefined);
+        pending.set(prompt, plan);
+        return { ...params, prompt };
+      }
       const resolved = await resolveCategories(params.prompt, classify, classified);
       const prompt = appendAppLanguageReminder(
         injectToolCategoriesContext(params.prompt, resolved.categories, resolved.intents),
@@ -231,8 +245,10 @@ export function createRequireWriteToolsMiddleware(options?: {
       }
       return { ...params, prompt, toolChoice: { type: "required" } };
     },
-    async wrapGenerate({ doGenerate, params, model }) {
-      const result = await doGenerate();
+    async wrapGenerate({ doGenerate, params: given, model }) {
+      const waiting = pending.get(given.prompt);
+      const [result, plan] = await Promise.all([doGenerate(), waiting]);
+      const params = plan ? withPlan(given, plan) : given;
       const policy = policyFromParams(params);
       if (
         !shouldRetryRequiredTools({
@@ -245,7 +261,12 @@ export function createRequireWriteToolsMiddleware(options?: {
       }
       return model.doGenerate({ ...params, toolChoice: { type: "required" } });
     },
-    async wrapStream({ doStream, params, model }) {
+    async wrapStream({ doStream, params: given, model }) {
+      const waiting = pending.get(given.prompt);
+      if (waiting) {
+        return streamAlongside({ doStream, model, params: given, plan: waiting });
+      }
+      const params = given;
       const policy = policyFromParams(params);
       if (!policy.shouldRequire) {
         return doStream();
@@ -264,6 +285,95 @@ export function createRequireWriteToolsMiddleware(options?: {
       return model.doStream({ ...params, toolChoice: { type: "required" } });
     },
   };
+}
+
+function withPlan(params: LanguageModelV4CallOptions, plan: ClassifyToolPlan): LanguageModelV4CallOptions {
+  return { ...params, prompt: injectToolCategoriesContext(params.prompt, plan.categories, plan.intents) };
+}
+
+// Longest a finished answer waits for the plan.
+const PLAN_GRACE_MS = 1_500;
+
+// The answer is generated while the plan is made, and held until it's known. Nearly always it's then
+// let through as it is; only when something had to be logged or saved and wasn't is it asked for again. Once it calls a tool
+// it's doing something, and the next step has the plan.
+async function streamAlongside(input: {
+  doStream: () => PromiseLike<LanguageModelV4StreamResult>;
+  model: { doStream: (params: LanguageModelV4CallOptions) => PromiseLike<LanguageModelV4StreamResult> };
+  params: LanguageModelV4CallOptions;
+  plan: Promise<ClassifyToolPlan>;
+}): Promise<LanguageModelV4StreamResult> {
+  const first = await input.doStream();
+  const reader = first.stream.getReader();
+  const held: LanguageModelV4StreamPart[] = [];
+  let ended = false;
+  let failure: unknown;
+  let decided = false;
+  // Reading ahead only until it's decided; after that whoever consumes the stream sets the pace.
+  let acted: () => void = () => undefined;
+  const acting = new Promise<null>((resolve) => {
+    acted = () => resolve(null);
+  });
+  const readingAhead = (async () => {
+    while (!decided) {
+      const { done, value } = await reader.read();
+      if (done) {
+        ended = true;
+        return;
+      }
+      held.push(value);
+      if (value.type === "tool-call") acted();
+    }
+  })().catch((error: unknown) => {
+    failure = error;
+    ended = true;
+  });
+  const late = readingAhead.then(() => new Promise<null>((resolve) => setTimeout(() => resolve(null), PLAN_GRACE_MS).unref?.()));
+  const plan = await Promise.race([input.plan, acting, late]);
+  const params = plan ? withPlan(input.params, plan) : input.params;
+  const policy = policyFromParams(params);
+  if (plan && policy.shouldRequire) {
+    await readingAhead;
+    if (failure === undefined && shouldRetryRequiredTools({ ...policy, toolNames: toolNamesFromStreamParts(held) })) {
+      return input.model.doStream({ ...params, toolChoice: { type: "required" } });
+    }
+  }
+  decided = true;
+  return {
+    ...first,
+    stream: new ReadableStream({
+      async pull(controller) {
+        // A read already under way lands in what's held.
+        if (held.length === 0 && !ended) await readingAhead;
+        const part = held.shift();
+        if (part !== undefined) {
+          controller.enqueue(part);
+          return;
+        }
+        if (failure !== undefined) {
+          controller.error(failure);
+          return;
+        }
+        if (ended) {
+          controller.close();
+          return;
+        }
+        const { done, value } = await reader.read();
+        if (done) controller.close();
+        else controller.enqueue(value);
+      },
+      cancel: (reason) => reader.cancel(reason),
+    }),
+  };
+}
+
+function isUnclassified(
+  prompt: LanguageModelV4Prompt,
+  classify: ClassifyToolCategories | undefined,
+  classified: ReadonlyMap<string, ClassifyToolPlan>,
+): boolean {
+  const key = lastUserText(prompt);
+  return classify !== undefined && key.length > 0 && categoriesFromPrompt(prompt) === null && !classified.has(key);
 }
 
 export const requireWriteToolsMiddleware = createRequireWriteToolsMiddleware();
