@@ -43,7 +43,10 @@ function model(write: (input: HomeWordsInput) => HomeWords[]) {
 }
 
 const three = (input: HomeWordsInput) =>
-  input.facts.slice(0, 3).map((_, fact) => ({ fact, text: `${fact < 2 ? "Kira, h" : "H"}ere is thought ${"abc"[fact]} of call ${"abcdefghi"[calls.length]}.` }));
+  input.facts.slice(0, 3).map((text, fact) => {
+    const figure = /\d[\d,]*/u.exec(text)?.[0] ?? "nothing";
+    return { fact, text: `Kira, here is thought ${"abc"[fact]} of call ${"abcdefghi"[calls.length]}: ${figure}.` };
+  });
 
 async function message(): Promise<HomeMessage> {
   const { body, status } = await api("GET", "/assistant/message", { token: session.accessToken });
@@ -66,10 +69,10 @@ describe("home message", () => {
     model(three);
     await goals();
     await eat();
-    assert.equal((await message()).text, "Kira, here is thought a of call b.");
+    assert.match((await message()).text, /^Kira, here is thought a of call b: /);
     assert.equal(calls[0]!.name, "Kira");
     assert.match(calls[0]!.localTime, /^Tuesday, \d+:\d\d$/);
-    assert.ok(calls[0]!.facts.some((fact) => fact.startsWith("75 grams of protein left today")));
+    assert.ok(calls[0]!.facts.some((fact) => fact.includes("so 75 grams are left to eat")));
     assert.ok(!JSON.stringify(calls[0]).includes("assistant@example.com"));
   });
 
@@ -97,7 +100,7 @@ describe("home message", () => {
     await eat();
     const next = await message();
     const row = await prisma.assistantAction.findUniqueOrThrow({ where: { id: next.id } });
-    assert.ok(!(row.payload as { fact: string }).fact.includes("75 grams of protein"));
+    assert.ok(!(row.payload as { fact: string }).fact.includes("75 grams are left"));
   });
 
   it("doesn't change at every food of a meal unless it stopped being true", async () => {
@@ -121,6 +124,10 @@ describe("home message", () => {
     assert.equal(ok("Kira, seven days in a row, well done."), null);
     assert.equal(ok("Кира, осталось 75 граммов белка."), "Кира, осталось 75 граммов белка.");
     assert.equal(ok("Осталось 75 граммов белка."), null);
+    // As seen: no figure, no name, and the opposite of what was true.
+    assert.equal(ok("Вы уже почти все на сегодня распределили, так что вечером есть куда вписаться."), null);
+    assert.equal(ok("Kira, almost everything is set for today."), null);
+    assert.equal(ok("Кира, на сегодня осталось 1 234 ккал."), "Кира, на сегодня осталось 1 234 ккал.");
     assert.equal(ok("You have 1,234 kcal left today."), null);
     assert.equal(ok("Kira, **75** grams to go."), null);
     assert.equal(ok("Kira, 75 grams to go.", 4), null);
