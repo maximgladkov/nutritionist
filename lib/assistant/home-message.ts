@@ -23,6 +23,16 @@ const TELL_MS = 24 * 3_600_000;
 
 export type HomeMessage = { id: string; mood: HomeMood; text: string };
 
+// Raised when older messages shouldn't be shown any more.
+const VERSION = 2;
+
+// Said without a figure and still clear.
+const NO_FIGURE = ["chat", "empty", "hello", "morning", "over", "usual"];
+
+function needsNumber(key: string): boolean {
+  return !NO_FIGURE.includes(key) && !key.startsWith("badge:") && !key.startsWith("comments:");
+}
+
 type Payload = {
   fact: string;
   key: string;
@@ -32,6 +42,7 @@ type Payload = {
   shownAt?: string;
   stamp?: string;
   text: string;
+  version?: number;
 };
 
 const read = (row: Pick<AssistantAction, "payload">) => row.payload as unknown as Payload;
@@ -87,7 +98,7 @@ export async function homeMessage(userId: string, now: Date): Promise<HomeMessag
   const save = async (row: AssistantAction, change: Partial<Payload>, state = row.state) =>
     prisma.assistantAction.update({ data: { payload: write({ ...read(row), ...change }), state }, where: { id: row.id } });
 
-  if (current && current.state !== "opened" && since(read(current).seenAt) < VISIT_GAP_MS) {
+  if (current && current.state !== "opened" && read(current).version === VERSION && since(read(current).seenAt) < VISIT_GAP_MS) {
     const { fact, shownAt, stamp } = read(current);
     if (stamp === info.stamp || (isTrue(fact) && since(shownAt) < SETTLE_MS)) {
       // Not put back over an opening that happened meanwhile.
@@ -99,7 +110,7 @@ export async function homeMessage(userId: string, now: Date): Promise<HomeMessag
 
   const show = { seenAt: now.toISOString(), shownAt: now.toISOString(), stamp: info.stamp };
   const ready = rows.filter(
-    (row) => row.state === "ready" && now.getTime() - row.createdAt.getTime() < READY_MS && isTrue(read(row).fact) && read(row).key !== (current && read(current).key),
+    (row) => row.state === "ready" && read(row).version === VERSION && now.getTime() - row.createdAt.getTime() < READY_MS && isTrue(read(row).fact) && read(row).key !== (current && read(current).key),
   );
   if (ready.length > 0) {
     // Newest batch first, and within it the order they were written in.
@@ -114,7 +125,7 @@ export async function homeMessage(userId: string, now: Date): Promise<HomeMessag
         callId: `home:${batch}:${index}`,
         createdAt: now,
         kind: HOME_KIND,
-        payload: write({ fact: fact.text, key: fact.key, mood: fact.mood, text, ...(first ? show : {}) }),
+        payload: write({ fact: fact.text, key: fact.key, mood: fact.mood, text, version: VERSION, ...(first ? show : {}) }),
         state: first ? "shown" : "ready",
         userId,
       },
@@ -122,7 +133,7 @@ export async function homeMessage(userId: string, now: Date): Promise<HomeMessag
   const batch = randomUUID();
 
   // Right after another, while a meal is being logged, plain words do.
-  const hurried = current !== undefined && current.state !== "opened" && since(read(current).shownAt) < SETTLE_MS;
+  const hurried = current !== undefined && read(current).version === VERSION && current.state !== "opened" && since(read(current).shownAt) < SETTLE_MS;
   if (!hurried && (await takeRun(userId, info.today, now))) {
     try {
       const texts = facts.map((fact) => fact.text);
@@ -134,8 +145,8 @@ export async function homeMessage(userId: string, now: Date): Promise<HomeMessag
         recent: shown.slice(0, 10).map((row) => read(row).text),
       });
       const used = new Set<number>();
-      const good = written.slice(0, 3).flatMap((words, index) => {
-        const text = used.has(words.fact) ? null : acceptWords(words, texts, info.name, index < 2);
+      const good = written.slice(0, 3).flatMap((words) => {
+        const text = used.has(words.fact) ? null : acceptWords(words, texts, info.name, needsNumber(facts[words.fact]?.key ?? ""));
         if (text === null) return [];
         used.add(words.fact);
         return [{ fact: facts[words.fact]!, text }];

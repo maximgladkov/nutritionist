@@ -154,7 +154,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
         "protein_left",
         hour >= 17 ? 84 : 74,
         "happy",
-        `${n(proteinLeft)} grams of protein left today to reach the goal.${idea}`,
+        `${n(protein)} of ${n(proteinGoal!)} grams of protein eaten so far today, so ${n(proteinLeft)} grams are left to eat.${idea}`,
         `you still need ${n(proteinLeft)} grams of protein.${best && share ? ` ${best.name} ${share}.` : ""}`,
       );
     }
@@ -167,11 +167,11 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
           "dish",
           80,
           "happy",
-          `${n(kcalLeft)} kcal left today. Their ${dish.what} "${dish.name}" fits: ${n(dish.kcal!)} kcal${dish.proteins ? ` and ${n(dish.proteins)} grams of protein` : ""} a serving.`,
+          `${n(eaten)} of ${n(kcalGoal!)} kcal eaten so far today, so ${n(kcalLeft)} kcal are left. Their ${dish.what} "${dish.name}" fits: ${n(dish.kcal!)} kcal${dish.proteins ? ` and ${n(dish.proteins)} grams of protein` : ""} a serving.`,
           `you have ${n(kcalLeft)} kcal left. Your ${dish.name} fits.`,
         );
       } else {
-        add("kcal_left", 60, "idle", `${n(kcalLeft)} kcal left today of the goal of ${n(kcalGoal!)}.`, `you have ${n(kcalLeft)} kcal left today.`);
+        add("kcal_left", 60, "idle", `${n(eaten)} of ${n(kcalGoal!)} kcal eaten so far today, so ${n(kcalLeft)} kcal are left.`, `you have ${n(kcalLeft)} kcal left today.`);
       }
     }
     if (proteinLeft !== null && proteinLeft <= 0) {
