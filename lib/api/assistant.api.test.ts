@@ -243,6 +243,68 @@ describe("talking", () => {
   });
 });
 
+describe("what was said in a call", () => {
+  const start = async () => (await api("POST", "/assistant/talk", { token: session.accessToken })).body.id as string;
+  const save = (id: string, lines: object[], token = session.accessToken) =>
+    api("PUT", `/assistant/talk/${id}`, { body: { lines }, token });
+  const read = async (query = "") => (await api("GET", `/assistant/conversation${query}`, { token: session.accessToken })).body;
+  const LINES = [
+    { atMs: 0, speaker: "user", text: "Hi" },
+    { atMs: 900, speaker: "assistant", text: "Hello!" },
+    { atMs: 4000, speaker: "user", text: "Plan lunch" },
+  ];
+
+  it("is kept line by line, over the agent turns it covers, with their cards", async () => {
+    const id = await start();
+    const { card } = await recordIdea({ callId: "idea", items: [CHICKEN], label: "lunch", sessionId: "s1", userId: session.userId });
+    const at = new Date();
+    await turn({ at, id: "spoken", items: [{ at: at.toISOString(), callId: "idea", stepIndex: 0, toolName: "suggest_meal", type: "tool" }] });
+    await turn({ at: new Date(Date.now() - 3_600_000), id: "typed-before" });
+    assert.equal((await save(id, LINES.slice(0, 1))).status, 204);
+    assert.equal((await save(id, LINES)).status, 204);
+    await turn({ at: new Date(Date.now() + 1000), id: "typed-after" });
+    const { talks, turns } = await read();
+    assert.equal(talks.length, 1);
+    assert.deepEqual(talks[0].lines, LINES);
+    assert.deepEqual(talks[0].turnIds, ["s1:spoken"]);
+    assert.deepEqual(talks[0].cards, [card]);
+    // Older apps show the agent's turns, which are still all there.
+    assert.equal(turns.length, 3);
+  });
+
+  it("isn't shown for a call with nothing written down, or to anyone else", async () => {
+    const id = await start();
+    assert.deepEqual((await read()).talks, []);
+    assert.equal((await save(id, LINES, other.accessToken)).status, 404);
+    assert.equal((await save("nope", LINES)).status, 404);
+    assert.equal((await save(id, [{ atMs: 0, speaker: "coach", text: "x" }])).status, 400);
+    assert.deepEqual((await read()).talks, []);
+  });
+
+  it("can't be rewritten long after", async () => {
+    const id = await start();
+    await prisma.assistantAction.update({ data: { createdAt: new Date(Date.now() - 2 * 3_600_000) }, where: { id } });
+    assert.equal((await save(id, LINES)).status, 404);
+  });
+
+  it("covers turns on both sides of a page edge", async () => {
+    const base = Date.now() - 1_000_000;
+    for (let index = 0; index < 35; index += 1) await turn({ at: new Date(base + index * 1000), id: `t${index}` });
+    const id = await start();
+    // Begins before turn 5, the first page's oldest, and runs past turn 6.
+    await prisma.assistantAction.update({
+      data: { createdAt: new Date(base + 3500), payload: { endedAt: new Date(base + 6500).toISOString(), lines: LINES } },
+      where: { id },
+    });
+    const first = await read();
+    assert.deepEqual(first.talks.map((talk: { id: string }) => talk.id), [id]);
+    assert.deepEqual(first.talks[0].turnIds, ["s1:t4", "s1:t5", "s1:t6"]);
+    const second = await read(`?before=${encodeURIComponent(first.next)}`);
+    // The app shows a call once, by id; both pages know which turns it covers.
+    assert.deepEqual(second.talks.map((talk: { id: string }) => talk.id), [id]);
+  });
+});
+
 describe("assistant home card", () => {
   const at = (iso: string) => setApiDeps({ now: () => new Date(iso) });
   const card = async () => (await api("GET", "/assistant/card", { token: session.accessToken })).body.messages as { id: string; text: string }[];

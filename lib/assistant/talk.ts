@@ -35,17 +35,39 @@ export async function mintTalkSecret(): Promise<TalkSecret> {
   return { expiresAt, token };
 }
 
-// Books a call before it's paid for; null once this person has had enough of them. One at a time
+// What was said, in order. `atMs` is from the start of the call.
+export type TalkLine = { atMs: number; speaker: "assistant" | "user"; text: string };
+export type TalkPayload = { endedAt?: string; lines?: TalkLine[] };
+
+// How long after it started a call may still be written down.
+const TALK_SAVE_WINDOW_MS = 60 * 60_000;
+
+// Writes down what's been said so far; each save replaces the last. False when the call isn't theirs
+// or is long over.
+export async function saveTalk(input: { id: string; lines: TalkLine[]; now: Date; userId: string }): Promise<boolean> {
+  const saved = await prisma.assistantAction.updateMany({
+    data: { payload: { endedAt: input.now.toISOString(), lines: input.lines } },
+    where: {
+      createdAt: { gt: new Date(input.now.getTime() - TALK_SAVE_WINDOW_MS) },
+      id: input.id,
+      kind: "talk",
+      userId: input.userId,
+    },
+  });
+  return saved.count > 0;
+}
+
+// Books a call before it's paid for, and returns its id; null once this person has had enough of them. One at a time
 // per person, so calls started together can't slip past the limit.
-export async function bookTalk(userId: string, callId: string, now: Date): Promise<boolean> {
+export async function bookTalk(userId: string, callId: string, now: Date): Promise<string | null> {
   return prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR UPDATE`;
     const since = (ms: number) =>
       tx.assistantAction.count({ where: { createdAt: { gt: new Date(now.getTime() - ms) }, kind: "talk", userId } });
     if ((await since(3_600_000)) >= TALK_HOURLY_CALLS || (await since(86_400_000)) >= TALK_DAILY_CALLS) {
-      return false;
+      return null;
     }
-    await tx.assistantAction.create({ data: { callId, createdAt: now, kind: "talk", payload: {}, userId } });
-    return true;
+    const row = await tx.assistantAction.create({ data: { callId, createdAt: now, kind: "talk", payload: {}, userId } });
+    return row.id;
   });
 }
