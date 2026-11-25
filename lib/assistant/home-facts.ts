@@ -254,12 +254,14 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
   }
 
   const said = words.at(-1);
-  if (said && now.getTime() - said.at.getTime() > 45 * 60_000 && now.getTime() - said.at.getTime() < 14 * 3_600_000) {
+  // A bare "yes" or "why?" isn't anything to come back to.
+  if (said && said.text.length >= 15 && now.getTime() - said.at.getTime() > 45 * 60_000 && now.getTime() - said.at.getTime() < 14 * 3_600_000) {
     const at = getZonedParts(said.at, timezone);
     add("chat", 68, "idle", `They wrote to you at ${at.hour}:${String(at.minute).padStart(2, "0")}: "${said.text}". Only worth following up if it was about something still ahead or that just happened.`, null);
   }
 
-  add("hello", 5, "happy", "Nothing in particular to report. Offer help with a meal idea, or logging by text, voice or photo.", "ask me for a meal idea, or send a photo of what you're eating.");
+  // Only for want of anything else.
+  if (facts.filter((fact) => fact.plain !== null).length < 3) add("hello", 5, "happy", "Nothing in particular to report. Offer help with a meal idea, or logging by text, voice or photo.", "ask me for a meal idea, or send a photo of what you're eating.");
 
   return {
     facts: facts.sort((a, b) => b.score - a.score),
