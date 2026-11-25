@@ -38,6 +38,7 @@ model User {
   groupInvitesUsed      GroupInvite[]  @relation("GroupInvitesUsed")
   refreshTokens RefreshToken[]
   pushDevices   PushDevice[]
+  recipes       Recipe[]
   savedMeals    SavedMeal[]
   mealShares    MealShare[]
   weightEntries WeightEntry[]
@@ -661,6 +662,38 @@ model SavedMeal {
   updatedAt DateTime        @updatedAt
 
   @@index([userId])
+}
+
+// Something to cook: what goes into all of it, and how to make it. Logged by the serving.
+model Recipe {
+  id          String       @id @default(cuid())
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  servings    Int
+  minutes     Int?
+  steps       String[]
+  items       RecipeItem[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([userId])
+}
+
+model RecipeItem {
+  id                String       @id @default(cuid())
+  recipeId          String
+  recipe            Recipe       @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  sortOrder         Int
+  name              String
+  brand             String?
+  barcode           String?
+  amount            Float
+  unit              MealItemUnit
+  nutrimentsPer100g Json
+
+  @@index([recipeId, sortOrder])
 }
 
 model SavedMealItem {
