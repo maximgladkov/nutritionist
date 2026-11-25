@@ -12,6 +12,7 @@ import { mealRoutes } from "./routes/meals.ts";
 import { meRoutes } from "./routes/me.ts";
 import { notificationRoutes } from "./routes/notifications.ts";
 import { profileRoutes } from "./routes/profile.ts";
+import { recipeRoutes } from "./routes/recipes.ts";
 import { savedMealRoutes } from "./routes/saved-meals.ts";
 import { mealShareRoutes } from "./routes/meal-shares.ts";
 import { uploadRoutes } from "./routes/uploads.ts";
@@ -28,6 +29,7 @@ export const apiRoutes: readonly RouteDefinition[] = [
   ...foodRoutes,
   ...mealRoutes,
   ...savedMealRoutes,
+  ...recipeRoutes,
   ...mealShareRoutes,
   ...analyzeRoutes,
   ...uploadRoutes,

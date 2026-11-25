@@ -771,9 +771,17 @@ export async function previewMealItems(input: {
   items: MealItemInput[];
   country?: string;
   signal?: AbortSignal;
-}): Promise<{ amount: number; metrics: NutrientValues; name: string; unit: AmountUnit }[]> {
+}): Promise<Omit<ResolvedItem, "grams" | "id" | "imageUrl" | "serving">[]> {
   const resolved = await resolveItems(input.items, input.country, input.signal);
-  return resolved.map(({ amount, metrics, name, unit }) => ({ amount, metrics, name, unit }));
+  return resolved.map(({ amount, barcode, brand, metrics, name, nutriments, unit }) => ({
+    amount,
+    barcode,
+    brand,
+    metrics,
+    name,
+    nutriments,
+    unit,
+  }));
 }
 
 async function resolveItems(

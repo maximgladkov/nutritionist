@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { addIdea, recordVoiceNote, undoLogged } from "../../assistant/actions.ts";
+import { saveRecipe } from "../../assistant/displays.ts";
 import { loadConversation } from "../../assistant/conversation.ts";
 import { homeCardMessages } from "../../assistant/home-card.ts";
 import { bookTalk, saveTalk, TALK_INSTRUCTIONS, TALK_MAX_SECONDS, TALK_MODEL, TALK_WEBSOCKET_URL } from "../../assistant/talk.ts";
@@ -109,6 +110,15 @@ export const assistantRoutes: RouteDefinition[] = [
     },
     method: "PUT",
     path: "/assistant/talk/:id",
+  },
+  {
+    async handler({ params, user }) {
+      const saved = await saveRecipe({ id: params.id ?? "", userId: user.id });
+      if (!saved) throw notFound("That recipe is gone.");
+      return json({ display: saved.display });
+    },
+    method: "POST",
+    path: "/assistant/displays/:id/save",
   },
   {
     async handler({ params, user }) {

@@ -1,3 +1,4 @@
+import type { AssistantAction } from "../../generated/prisma/client.ts";
 import { parseTranscript, type AgentTurnMessage } from "../agent-turn-model.ts";
 import { prisma } from "../prisma.ts";
 import { loadTodayNutritionProgress } from "../nutrition-progress.ts";
@@ -5,6 +6,7 @@ import { listMeals } from "../meals.ts";
 import { readSummaryContext } from "../summary.ts";
 import { getZonedParts, localDayRange } from "../timezone.ts";
 import { cardView, type AssistantCard } from "./actions.ts";
+import { DISPLAY_KINDS, displayView, type AssistantDisplay } from "./displays.ts";
 import type { TalkLine, TalkPayload } from "./talk.ts";
 
 export const CONVERSATION_PAGE = 30;
@@ -17,9 +19,10 @@ const TURN_STALE_MS = 10 * 60_000;
 
 // What each look-up is called in "Checked ...". Tools that only write aren't listed.
 export const CHECKED_LABELS: Record<string, string> = {
+  find_foods: "Food catalog",
   get_my_goals: "Goals",
+  get_my_info: "Your details",
   get_my_profile: "Profile",
-  get_my_weight: "Weight",
   get_nutrition_summary: "Nutrition",
   list_frequent_foods: "Foods you log often",
   list_meals: "Diary",
@@ -33,6 +36,7 @@ export type AssistantTurnView = {
   at: string;
   cards: AssistantCard[];
   checked: string[];
+  displays: AssistantDisplay[];
   id: string;
   reply: string;
   status: "cancelled" | "completed" | "failed" | "running";
@@ -51,6 +55,7 @@ export type AssistantGreeting = {
 export type AssistantTalkView = {
   at: string;
   cards: AssistantCard[];
+  displays: AssistantDisplay[];
   endedAt: string;
   id: string;
   lines: TalkLine[];
@@ -117,6 +122,17 @@ async function greetingFor(userId: string, now: Date): Promise<AssistantGreeting
   return { ...(row.payload as Omit<AssistantGreeting, "at">), at: row.createdAt.toISOString() };
 }
 
+const MEAL_CARD_KINDS = ["idea", "logged"];
+const CARD_KINDS = [...MEAL_CARD_KINDS, ...DISPLAY_KINDS];
+
+function cardsOf(rows: readonly AssistantAction[]): AssistantCard[] {
+  return rows.filter((row) => MEAL_CARD_KINDS.includes(row.kind)).map(cardView);
+}
+
+function displaysOf(rows: readonly AssistantAction[]): AssistantDisplay[] {
+  return rows.filter((row) => DISPLAY_KINDS.includes(row.kind)).map(displayView);
+}
+
 function talkIn(row: { payload: unknown }): { endedAt: Date; lines: TalkLine[] } | null {
   const { endedAt, lines } = row.payload as TalkPayload;
   return endedAt && lines && lines.length > 0 ? { endedAt: new Date(endedAt), lines } : null;
@@ -144,11 +160,12 @@ async function talksBetween(userId: string, from: Date | null, before: Date | nu
       );
       const actions = await prisma.assistantAction.findMany({
         orderBy: { createdAt: "asc" },
-        where: { callId: { in: callIds }, kind: { in: ["idea", "logged"] }, userId },
+        where: { callId: { in: callIds }, kind: { in: CARD_KINDS }, userId },
       });
       return {
         at: row.createdAt.toISOString(),
-        cards: actions.map(cardView),
+        cards: cardsOf(actions),
+        displays: displaysOf(actions),
         endedAt: endedAt.toISOString(),
         id: row.id,
         lines,
@@ -175,7 +192,7 @@ export async function loadConversation(input: { before?: Date; now: Date; userId
   }
   const sessionIds = [...new Set(page.map((row) => row.sessionId))];
   const [actions, voices, session] = await Promise.all([
-    prisma.assistantAction.findMany({ where: { callId: { in: callIds }, kind: { in: ["idea", "logged"] }, userId } }),
+    prisma.assistantAction.findMany({ where: { callId: { in: callIds }, kind: { in: CARD_KINDS }, userId } }),
     prisma.assistantAction.findMany({
       orderBy: { createdAt: "asc" },
       where: { kind: "voice", sessionId: { in: sessionIds }, userId },
@@ -206,15 +223,13 @@ export async function loadConversation(input: { before?: Date; now: Date; userId
     const stale = row.status === "running" && now.getTime() - row.startedAt.getTime() > TURN_STALE_MS;
     return {
       at: row.startedAt.toISOString(),
-      cards: tools.flatMap((tool) => {
-        const action = byCall.get(tool.callId);
-        return action ? [cardView(action)] : [];
-      }),
+      cards: cardsOf(tools.flatMap((tool) => byCall.get(tool.callId) ?? [])),
       checked: [
         ...new Set(
           tools.flatMap((tool) => (tool.isError || !CHECKED_LABELS[tool.toolName] ? [] : [CHECKED_LABELS[tool.toolName]!])),
         ),
       ],
+      displays: displaysOf(tools.flatMap((tool) => byCall.get(tool.callId) ?? [])),
       id: `${row.sessionId}:${row.turnId}`,
       reply: replyText(items),
       status: stale ? "failed" : row.status,
