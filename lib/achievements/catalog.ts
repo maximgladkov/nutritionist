@@ -115,7 +115,7 @@ const PROTEIN: AchievementFamily = {
   badges: ({ goals }) =>
     dayTiers({
       color: "protein",
-      describe: (span) => `${span} at or above your protein goal.`,
+      describe: (span) => `Your muscles noticed. ${span} you can be proud of.`,
       icon: "protein",
       idPrefix: "protein",
       metric: "protein_days",
@@ -139,7 +139,7 @@ const CALORIES: AchievementFamily = {
   badges: ({ goals }) =>
     dayTiers({
       color: "champagne",
-      describe: (span) => `${span} within 10% of your calorie goal.`,
+      describe: (span) => `Within 10% of your goal, for ${span}. That’s balance.`,
       icon: "target",
       idPrefix: "calories",
       metric: "calorie_days",
@@ -247,17 +247,17 @@ const FIRSTS: AchievementFamily = {
       toGo: string,
     ): Achievement => ({ color: "ink", description, icon, id, metric, name, target: 1, tier: "", title, toGo: () => toGo, unit: "" });
     return [
-      once("first-barcode", "barcode", "event:barcode_scan", "Barcode", "First barcode scan", "You scanned your first product.", "Scan the barcode on a product."),
-      once("first-photo", "camera", "meal_photos", "Photo", "First meal photo", "You added a photo to a meal.", "Add a photo to a meal."),
-      once("first-voice", "mic", "event:voice_note", "Voice", "Describe by voice", "You said what you ate.", "Say what you ate instead of typing it."),
-      once("first-group", "group", "groups_joined", "Group", "Joined a group", "You joined your first group.", "Join a group with a code or a link."),
+      once("first-barcode", "barcode", "event:barcode_scan", "Barcode", "First barcode scan", "Point, beep, logged. That’s all it takes.", "Scan the barcode on a product."),
+      once("first-photo", "camera", "meal_photos", "Photo", "First meal photo", "Your diary looks tastier already.", "Add a photo to a meal."),
+      once("first-voice", "mic", "event:voice_note", "Voice", "Describe by voice", "No typing needed.", "Say what you ate instead of typing it."),
+      once("first-group", "group", "groups_joined", "Group", "Joined a group", "It’s easier together.", "Join a group with a code or a link."),
       {
-        color: "ink", description: "A hundred foods in your diary.", icon: "food", id: "foods-100", metric: "foods_logged",
+        color: "ink", description: "Your diary knows you by now.", icon: "food", id: "foods-100", metric: "foods_logged",
         name: "100 foods", target: 100, tier: "100", title: "100 foods logged",
         toGo: (left) => `${plural(left, "more food")} to log.`, unit: "foods",
       },
       {
-        color: "ink", description: "You weighed in ten times.", icon: "scale", id: "weigh-ins-10", metric: "weigh_ins",
+        color: "ink", description: "The trend matters more than any one number.", icon: "scale", id: "weigh-ins-10", metric: "weigh_ins",
         name: "Weigh-ins", target: 10, tier: "10", title: "10 weigh-ins",
         toGo: (left) => `${plural(left, "more weigh-in")} to log.`, unit: "weigh-ins",
       },
@@ -278,20 +278,22 @@ function dayBest(input: {
   best: MetricName;
   days: MetricName;
   goodDay: number;
-  targets: readonly number[];
+  // Each with what to say once it's reached.
+  targets: readonly (readonly [target: number, earned: string])[];
+  often: readonly [string, string];
   tier: (target: number) => string;
   title: string;
   unit: string;
 }): Achievement[] {
-  const { best, color, days, goodDay, icon, id, targets, tier, title, unit } = input;
+  const { best, color, days, goodDay, icon, id, often, targets, tier, title, unit } = input;
   const amount = (value: number) => `${value.toLocaleString("en-US")} ${unit}`;
   return [
-    ...targets.map((target): Achievement => ({
-      color, description: "All in a single day. Keep moving.", icon, id: `${id}-${target}`, metric: best, name: target.toLocaleString("en-US"),
+    ...targets.map(([target, earned]): Achievement => ({
+      color, description: earned, icon, id: `${id}-${target}`, metric: best, name: target.toLocaleString("en-US"),
       target, tier: tier(target), title: `${amount(target)} in a day`, toGo: () => `Reach ${amount(target)} in one day.`, unit,
     })),
-    ...[7, 30].map((count): Achievement => ({
-      color, description: `${count} days with at least ${amount(goodDay)}.`, icon, id: `${id}-days-${count}`, metric: days, name: `${count} days`,
+    ...([[7, often[0]], [30, often[1]]] as const).map(([count, earned]): Achievement => ({
+      color, description: earned, icon, id: `${id}-days-${count}`, metric: days, name: `${count} days`,
       target: count, tier: `${count}D`, title: `${title} · ${count} days`,
       toGo: (left) => `${plural(left, "more day")} with at least ${amount(goodDay)}.`, unit: "days",
     })),
@@ -304,7 +306,14 @@ const STEPS: AchievementFamily = {
   badges: () =>
     dayBest({
       best: "steps_best", color: "carbs", days: "steps_days", goodDay: STEPS_DAY, icon: "steps", id: "steps",
-      targets: [5_000, 10_000, 15_000, 20_000], tier: thousands, title: "Steps", unit: "steps",
+      often: ["That many times past 10,000. It’s becoming a habit.", "A month’s worth of days past 10,000. Strong legs."],
+      targets: [
+        [5_000, "A proper walk. A great place to start."],
+        [10_000, "The classic, and you made it."],
+        [15_000, "That’s around eleven kilometres for most people."],
+        [20_000, "Feet up. You’ve earned it."],
+      ],
+      tier: thousands, title: "Steps", unit: "steps",
     }),
   context: "Steps",
   id: "steps",
@@ -317,7 +326,14 @@ const BURNED: AchievementFamily = {
   badges: () =>
     dayBest({
       best: "burned_best", color: "protein", days: "burned_days", goodDay: BURNED_DAY_KCAL, icon: "burn", id: "burned",
-      targets: [300, 500, 750, 1_000], tier: thousands, title: "Burned", unit: "kcal",
+      often: ["That many active days. Your body notices.", "A month’s worth of active days. Impressive."],
+      targets: [
+        [300, "A good, solid workout’s worth."],
+        [500, "You really moved. It shows."],
+        [750, "A big day. Drink some water."],
+        [1_000, "A huge day. Rest well and eat properly."],
+      ],
+      tier: thousands, title: "Burned", unit: "kcal",
     }),
   context: "Calories burned",
   id: "burned",
@@ -333,21 +349,21 @@ const ASSISTANT: AchievementFamily = {
       toGo: (left: number) => string, unit = "", tier = "",
     ): Achievement => ({ color: "champagne", description, icon, id: `assistant-${id}`, metric, name, target, tier, title, toGo, unit });
     return [
-      badge("chat", "chat", "assistant_chats", 1, "Hello", "First message", "You wrote to your coach.", () => "Write to your coach."),
-      badge("voice", "mic", "assistant_voice_notes", 1, "Voice note", "First voice note", "You sent your coach a voice note.", () => "Send your coach a voice note."),
-      badge("call", "phone", "assistant_calls", 1, "Call", "First call", "You talked with your coach.", () => "Talk live with your coach."),
-      badge("photo", "camera", "assistant_photos", 1, "Photo", "Show and ask", "You showed your coach a photo.", () => "Send your coach a photo, like a menu."),
-      badge("reply", "sparkles", "assistant_openers", 1, "Reply", "Picked up the thread", "You followed up on a message on Today.", () => "Tap your coach’s message on Today."),
-      badge("idea", "food", "assistant_ideas", 1, "Idea", "Good idea", "You added a meal your coach suggested.", () => "Add a meal your coach suggests."),
-      badge("recipe", "food", "recipes_saved", 1, "Recipe", "First recipe", "You saved a recipe from your coach.", () => "Ask your coach for a recipe and save it."),
-      badge("ideas-10", "food", "assistant_ideas", 10, "10 ideas", "10 ideas eaten", "Ten of your coach’s ideas in your diary.", (left) => `${plural(left, "more idea")} to add.`, "ideas", "10"),
-      badge("chats-50", "chat", "assistant_chats", 50, "50 messages", "50 messages", "Fifty messages answered by your coach.", (left) => `${plural(left, "more message")} to go.`, "messages", "50"),
-      badge("calls-5", "phone", "assistant_calls", 5, "5 calls", "5 calls", "Five conversations with your coach.", (left) => `${plural(left, "more call")} to go.`, "calls", "5"),
+      badge("chat", "chat", "assistant_chats", 1, "Hello", "First message", "Ask anything, any time. It knows your diary.", () => "Write to your coach."),
+      badge("voice", "mic", "assistant_voice_notes", 1, "Voice note", "First voice note", "Easier than typing with your hands full.", () => "Send your coach a voice note."),
+      badge("call", "phone", "assistant_calls", 1, "Call", "First call", "Good conversation. It remembers what you said.", () => "Talk live with your coach."),
+      badge("photo", "camera", "assistant_photos", 1, "Photo", "Show and ask", "A picture is worth a thousand words. Menus work too.", () => "Send your coach a photo, like a menu."),
+      badge("reply", "sparkles", "assistant_openers", 1, "Reply", "Picked up the thread", "A quick tap on Today, and you’re talking.", () => "Tap your coach’s message on Today."),
+      badge("idea", "food", "assistant_ideas", 1, "Idea", "Good idea", "Your coach suggested it, you ate it.", () => "Add a meal your coach suggests."),
+      badge("recipe", "food", "recipes_saved", 1, "Recipe", "First recipe", "It’s waiting in Log food whenever you cook.", () => "Ask your coach for a recipe and save it."),
+      badge("ideas-10", "food", "assistant_ideas", 10, "10 ideas", "10 ideas eaten", "You two clearly have the same taste.", (left) => `${plural(left, "more idea")} to add.`, "ideas", "10"),
+      badge("chats-50", "chat", "assistant_chats", 50, "50 messages", "50 messages", "You know each other well by now.", (left) => `${plural(left, "more message")} to go.`, "messages", "50"),
+      badge("calls-5", "phone", "assistant_calls", 5, "5 calls", "5 calls", "Some things are better said out loud.", (left) => `${plural(left, "more call")} to go.`, "calls", "5"),
       ...[10, 60, 300].map((minutes) =>
         badge(
           `minutes-${minutes}`, "clock", "assistant_minutes", minutes, minutes < 60 ? `${minutes} min` : plural(minutes / 60, "hour"),
           `${minutes < 60 ? `${minutes} minutes` : plural(minutes / 60, "hour")} together`,
-          `${minutes < 60 ? `${minutes} minutes` : plural(minutes / 60, "hour")} spent with your coach.`,
+          minutes < 60 ? "Off to a good start, you and your coach." : minutes < 300 ? "Time well spent." : "Practically old friends.",
           (left) => `${plural(Math.ceil(left), "more minute")} with your coach.`, "minutes", minutes < 60 ? `${minutes}M` : `${minutes / 60}H`,
         ),
       ),

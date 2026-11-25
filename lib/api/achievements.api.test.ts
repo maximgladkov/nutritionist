@@ -58,6 +58,20 @@ describe("the catalogue", () => {
   });
 });
 
+describe("what's said once a badge is earned", () => {
+  it("adds to the title instead of repeating it", () => {
+    const context = { goals: {} as never, goalWeightKg: 55, loggedDates: new Set<string>(), startWeightKg: 65, today };
+    const words = (text: string) => new Set((text.toLowerCase().match(/[a-z]{4,}/gu) ?? []).filter((word) => !["your", "with", "days", "that"].includes(word)));
+    for (const family of ACHIEVEMENT_FAMILIES.filter((entry) => ["steps", "burned", "assistant", "firsts"].includes(entry.id))) {
+      for (const item of family.badges(context, new Set())) {
+        const title = words(item.title);
+        const repeated = [...words(item.description)].filter((word) => title.has(word));
+        assert.ok(repeated.length === 0, `${item.id}: ${repeated.join(", ")}`);
+      }
+    }
+  });
+});
+
 describe("achievements", () => {
   it("needs a sign-in", async () => {
     assert.equal((await api("GET", "/me/achievements")).status, 401);
