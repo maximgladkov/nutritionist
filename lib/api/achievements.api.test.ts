@@ -58,6 +58,20 @@ describe("the catalogue", () => {
   });
 });
 
+describe("what's said once a badge is earned", () => {
+  it("adds to the title instead of repeating it", () => {
+    const context = { goals: {} as never, goalWeightKg: 55, loggedDates: new Set<string>(), startWeightKg: 65, today };
+    const words = (text: string) => new Set((text.toLowerCase().match(/[a-z]{4,}/gu) ?? []).filter((word) => !["your", "with", "days", "that"].includes(word)));
+    for (const family of ACHIEVEMENT_FAMILIES.filter((entry) => ["steps", "burned", "assistant", "firsts"].includes(entry.id))) {
+      for (const item of family.badges(context, new Set())) {
+        const title = words(item.title);
+        const repeated = [...words(item.description)].filter((word) => title.has(word));
+        assert.ok(repeated.length === 0, `${item.id}: ${repeated.join(", ")}`);
+      }
+    }
+  });
+});
+
 describe("achievements", () => {
   it("needs a sign-in", async () => {
     assert.equal((await api("GET", "/me/achievements")).status, 401);
@@ -199,5 +213,61 @@ describe("achievements", () => {
     assert.deepEqual(view.closest, []);
     assert.equal(view.streak.next, null);
     assert.ok(view.families.every((entry: any) => entry.activeId === null));
+  });
+});
+
+describe("moving and the assistant", () => {
+  let mover: Session;
+  const at = (back: number) => new Date(`${shiftYmd(today, -back)}T10:00:00Z`);
+  const turn = (back: number, id: string, messages: object = { items: [], steps: [] }, status: "completed" | "failed" = "completed") =>
+    prisma.agentTurn.create({
+      data: { channel: "app", durationMs: 90_000, messages, sessionId: "m", startedAt: at(back), status, turnId: id, turnSequence: 0, userId: mover.userId },
+    });
+  const action = (kind: string, back: number, payload: object, state = "open") =>
+    prisma.assistantAction.create({ data: { callId: `${kind}:${back}`, createdAt: at(back), kind, payload, state, userId: mover.userId } });
+
+  before(async () => {
+    mover = await signIn("mover@example.com");
+  });
+
+  it("counts the best day and good days of steps and calories burned", async () => {
+    for (let back = 7; back >= 1; back -= 1) {
+      await prisma.dailyActivity.create({ data: { activeKcal: back === 3 ? 760.4 : 200, date: shiftYmd(today, -back), steps: back === 2 ? 15_200 : 10_000, userId: mover.userId } });
+    }
+    await prisma.dailyActivity.create({ data: { activeKcal: 5000, date: shiftYmd(today, 1), steps: 90_000, userId: mover.userId } });
+    const view = await load(mover);
+    assert.equal(badge(view, "steps-10000").earnedOn, shiftYmd(today, -7));
+    assert.equal(badge(view, "steps-15000").earnedOn, shiftYmd(today, -2));
+    assert.equal(badge(view, "steps-20000").earnedOn, null);
+    assert.equal(badge(view, "steps-20000").progressText, "15,200 / 20,000 steps");
+    assert.equal(badge(view, "steps-days-7").earnedOn, shiftYmd(today, -1));
+    assert.equal(badge(view, "burned-750").earnedOn, shiftYmd(today, -3));
+    assert.equal(badge(view, "burned-1000").earnedOn, null);
+    assert.equal(badge(view, "burned-days-7").value, 1);
+  });
+
+  it("rewards trying the assistant in different ways, and time with it", async () => {
+    await turn(5, "a");
+    await turn(5, "failed", undefined, "failed");
+    await turn(4, "b", { items: [{ parts: [{ type: "file", url: "https://btr.me/api/v1/uploads/x/content" }], text: "", type: "user" }], steps: [] });
+    await action("voice", 4, { durationMs: 60_000 });
+    await action("idea", 3, {}, "added");
+    await action("home", 3, {}, "opened");
+    await action("talk", 2, { endedAt: new Date(at(2).getTime() + 8 * 60_000).toISOString(), lines: [{ atMs: 0, speaker: "user", text: "Hi" }] });
+    // Part of the call, so not another message or more time.
+    await turn(2, "c");
+    const view = await load(mover);
+    assert.equal(badge(view, "assistant-chat").earnedOn, shiftYmd(today, -5));
+    assert.equal(badge(view, "assistant-photo").earnedOn, shiftYmd(today, -4));
+    assert.equal(badge(view, "assistant-voice").earnedOn, shiftYmd(today, -4));
+    assert.equal(badge(view, "assistant-idea").earnedOn, shiftYmd(today, -3));
+    assert.equal(badge(view, "assistant-reply").earnedOn, shiftYmd(today, -3));
+    assert.equal(badge(view, "assistant-call").earnedOn, shiftYmd(today, -2));
+    assert.equal(badge(view, "assistant-recipe").earnedOn, null);
+    assert.equal(badge(view, "assistant-chats-50").value, 2);
+    // 1.5 + 1.5 + 1 + 8.
+    assert.equal(badge(view, "assistant-minutes-10").earnedOn, shiftYmd(today, -2));
+    assert.equal(badge(view, "assistant-minutes-60").progressText, "12 / 60 minutes");
+    assert.equal(badge(await load(newcomer), "assistant-chat").earnedOn, null);
   });
 });
