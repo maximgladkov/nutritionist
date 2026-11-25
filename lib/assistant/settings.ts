@@ -7,11 +7,14 @@ export type HomeTopic = (typeof HOME_TOPICS)[number];
 export const TONES = ["friendly", "direct", "playful", "calm"] as const;
 export type Tone = (typeof TONES)[number];
 
-// OpenAI's GPT-Live voices.
+// The GPT-Live voices that were heard to work; their samples are in public/voice-samples. See
+// scripts/voices/record.ts. `marin` has no sample, but is the one calls have always had.
 export const VOICES = [
-  "marin", "gleam", "meridian", "halo", "vesper", "willow", "stone", "pearl", "ripple", "delta",
-  "luciernaga", "destello", "calandria", "compas", "nuri", "flitz", "brise", "sillage", "bossa", "tempo",
+  "marin", "gleam", "meridian", "delta", "cinder", "halo", "vesper", "willow", "pearl", "ripple", "beacon",
+  "luciernaga", "destello", "compas", "hornero", "brise", "sillage", "bossa", "shida",
 ] as const;
+// Offered once. Still understood, so someone who chose one keeps the rest of their settings.
+const RETIRED_VOICES = ["stone", "calandria", "nuri", "flitz", "tempo"] as const;
 export type Voice = (typeof VOICES)[number];
 export const DEFAULT_VOICE: Voice = "marin";
 
@@ -40,12 +43,12 @@ export const assistantSettingsSchema = z
     homeTopics: z.array(z.enum(HOME_TOPICS)).max(HOME_TOPICS.length),
     language: languageSchema,
     tone: z.enum(TONES),
-    voice: z.enum(VOICES),
+    voice: z.enum([...VOICES, ...RETIRED_VOICES]),
   })
   .partial()
   .strict();
 
-export type AssistantSettings = Required<z.infer<typeof assistantSettingsSchema>>;
+export type AssistantSettings = Required<Omit<z.infer<typeof assistantSettingsSchema>, "voice">> & { voice: Voice };
 
 export const DEFAULT_SETTINGS: AssistantSettings = {
   homeMessages: true,
@@ -58,7 +61,8 @@ export const DEFAULT_SETTINGS: AssistantSettings = {
 export function readSettings(preferences: unknown): AssistantSettings {
   const stored = (preferences as { assistant?: unknown } | null)?.assistant;
   const parsed = assistantSettingsSchema.safeParse(stored ?? {});
-  return { ...DEFAULT_SETTINGS, ...(parsed.success ? parsed.data : {}) };
+  const chosen = parsed.success ? parsed.data : {};
+  return { ...DEFAULT_SETTINGS, ...chosen, voice: VOICES.find((voice) => voice === chosen.voice) ?? DEFAULT_VOICE };
 }
 
 export async function loadSettings(userId: string): Promise<AssistantSettings> {

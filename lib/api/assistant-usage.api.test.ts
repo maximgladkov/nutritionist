@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { after, beforeEach, describe, it } from "node:test";
-import { DEFAULT_SETTINGS, readSettings, settingsInstructions } from "../assistant/settings.ts";
+import { readdirSync } from "node:fs";
+import { DEFAULT_SETTINGS, readSettings, settingsInstructions, VOICES } from "../assistant/settings.ts";
 import { APP_INSTRUCTIONS } from "../assistant/app-instructions.ts";
 import { FREE_WEEKLY_MINUTES } from "../assistant/usage.ts";
 import type { HomeWordsInput } from "../assistant/home-words.ts";
@@ -120,6 +121,13 @@ describe("time with the coach", () => {
   });
 });
 
+describe("voices", () => {
+  it("each have a sample, but the usual one", () => {
+    const sampled = readdirSync(new URL("../../public/voice-samples/", import.meta.url)).map((name) => name.replace(".wav", ""));
+    assert.deepEqual(sampled.sort(), VOICES.filter((voice) => voice !== "marin").sort());
+  });
+});
+
 describe("assistant settings", () => {
   const save = (assistant: object) => api("PATCH", "/me", { body: { preferences: { assistant } }, token: session.accessToken });
 
@@ -132,6 +140,9 @@ describe("assistant settings", () => {
     assert.equal((await save({ voice: "nope" })).status, 400);
     assert.equal((await save({ plan: "pro" })).status, 400);
     assert.deepEqual(readSettings({ assistant: { tone: "rude" } }), DEFAULT_SETTINGS);
+    // A voice no longer offered only goes back to the usual one.
+    assert.deepEqual(readSettings({ assistant: { tone: "direct", voice: "stone" } }), { ...DEFAULT_SETTINGS, tone: "direct" });
+    assert.equal((await save({ ...DEFAULT_SETTINGS, voice: "stone" })).body.preferences.nutrientOrder[0], "fat");
   });
 
   it("reach calls, replies and messages on Today", async () => {
