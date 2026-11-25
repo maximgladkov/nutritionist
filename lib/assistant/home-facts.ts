@@ -244,8 +244,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
     if (streak.loggedToday) add("streak", 52, "happy", `${days(streak.days)} in a row with something logged; today counts already.`, `that's ${days(streak.days)} logged in a row. Keep it rolling.`);
     else add("streak", hour >= 17 ? 88 : 56, "idle", `${days(streak.days)} in a row with something logged. Nothing logged yet today; logging keeps the streak.`, `log something today to keep your ${streak.days}-day streak.`);
   }
-  const fresh = badges.latest.find((badge) => badge.earnedOn !== null && badge.earnedOn >= shiftYmd(today, -1));
-  if (fresh) add(`badge:${fresh.id}`, 86, "happy", `Just earned the badge "${fresh.title}": ${fresh.description}`, `you earned a badge: ${fresh.title}.`);
+  // A badge just earned has its own moment; the coach only mentions one that's close.
   const near = badges.closest[0];
   if (near && near.progress >= 0.7) add("next_badge", 54, "happy", `Closest badge: "${near.title}", ${near.progressText}. ${near.description}`, `you're close to a badge: ${near.title}, ${near.progressText}.`);
 
