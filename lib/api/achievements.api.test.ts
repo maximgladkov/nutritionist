@@ -241,6 +241,10 @@ describe("moving and the assistant", () => {
     assert.equal(badge(view, "steps-20000").earnedOn, null);
     assert.equal(badge(view, "steps-20000").progressText, "15,200 / 20,000 steps");
     assert.equal(badge(view, "steps-days-7").earnedOn, shiftYmd(today, -1));
+    assert.equal(badge(view, "burned-1000").title, "1,000 kcal burned in a day");
+    assert.equal(badge(view, "burned-1000").description, "Burn 1,000 kcal by moving in one day.");
+    assert.equal(badge(view, "burned-days-7").description, "6 more days burning 500 kcal or more.");
+    assert.equal(badge(view, "steps-20000").description, "Walk 20,000 steps in one day.");
     assert.equal(badge(view, "burned-750").earnedOn, shiftYmd(today, -3));
     assert.equal(badge(view, "burned-1000").earnedOn, null);
     assert.equal(badge(view, "burned-days-7").value, 1);
