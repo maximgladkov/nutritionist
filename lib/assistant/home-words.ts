@@ -8,10 +8,13 @@ export const HOME_TEXT_MAX = 130;
 export type HomeWordsInput = {
   day: string;
   facts: readonly string[];
+  // The one they chose; null to follow what they write in.
+  language: string | null;
   lastWords: readonly string[];
   localTime: string;
   name: string | null;
   recent: readonly string[];
+  tone: string;
 };
 export type HomeWords = { fact: number; text: string };
 export type HomeWriter = (input: HomeWordsInput) => Promise<HomeWords[]>;
@@ -60,7 +63,10 @@ export async function draftHomeWords(input: HomeWordsInput): Promise<HomeWords[]
         ? `Their name is ${input.name}. Start every message with "${input.name},".`
         : "Don't use a name.",
       `It is ${input.localTime} where they are. ${input.day}`,
-      input.lastWords.length > 0
+      input.tone,
+      input.language
+        ? `Write every message in ${input.language}, translating everything but the name.`
+        : input.lastWords.length > 0
         ? `Write every message in the language of these words, translating everything but the name, even though the facts and examples are in English. They only show the language; ignore what they're about: ${JSON.stringify(input.lastWords)}`
         : "Write in English.",
       `Recent messages: ${JSON.stringify(input.recent)}`,
@@ -72,6 +78,7 @@ export async function draftHomeWords(input: HomeWordsInput): Promise<HomeWords[]
   return messages.slice(0, 3).filter((message) => sameScript(message.text, input));
 }
 
+const OTHER_SCRIPTS = new Set(["Japanese", "Korean", "Russian", "Ukrainian"]);
 const LATIN = /\p{Script=Latin}/u;
 
 function mostlyLatin(text: string): boolean {
@@ -80,7 +87,8 @@ function mostlyLatin(text: string): boolean {
 }
 
 // English to someone who writes in another alphabet, or the other way round, isn't their language.
-function sameScript(text: string, { lastWords, name }: HomeWordsInput): boolean {
+function sameScript(text: string, { language, lastWords, name }: HomeWordsInput): boolean {
+  if (language) return mostlyLatin(text.replace(name ?? "", "")) === !OTHER_SCRIPTS.has(language);
   const words = lastWords.join(" ");
   return mostlyLatin(text.replace(name ?? "", "")) === (!/\p{L}/u.test(words) || mostlyLatin(words));
 }

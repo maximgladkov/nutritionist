@@ -24,12 +24,15 @@ import { birthDateSchema, genderSchema, heightSchema } from "../schemas.ts";
 import { issueTokens } from "../tokens.ts";
 import { ApiError } from "../errors.ts";
 import { apiDeps } from "../deps.ts";
+import { assistantSettingsSchema } from "../../assistant/settings.ts";
 
 // Known preferences and their allowed values; anything else is rejected, so stored preferences
 // stay well-formed for every client.
 const NUTRIENT_KEYS = ["kcal", "protein", "carbs", "fat"] as const;
 export const preferencesSchema = z
   .object({
+    // Sent whole: it replaces what was chosen before.
+    assistant: assistantSettingsSchema,
     // Order nutrients appear in across the app; must list each nutrient exactly once.
     nutrientOrder: z
       .array(z.enum(NUTRIENT_KEYS))

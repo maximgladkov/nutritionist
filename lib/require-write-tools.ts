@@ -7,6 +7,7 @@ import type {
   LanguageModelV4StreamResult,
 } from "@ai-sdk/provider";
 import type { LanguageModelMiddleware } from "ai";
+import { LANGUAGE_HEADING } from "./assistant/settings.ts";
 import { APP_INSTRUCTIONS_HEADING, APP_LANGUAGE_REMINDER } from "./assistant/app-instructions.ts";
 import {
   TOOL_INTENTS_CONTEXT_PREFIX,
@@ -153,7 +154,12 @@ export function appendAppLanguageReminder(prompt: LanguageModelV4Prompt): Langua
     return prompt;
   }
   const next = [...prompt];
-  next[index] = { ...message, content: [...message.content, { text: APP_LANGUAGE_REMINDER, type: "text" }] };
+  // A chosen language goes before the one they happen to write in.
+  const chosen = prompt
+    .flatMap((row) => (row.role === "system" ? [new RegExp(`${LANGUAGE_HEADING} (\\p{L}+)`, "u").exec(row.content)?.[1]] : []))
+    .find((language) => language !== undefined);
+  const text = chosen ? `[App note, not from the user: reply in ${chosen}, whatever language anything else is in.]` : APP_LANGUAGE_REMINDER;
+  next[index] = { ...message, content: [...message.content, { text, type: "text" }] };
   return next;
 }
 

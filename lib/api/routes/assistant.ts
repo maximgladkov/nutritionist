@@ -6,6 +6,8 @@ import { loadConversation } from "../../assistant/conversation.ts";
 import { homeCardMessages } from "../../assistant/home-card.ts";
 import { bookTalk, saveTalk, TALK_INSTRUCTIONS, TALK_MAX_SECONDS, TALK_MODEL, TALK_WEBSOCKET_URL } from "../../assistant/talk.ts";
 import { homeMessage, openHomeMessage, openingNotes } from "../../assistant/home-message.ts";
+import { loadSettings, talkSettingsLines } from "../../assistant/settings.ts";
+import { ASLEEP_MESSAGE, loadUsage, TALK_MIN_LEFT_S } from "../../assistant/usage.ts";
 import { prisma } from "../../prisma.ts";
 import { apiDeps } from "../deps.ts";
 import { ApiError, notFound } from "../errors.ts";
@@ -44,9 +46,20 @@ export const assistantRoutes: RouteDefinition[] = [
   },
   {
     // Something new to say at each visit, where /assistant/card has the fixed messages older apps show.
-    handler: async ({ user }) => ({ message: await homeMessage(user.id, apiDeps().now()) }),
+    async handler({ user }) {
+      const now = apiDeps().now();
+      const [usage, settings] = await Promise.all([loadUsage(user.id, now), loadSettings(user.id)]);
+      const message = usage.asleep || !settings.homeMessages ? null : await homeMessage(user.id, now, settings);
+      return { asleep: usage.asleep, message, resetsAt: usage.resetsAt };
+    },
     method: "GET",
     path: "/assistant/message",
+  },
+  {
+    // How this week's minutes with the coach have gone.
+    handler: async ({ user }) => loadUsage(user.id, apiDeps().now()),
+    method: "GET",
+    path: "/assistant/usage",
   },
   {
     async handler({ params, user }) {
@@ -61,7 +74,8 @@ export const assistantRoutes: RouteDefinition[] = [
     async handler({ url, user }) {
       const { before } = readQuery(url, z.object({ before: z.iso.datetime().optional() }));
       const view = await loadConversation({ before: before ? new Date(before) : undefined, now: apiDeps().now(), userId: user.id });
-      return { ...view, talk: apiDeps().talk.available() };
+      const usage = before ? null : await loadUsage(user.id, apiDeps().now());
+      return { ...view, ...(usage ? { usage } : {}), talk: apiDeps().talk.available() };
     },
     method: "GET",
     path: "/assistant/conversation",
@@ -85,6 +99,11 @@ export const assistantRoutes: RouteDefinition[] = [
     // Starts a live spoken conversation: the phone connects to the gateway itself with this key.
     async handler({ user }) {
       const { now, talk } = apiDeps();
+      const [usage, settings] = await Promise.all([loadUsage(user.id, now()), loadSettings(user.id)]);
+      const left = usage.limit - usage.used;
+      if (left < TALK_MIN_LEFT_S) {
+        throw new ApiError(403, "asleep", ASLEEP_MESSAGE);
+      }
       if (!talk.available()) {
         throw new ApiError(503, "talk_unavailable", "Talking isn't available right now.");
       }
@@ -98,10 +117,11 @@ export const assistantRoutes: RouteDefinition[] = [
         const response = json({
           expiresAt,
           id,
-          instructions: [TALK_INSTRUCTIONS, ...notes].join("\n\n"),
-          maxSeconds: TALK_MAX_SECONDS,
+          instructions: [TALK_INSTRUCTIONS, ...talkSettingsLines(settings), ...notes].join("\n\n"),
+          maxSeconds: Math.min(TALK_MAX_SECONDS, left),
           model: TALK_MODEL,
           token,
+          voice: settings.voice,
           url: TALK_WEBSOCKET_URL,
         });
         response.headers.set("Cache-Control", "no-store");

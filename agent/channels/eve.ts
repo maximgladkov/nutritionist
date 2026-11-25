@@ -14,6 +14,7 @@ import { appPrincipal } from "../../lib/principal";
 import { ASSISTANT_MAX_REQUEST_BYTES, assistantLimit } from "../../lib/assistant/limits";
 import { openingNotes } from "../../lib/assistant/home-message";
 import { requireOwnPhotos } from "../../lib/assistant/photos";
+import { ASLEEP_MESSAGE, loadUsage } from "../../lib/assistant/usage";
 import { prisma } from "../../lib/prisma";
 import { eveSessionIdFromPath, getUserFromRequest } from "../../lib/session";
 import { formatToolCategoriesContext } from "../../lib/tool-categories";
@@ -64,6 +65,9 @@ async function requireAssistantCapacity(request: Request, userId: string): Promi
   }
   if (Number(request.headers.get("content-length") ?? 0) > ASSISTANT_MAX_REQUEST_BYTES) {
     throw new ForbiddenError({ code: "message_too_long", message: "That message is too long." });
+  }
+  if ((await loadUsage(userId, new Date())).asleep) {
+    throw new ForbiddenError({ code: "asleep", message: ASLEEP_MESSAGE });
   }
   const limited = await assistantLimit(userId);
   if (limited) {
