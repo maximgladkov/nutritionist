@@ -281,21 +281,26 @@ function dayBest(input: {
   // Each with what to say once it's reached.
   targets: readonly (readonly [target: number, earned: string])[];
   often: readonly [string, string];
+  // "Burn 750 kcal by moving", and for how often: "burning 500 kcal".
+  act: (amount: string) => string;
+  acting: (amount: string) => string;
+  // "750 kcal burned".
+  done: (amount: string) => string;
   tier: (target: number) => string;
   title: string;
   unit: string;
 }): Achievement[] {
-  const { best, color, days, goodDay, icon, id, often, targets, tier, title, unit } = input;
+  const { act, acting, best, color, days, done, goodDay, icon, id, often, targets, tier, title, unit } = input;
   const amount = (value: number) => `${value.toLocaleString("en-US")} ${unit}`;
   return [
     ...targets.map(([target, earned]): Achievement => ({
       color, description: earned, icon, id: `${id}-${target}`, metric: best, name: target.toLocaleString("en-US"),
-      target, tier: tier(target), title: `${amount(target)} in a day`, toGo: () => `Reach ${amount(target)} in one day.`, unit,
+      target, tier: tier(target), title: `${done(amount(target))} in a day`, toGo: () => `${act(amount(target))} in one day.`, unit,
     })),
     ...([[7, often[0]], [30, often[1]]] as const).map(([count, earned]): Achievement => ({
       color, description: earned, icon, id: `${id}-days-${count}`, metric: days, name: `${count} days`,
       target: count, tier: `${count}D`, title: `${title} · ${count} days`,
-      toGo: (left) => `${plural(left, "more day")} with at least ${amount(goodDay)}.`, unit: "days",
+      toGo: (left) => `${plural(left, "more day")} ${acting(amount(goodDay))} or more.`, unit: "days",
     })),
   ];
 }
@@ -305,6 +310,9 @@ const thousands = (value: number) => (value >= 1000 ? `${value / 1000}K` : Strin
 const STEPS: AchievementFamily = {
   badges: () =>
     dayBest({
+      act: (amount) => `Walk ${amount}`,
+      acting: (amount) => `walking ${amount}`,
+      done: (amount) => amount,
       best: "steps_best", color: "carbs", days: "steps_days", goodDay: STEPS_DAY, icon: "steps", id: "steps",
       often: ["That many times past 10,000. It’s becoming a habit.", "A month’s worth of days past 10,000. Strong legs."],
       targets: [
@@ -313,18 +321,21 @@ const STEPS: AchievementFamily = {
         [15_000, "That’s around eleven kilometres for most people."],
         [20_000, "Feet up. You’ve earned it."],
       ],
-      tier: thousands, title: "Steps", unit: "steps",
+      tier: thousands, title: "10,000 steps", unit: "steps",
     }),
   context: "Steps",
   id: "steps",
   ordered: false,
-  rule: () => "Walk more in a day. Steps come from Apple Health.",
+  rule: () => "Steps you walk in a day, from Apple Health.",
   title: "Steps",
 };
 
 const BURNED: AchievementFamily = {
   badges: () =>
     dayBest({
+      act: (amount) => `Burn ${amount} by moving`,
+      acting: (amount) => `burning ${amount}`,
+      done: (amount) => `${amount} burned`,
       best: "burned_best", color: "protein", days: "burned_days", goodDay: BURNED_DAY_KCAL, icon: "burn", id: "burned",
       often: ["That many active days. Your body notices.", "A month’s worth of active days. Impressive."],
       targets: [
@@ -333,12 +344,12 @@ const BURNED: AchievementFamily = {
         [750, "A big day. Drink some water."],
         [1_000, "A huge day. Rest well and eat properly."],
       ],
-      tier: thousands, title: "Burned", unit: "kcal",
+      tier: thousands, title: "500 kcal burned", unit: "kcal",
     }),
   context: "Calories burned",
   id: "burned",
   ordered: false,
-  rule: () => "Burn more by moving in a day. It comes from Apple Health.",
+  rule: () => "Calories you burn by moving in a day, from Apple Health.",
   title: "Calories burned",
 };
 
