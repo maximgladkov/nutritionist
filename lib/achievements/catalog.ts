@@ -1,3 +1,4 @@
+import { BURNED_DAY_KCAL, STEPS_DAY } from "./metrics.ts";
 import type { AchievementContext, MetricName } from "./metrics.ts";
 
 // Every badge there is. Adding one is adding an entry here: the app draws whatever families and
@@ -8,8 +9,8 @@ import type { AchievementContext, MetricName } from "./metrics.ts";
 
 // Icons and colours the app draws (src/features/achievements in btrme-app).
 export type BadgeIcon =
-  | "barcode" | "camera" | "down" | "flag" | "flame" | "food" | "group" | "mic"
-  | "protein" | "scale" | "target" | "up" | "water";
+  | "barcode" | "burn" | "camera" | "chat" | "clock" | "down" | "flag" | "flame" | "food" | "group" | "mic" | "phone"
+  | "protein" | "scale" | "sparkles" | "steps" | "target" | "up" | "water";
 export type BadgeColor = "carbs" | "champagne" | "fat" | "ink" | "protein";
 
 export type Achievement = {
@@ -269,5 +270,95 @@ const FIRSTS: AchievementFamily = {
   title: "Firsts",
 };
 
+// So much in one day, then a good day that often.
+function dayBest(input: {
+  id: string;
+  color: BadgeColor;
+  icon: BadgeIcon;
+  best: MetricName;
+  days: MetricName;
+  goodDay: number;
+  targets: readonly number[];
+  tier: (target: number) => string;
+  title: string;
+  unit: string;
+}): Achievement[] {
+  const { best, color, days, goodDay, icon, id, targets, tier, title, unit } = input;
+  const amount = (value: number) => `${value.toLocaleString("en-US")} ${unit}`;
+  return [
+    ...targets.map((target): Achievement => ({
+      color, description: `${amount(target)} in a single day.`, icon, id: `${id}-${target}`, metric: best, name: target.toLocaleString("en-US"),
+      target, tier: tier(target), title: `${amount(target)} in a day`, toGo: () => `Reach ${amount(target)} in one day.`, unit,
+    })),
+    ...[7, 30].map((count): Achievement => ({
+      color, description: `${count} days with at least ${amount(goodDay)}.`, icon, id: `${id}-days-${count}`, metric: days, name: `${count} days`,
+      target: count, tier: `${count}D`, title: `${title} · ${count} days`,
+      toGo: (left) => `${plural(left, "more day")} with at least ${amount(goodDay)}.`, unit: "days",
+    })),
+  ];
+}
+
+const thousands = (value: number) => (value >= 1000 ? `${value / 1000}K` : String(value));
+
+const STEPS: AchievementFamily = {
+  badges: () =>
+    dayBest({
+      best: "steps_best", color: "carbs", days: "steps_days", goodDay: STEPS_DAY, icon: "steps", id: "steps",
+      targets: [5_000, 10_000, 15_000, 20_000], tier: thousands, title: "Steps", unit: "steps",
+    }),
+  context: "Steps",
+  id: "steps",
+  ordered: false,
+  rule: () => "Walk more in a day. Steps come from Apple Health.",
+  title: "Steps",
+};
+
+const BURNED: AchievementFamily = {
+  badges: () =>
+    dayBest({
+      best: "burned_best", color: "protein", days: "burned_days", goodDay: BURNED_DAY_KCAL, icon: "burn", id: "burned",
+      targets: [300, 500, 750, 1_000], tier: thousands, title: "Burned", unit: "kcal",
+    }),
+  context: "Calories burned",
+  id: "burned",
+  ordered: false,
+  rule: () => "Burn more by moving in a day. It comes from Apple Health.",
+  title: "Calories burned",
+};
+
+const ASSISTANT: AchievementFamily = {
+  badges: () => {
+    const badge = (
+      id: string, icon: BadgeIcon, metric: MetricName, target: number, name: string, title: string, description: string,
+      toGo: (left: number) => string, unit = "", tier = "",
+    ): Achievement => ({ color: "champagne", description, icon, id: `assistant-${id}`, metric, name, target, tier, title, toGo, unit });
+    return [
+      badge("chat", "chat", "assistant_chats", 1, "Hello", "First message", "You wrote to your coach.", () => "Write to your coach."),
+      badge("voice", "mic", "assistant_voice_notes", 1, "Voice note", "First voice note", "You sent your coach a voice note.", () => "Send your coach a voice note."),
+      badge("call", "phone", "assistant_calls", 1, "Call", "First call", "You talked with your coach.", () => "Talk live with your coach."),
+      badge("photo", "camera", "assistant_photos", 1, "Photo", "Show and ask", "You showed your coach a photo.", () => "Send your coach a photo, like a menu."),
+      badge("reply", "sparkles", "assistant_openers", 1, "Reply", "Picked up the thread", "You followed up on a message on Today.", () => "Tap your coach’s message on Today."),
+      badge("idea", "food", "assistant_ideas", 1, "Idea", "Good idea", "You added a meal your coach suggested.", () => "Add a meal your coach suggests."),
+      badge("recipe", "food", "recipes_saved", 1, "Recipe", "First recipe", "You saved a recipe from your coach.", () => "Ask your coach for a recipe and save it."),
+      badge("ideas-10", "food", "assistant_ideas", 10, "10 ideas", "10 ideas eaten", "Ten of your coach’s ideas in your diary.", (left) => `${plural(left, "more idea")} to add.`, "ideas", "10"),
+      badge("chats-50", "chat", "assistant_chats", 50, "50 messages", "50 messages", "Fifty messages answered by your coach.", (left) => `${plural(left, "more message")} to go.`, "messages", "50"),
+      badge("calls-5", "phone", "assistant_calls", 5, "5 calls", "5 calls", "Five conversations with your coach.", (left) => `${plural(left, "more call")} to go.`, "calls", "5"),
+      ...[10, 60, 300].map((minutes) =>
+        badge(
+          `minutes-${minutes}`, "clock", "assistant_minutes", minutes, minutes < 60 ? `${minutes} min` : plural(minutes / 60, "hour"),
+          `${minutes < 60 ? `${minutes} minutes` : plural(minutes / 60, "hour")} together`,
+          `${minutes < 60 ? `${minutes} minutes` : plural(minutes / 60, "hour")} spent with your coach.`,
+          (left) => `${plural(Math.ceil(left), "more minute")} with your coach.`, "minutes", minutes < 60 ? `${minutes}M` : `${minutes / 60}H`,
+        ),
+      ),
+    ];
+  },
+  context: "Assistant",
+  id: "assistant",
+  ordered: false,
+  rule: () => "Get to know your coach: write, talk, show and cook.",
+  title: "Assistant",
+};
+
 // In the order the app shows them.
-export const ACHIEVEMENT_FAMILIES: readonly AchievementFamily[] = [STREAKS, PROTEIN, CALORIES, WEIGHT, FIRSTS];
+export const ACHIEVEMENT_FAMILIES: readonly AchievementFamily[] = [STREAKS, PROTEIN, CALORIES, STEPS, BURNED, ASSISTANT, WEIGHT, FIRSTS];
