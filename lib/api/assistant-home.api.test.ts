@@ -219,6 +219,63 @@ describe("home message", () => {
   });
 });
 
+describe("a flagged day", () => {
+  // 250 g of cheese: 83 g of fat, over the 62 g that fits 1,600 kcal.
+  const CHEESE = { amount: 250, name: "Cheese", nutrimentsPer100g: { energyKcal100g: 400, fat100g: 33, proteins100g: 25 }, unit: "g" as const };
+  const cheese = () => upsertMealItems({ eatenAt: new Date(START + minutes * 60_000), items: [CHEESE], label: "lunch", userId: session.userId });
+  const keyOf = async (id: string) => ((await prisma.assistantAction.findUniqueOrThrow({ where: { id } })).payload as { key: string }).key;
+
+  it("says fat is over the limit, with what to do, before any tip", async () => {
+    await goals();
+    await cheese();
+    assert.equal(
+      (await message()).text,
+      "Kira, fat is at 83 g of a 62 g limit today. For dinner, go lean: chicken or fish with vegetables, nothing fried or creamy.",
+    );
+  });
+
+  it("gives the model the flag first and shows its words about it, even when it puts another first", async () => {
+    model((input) => [
+      { fact: 1, text: `Kira, a tip about ${/\d[\d,]*/u.exec(input.facts[1]!)?.[0]}.` },
+      { fact: 0, text: "Kira, fat is at 83 of 62 g today. Go lean for dinner: fish and vegetables." },
+    ]);
+    await goals();
+    await cheese();
+    const shown = await message();
+    assert.match(calls[0]!.facts[0]!, /^Fat today: 83 g of a 62 g limit/);
+    assert.equal(shown.text, "Kira, fat is at 83 of 62 g today. Go lean for dinner: fish and vegetables.");
+  });
+
+  it("says the flag in plain words when the model skips it", async () => {
+    model((input) => [{ fact: 1, text: `Kira, a tip about ${/\d[\d,]*/u.exec(input.facts[1]!)?.[0]}.` }]);
+    await goals();
+    await cheese();
+    assert.match((await message()).text, /^Kira, fat is at 83 g of a 62 g limit today\./);
+  });
+
+  it("keeps to flags on later visits, not prepared tips", async () => {
+    model(three);
+    await goals();
+    await cheese();
+    assert.equal(await keyOf((await message()).id), "over:fat");
+    for (const visit of [1, 2, 3]) {
+      at(visit * 31);
+      assert.match(await keyOf((await message()).id), /^(over|near):|^protein_low$/);
+    }
+  });
+
+  it("is said even to someone who turned reminders and ideas off", async () => {
+    await prisma.userProfile.upsert({
+      create: { preferences: { assistant: { homeTopics: ["cheer"] } }, userId: session.userId },
+      update: { preferences: { assistant: { homeTopics: ["cheer"] } } },
+      where: { userId: session.userId },
+    });
+    await goals();
+    await cheese();
+    assert.equal(await keyOf((await message()).id), "over:fat");
+  });
+});
+
 describe("a home message they tapped", () => {
   const conversation = async (query = "") => (await api("GET", `/assistant/conversation${query}`, { token: session.accessToken })).body;
 
