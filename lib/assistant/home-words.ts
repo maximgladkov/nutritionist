@@ -41,6 +41,8 @@ export async function writeHomeWords(input: HomeWordsInput): Promise<HomeWords[]
     maxRetries: 0,
     model: gateway(process.env.ASSISTANT_HOME_MODEL?.trim() || HOME_MODEL),
     output: Output.object({ schema }),
+    // A line, not a puzzle: without this an Anthropic model thinks past the limits above.
+    providerOptions: { anthropic: { thinking: { type: "disabled" } } },
     prompt: [
       input.name
         ? `Their name is ${input.name}. Start the first two with "${input.name}," and leave the name out of the third.`
