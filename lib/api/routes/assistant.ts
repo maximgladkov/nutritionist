@@ -5,6 +5,7 @@ import { saveRecipe } from "../../assistant/displays.ts";
 import { loadConversation } from "../../assistant/conversation.ts";
 import { homeCardMessages } from "../../assistant/home-card.ts";
 import { bookTalk, saveTalk, TALK_INSTRUCTIONS, TALK_MAX_SECONDS, TALK_MODEL, TALK_WEBSOCKET_URL } from "../../assistant/talk.ts";
+import { homeMessage, openHomeMessage, openingNotes } from "../../assistant/home-message.ts";
 import { prisma } from "../../prisma.ts";
 import { apiDeps } from "../deps.ts";
 import { ApiError, notFound } from "../errors.ts";
@@ -40,6 +41,21 @@ export const assistantRoutes: RouteDefinition[] = [
     }),
     method: "GET",
     path: "/assistant/card",
+  },
+  {
+    // Something new to say at each visit, where /assistant/card has the fixed messages older apps show.
+    handler: async ({ user }) => ({ message: await homeMessage(user.id, apiDeps().now()) }),
+    method: "GET",
+    path: "/assistant/message",
+  },
+  {
+    async handler({ params, user }) {
+      const opener = await openHomeMessage({ id: params.id ?? "", now: apiDeps().now(), userId: user.id });
+      if (!opener) throw notFound("That message is gone.");
+      return json({ opener });
+    },
+    method: "POST",
+    path: "/assistant/message/:id/open",
   },
   {
     async handler({ url, user }) {
@@ -78,11 +94,11 @@ export const assistantRoutes: RouteDefinition[] = [
         throw new ApiError(429, "talk_limit", "You've talked a lot lately. Try again later, or type instead.");
       }
       try {
-        const { expiresAt, token } = await talk.mintSecret();
+        const [{ expiresAt, token }, notes] = await Promise.all([talk.mintSecret(), openingNotes(user.id, now())]);
         const response = json({
           expiresAt,
           id,
-          instructions: TALK_INSTRUCTIONS,
+          instructions: [TALK_INSTRUCTIONS, ...notes].join("\n\n"),
           maxSeconds: TALK_MAX_SECONDS,
           model: TALK_MODEL,
           token,
