@@ -5,10 +5,13 @@ import { listMeals } from "../meals.ts";
 import { readSummaryContext } from "../summary.ts";
 import { getZonedParts, localDayRange } from "../timezone.ts";
 import { cardView, type AssistantCard } from "./actions.ts";
+import type { TalkLine, TalkPayload } from "./talk.ts";
 
 export const CONVERSATION_PAGE = 30;
 // eve retires a session after 30 days; start a fresh one before then.
 const SESSION_MAX_AGE_MS = 25 * 24 * 60 * 60_000;
+// No call lasts longer than this.
+const TALK_OVERLAP_MS = 15 * 60_000;
 // A reply that hasn't finished by now never will.
 const TURN_STALE_MS = 10 * 60_000;
 
@@ -43,12 +46,25 @@ export type AssistantGreeting = {
   text: string;
 };
 
+// A live spoken conversation. The agent's turns that answered it are in `turnIds`: show the call
+// instead of them.
+export type AssistantTalkView = {
+  at: string;
+  cards: AssistantCard[];
+  endedAt: string;
+  id: string;
+  lines: TalkLine[];
+  turnIds: string[];
+};
+
 export type ConversationView = {
   greeting: AssistantGreeting | null;
   // Send as `before` for the turns before these; null at the beginning.
   next: string | null;
   // The session to continue, or null to start one.
   sessionId: string | null;
+  // Oldest first. Apps from before calls were saved don't read these.
+  talks: AssistantTalkView[];
   // Oldest first.
   turns: AssistantTurnView[];
 };
@@ -99,6 +115,47 @@ async function greetingFor(userId: string, now: Date): Promise<AssistantGreeting
     where,
   });
   return { ...(row.payload as Omit<AssistantGreeting, "at">), at: row.createdAt.toISOString() };
+}
+
+function talkIn(row: { payload: unknown }): { endedAt: Date; lines: TalkLine[] } | null {
+  const { endedAt, lines } = row.payload as TalkPayload;
+  return endedAt && lines && lines.length > 0 ? { endedAt: new Date(endedAt), lines } : null;
+}
+
+// The calls that started in a stretch of the conversation, with what the agent did during each.
+async function talksBetween(userId: string, from: Date | null, before: Date | null): Promise<AssistantTalkView[]> {
+  const rows = await prisma.assistantAction.findMany({
+    orderBy: { createdAt: "desc" },
+    take: CONVERSATION_PAGE,
+    where: { createdAt: { ...(from ? { gte: from } : {}), ...(before ? { lt: before } : {}) }, kind: "talk", userId },
+  });
+  const talks = rows.flatMap((row) => {
+    const talk = talkIn(row);
+    return talk ? [{ ...talk, row }] : [];
+  });
+  return Promise.all(
+    talks.reverse().map(async ({ endedAt, lines, row }) => {
+      const turns = await prisma.agentTurn.findMany({
+        orderBy: { startedAt: "asc" },
+        where: { channel: "app", startedAt: { gte: row.createdAt, lte: endedAt }, userId },
+      });
+      const callIds = turns.flatMap((turn) =>
+        parseTranscript(turn.messages).items.flatMap((item) => (item.type === "tool" ? [item.callId] : [])),
+      );
+      const actions = await prisma.assistantAction.findMany({
+        orderBy: { createdAt: "asc" },
+        where: { callId: { in: callIds }, kind: { in: ["idea", "logged"] }, userId },
+      });
+      return {
+        at: row.createdAt.toISOString(),
+        cards: actions.map(cardView),
+        endedAt: endedAt.toISOString(),
+        id: row.id,
+        lines,
+        turnIds: turns.map((turn) => `${turn.sessionId}:${turn.turnId}`),
+      };
+    }),
+  );
 }
 
 export async function loadConversation(input: { before?: Date; now: Date; userId: string }): Promise<ConversationView> {
@@ -166,10 +223,17 @@ export async function loadConversation(input: { before?: Date; now: Date; userId
     };
   });
 
+  // A page reaches back to its oldest turn, or to the beginning when it's the last one. Calls reach a
+  // little further, so one that began just before the page still covers its turns here.
+  const more = rows.length > CONVERSATION_PAGE;
+  const from = more ? page[0]!.startedAt : null;
+  const talks = await talksBetween(userId, from && new Date(from.getTime() - TALK_OVERLAP_MS), before ?? null);
+
   return {
     greeting: before ? null : await greetingFor(userId, now),
     next: rows.length > CONVERSATION_PAGE ? page[0]!.startedAt.toISOString() : null,
     sessionId: session?.eveSessionId ?? null,
+    talks,
     turns,
   };
 }

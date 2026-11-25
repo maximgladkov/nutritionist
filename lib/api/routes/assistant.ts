@@ -3,7 +3,7 @@ import { z } from "zod";
 import { addIdea, recordVoiceNote, undoLogged } from "../../assistant/actions.ts";
 import { loadConversation } from "../../assistant/conversation.ts";
 import { homeCardMessages } from "../../assistant/home-card.ts";
-import { bookTalk, TALK_INSTRUCTIONS, TALK_MAX_SECONDS, TALK_MODEL, TALK_WEBSOCKET_URL } from "../../assistant/talk.ts";
+import { bookTalk, saveTalk, TALK_INSTRUCTIONS, TALK_MAX_SECONDS, TALK_MODEL, TALK_WEBSOCKET_URL } from "../../assistant/talk.ts";
 import { prisma } from "../../prisma.ts";
 import { apiDeps } from "../deps.ts";
 import { ApiError, notFound } from "../errors.ts";
@@ -16,6 +16,18 @@ const voiceNoteSchema = z.object({
   levels: z.array(z.number().min(0).max(1)).max(40),
   sessionId: z.string().min(1).max(200),
   text: z.string().min(1).max(8_000),
+});
+
+const talkLinesSchema = z.object({
+  lines: z
+    .array(
+      z.object({
+        atMs: z.number().int().min(0).max(3_600_000),
+        speaker: z.enum(["assistant", "user"]),
+        text: z.string().trim().min(1).max(4_000),
+      }),
+    )
+    .max(400),
 });
 
 // Messages themselves go straight to eve (/eve/v1/session), which streams the reply.
@@ -60,13 +72,15 @@ export const assistantRoutes: RouteDefinition[] = [
         throw new ApiError(503, "talk_unavailable", "Talking isn't available right now.");
       }
       const callId = `talk:${randomUUID()}`;
-      if (!(await bookTalk(user.id, callId, now()))) {
+      const id = await bookTalk(user.id, callId, now());
+      if (!id) {
         throw new ApiError(429, "talk_limit", "You've talked a lot lately. Try again later, or type instead.");
       }
       try {
         const { expiresAt, token } = await talk.mintSecret();
         const response = json({
           expiresAt,
+          id,
           instructions: TALK_INSTRUCTIONS,
           maxSeconds: TALK_MAX_SECONDS,
           model: TALK_MODEL,
@@ -84,6 +98,17 @@ export const assistantRoutes: RouteDefinition[] = [
     },
     method: "POST",
     path: "/assistant/talk",
+  },
+  {
+    async handler({ params, request, user }) {
+      const { lines } = await readJson(request, talkLinesSchema);
+      if (!(await saveTalk({ id: params.id ?? "", lines, now: apiDeps().now(), userId: user.id }))) {
+        throw notFound("That call is gone.");
+      }
+      return null;
+    },
+    method: "PUT",
+    path: "/assistant/talk/:id",
   },
   {
     async handler({ params, user }) {
