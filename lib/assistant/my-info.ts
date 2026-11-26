@@ -65,7 +65,7 @@ const readers: Record<InfoSection, (userId: string, now: Date) => Promise<unknow
       orderBy: { createdAt: "desc" },
       take: LIST_MAX,
       // Between this person and the owner only, in groups they're still in.
-      where: { OR: [{ toUserId: userId }, { fromUserId: userId }], group: { members: { some: { userId } } } },
+      where: { OR: [{ toUserId: userId }, { fromUserId: userId }], draftFor: null, group: { members: { some: { userId } } } },
     });
     const foods = await prisma.mealItem.findMany({
       select: { id: true, name: true },

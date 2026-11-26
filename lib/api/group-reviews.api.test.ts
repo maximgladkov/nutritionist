@@ -139,12 +139,84 @@ describe("marking a day reviewed", () => {
   });
 });
 
+describe("notes wait for the day's review", () => {
+  let draftId: string;
+
+  it("keeps the owner's comments and reactions from the member until the day is reviewed", async () => {
+    pushes.length = 0;
+    const draft = await api("POST", `/groups/${groupId}/messages`, {
+      body: { body: "Lunch was light.", draftFor: yesterday, memberId: kira.userId, target: { date: yesterday, part: "meal:lunch", type: "day" } },
+      token: coach.accessToken,
+    });
+    assert.equal(draft.status, 201, JSON.stringify(draft.body));
+    assert.equal(draft.body.message.draft, true);
+    draftId = draft.body.message.id;
+    const second = await api("POST", `/groups/${groupId}/messages`, {
+      body: { body: "And more water, please.", draftFor: yesterday, replyToId: draftId },
+      token: coach.accessToken,
+    });
+    assert.equal(second.body.message.draft, true);
+    await api("PUT", `/groups/${groupId}/members/${kira.userId}/days/${yesterday}/reaction`, { body: { emoji: "💪", part: "day" }, token: coach.accessToken });
+    await wait();
+    assert.equal(pushes.length, 0, "nothing is sent while the owner is still reviewing");
+
+    const asMember = await api("GET", `/groups/${groupId}/messages`, { token: kira.accessToken });
+    assert.equal(asMember.body.messages.some((message: { id: string }) => message.id === draftId), false);
+    assert.equal(asMember.body.reactions.some((reaction: { date: string }) => reaction.date === yesterday), false);
+    const unread = (await api("GET", "/groups", { token: kira.accessToken })).body.groups[0].unreadCount;
+    assert.equal(unread, 0);
+    const reply = await api("POST", `/groups/${groupId}/messages`, { body: { body: "Hi", replyToId: draftId }, token: kira.accessToken });
+    assert.equal(reply.status, 404, "members can't answer a comment they can't see");
+
+    const asOwner = await api("GET", `/groups/${groupId}/messages?memberId=${kira.userId}`, { token: coach.accessToken });
+    assert.equal(asOwner.body.messages.find((message: { id: string }) => message.id === draftId)?.draft, true);
+    assert.equal(asOwner.body.reactions.find((reaction: { date: string }) => reaction.date === yesterday)?.sent, false);
+    const board = (await api("GET", `/groups/${groupId}/reviews?date=${yesterday}&from=${shiftYmd(yesterday, -1)}&to=${yesterday}`, { token: coach.accessToken })).body;
+    assert.equal(memberOf(board, kira.userId).unsent, 3);
+  });
+
+  it("sends everything with one notification when the day is marked reviewed", async () => {
+    pushes.length = 0;
+    const marked = await api("PUT", `/groups/${groupId}/members/${kira.userId}/days/${yesterday}/review`, { body: { reviewed: true }, token: coach.accessToken });
+    assert.equal(marked.status, 200);
+    assert.equal(marked.body.sent, 3);
+    await wait();
+    assert.equal(pushes.length, 1);
+    assert.equal(pushes[0]?.body, "Lunch was light. (+1 more)");
+    assert.equal((pushes[0]?.data as { type?: string }).type, "group_review");
+
+    const asMember = await api("GET", `/groups/${groupId}/messages`, { token: kira.accessToken });
+    const shown = asMember.body.messages.find((message: { id: string }) => message.id === draftId);
+    assert.equal(shown?.draft, false);
+    assert.ok(asMember.body.reactions.some((reaction: { date: string; sent: boolean }) => reaction.date === yesterday && reaction.sent));
+    assert.equal((await api("GET", "/groups", { token: kira.accessToken })).body.groups[0].unreadCount, 2, "sent comments count as new");
+    const board = (await api("GET", `/groups/${groupId}/reviews?date=${yesterday}&from=${shiftYmd(yesterday, -1)}&to=${yesterday}`, { token: coach.accessToken })).body;
+    assert.equal(memberOf(board, kira.userId).unsent, 0);
+
+    pushes.length = 0;
+    await api("PUT", `/groups/${groupId}/members/${kira.userId}/days/${yesterday}/review`, { body: { reviewed: true }, token: coach.accessToken });
+    await wait();
+    assert.equal(pushes.length, 0, "marking again with nothing new stays quiet");
+  });
+
+  it("sends right away on a day that's already reviewed", async () => {
+    pushes.length = 0;
+    const late = await api("POST", `/groups/${groupId}/messages`, {
+      body: { body: "One more thing.", draftFor: yesterday, memberId: kira.userId, target: { date: yesterday, type: "day" } },
+      token: coach.accessToken,
+    });
+    assert.equal(late.body.message.draft, false);
+    await wait();
+    assert.equal(pushes.length, 1);
+  });
+});
+
 describe("reactions and comments on part of the day", () => {
   it("sets, changes and clears a reaction", async () => {
     const path = `/groups/${groupId}/members/${kira.userId}/days/${today}/reaction`;
     const set = await api("PUT", path, { body: { emoji: "👍", part: "meal:breakfast" }, token: coach.accessToken });
     assert.equal(set.status, 200, JSON.stringify(set.body));
-    assert.deepEqual(set.body.reaction, { date: today, emoji: "👍", part: "meal:breakfast" });
+    assert.deepEqual(set.body.reaction, { date: today, emoji: "👍", part: "meal:breakfast", sent: true }, "Kira's day is already reviewed");
     const changed = await api("PUT", path, { body: { emoji: "💪", part: "meal:breakfast" }, token: coach.accessToken });
     assert.equal(changed.body.reaction.emoji, "💪");
     await api("PUT", path, { body: { emoji: "🔥", part: "total:protein" }, token: coach.accessToken });
@@ -194,19 +266,25 @@ describe("reactions and comments on part of the day", () => {
     const mine = await api("GET", `/groups/${groupId}/messages`, { token: kira.accessToken });
     assert.equal(mine.status, 200);
     assert.deepEqual(
-      mine.body.reactions.map((reaction: { emoji: string; part: string }) => `${reaction.part} ${reaction.emoji}`).sort(),
+      mine.body.reactions
+        .filter((reaction: { date: string }) => reaction.date === today)
+        .map((reaction: { emoji: string; part: string }) => `${reaction.part} ${reaction.emoji}`)
+        .sort(),
       ["meal:breakfast 💪", "total:protein 🔥"],
     );
-    assert.deepEqual(mine.body.reviews.map((review: { date: string }) => review.date), [today]);
+    assert.deepEqual(mine.body.reviews.map((review: { date: string }) => review.date), [today, yesterday]);
     assert.ok(mine.body.messages.every((message: { toUserId: string }) => message.toUserId === kira.userId));
 
     const lauras = await api("GET", `/groups/${groupId}/messages`, { token: laura.accessToken });
-    assert.deepEqual(lauras.body.reactions, [{ date: yesterday, emoji: "🤔", part: "meal:lunch" }]);
+    assert.deepEqual(lauras.body.reactions, [], "the reaction waits for the day's review");
     assert.equal(lauras.body.messages.length, 0);
+    await api("PUT", `/groups/${groupId}/members/${laura.userId}/days/${yesterday}/review`, { body: { reviewed: true }, token: coach.accessToken });
+    const reviewed = await api("GET", `/groups/${groupId}/messages`, { token: laura.accessToken });
+    assert.deepEqual(reviewed.body.reactions, [{ date: yesterday, emoji: "🤔", part: "meal:lunch", sent: true }]);
 
     const asOwner = await api("GET", `/groups/${groupId}/messages?memberId=${kira.userId}`, { token: coach.accessToken });
-    assert.equal(asOwner.body.reactions.length, 2);
-    assert.equal(asOwner.body.reviews.length, 1);
+    assert.equal(asOwner.body.reactions.length, 3);
+    assert.equal(asOwner.body.reviews.length, 2);
     // A member can't read another member's thread by passing memberId.
     const peek = await api("GET", `/groups/${groupId}/messages?memberId=${kira.userId}`, { token: laura.accessToken });
     assert.equal(peek.body.reactions.length, 1);

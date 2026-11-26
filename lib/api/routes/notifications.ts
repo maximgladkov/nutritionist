@@ -34,7 +34,7 @@ async function loadNotifications(userId: string, before?: Date) {
       include: { fromUser: { select: { name: true } }, group: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
       take: PAGE_SIZE,
-      where: { createdAt: createdBefore, fromUserId: { not: userId }, toUserId: userId },
+      where: { createdAt: createdBefore, draftFor: null, fromUserId: { not: userId }, toUserId: userId },
     }),
     prisma.groupMember.findMany({
       include: { group: { select: { name: true } }, user: { select: { name: true } } },
@@ -88,7 +88,7 @@ async function loadNotifications(userId: string, before?: Date) {
 
   const unreadSince = readAt ? { gt: readAt } : undefined;
   const [unreadMessages, unreadJoins, unreadNotices] = await Promise.all([
-    prisma.groupMessage.count({ where: { createdAt: unreadSince, fromUserId: { not: userId }, toUserId: userId } }),
+    prisma.groupMessage.count({ where: { createdAt: unreadSince, draftFor: null, fromUserId: { not: userId }, toUserId: userId } }),
     prisma.groupMember.count({ where: { group: { ownerId: userId }, joinedAt: unreadSince, role: "member" } }),
     prisma.groupNotice.count({ where: noticeFeedWhere(userId, unreadSince) }),
   ]);

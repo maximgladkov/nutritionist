@@ -1,5 +1,6 @@
 import type { Prisma } from "../generated/prisma/client";
-import { effectiveShares, requireOwnerCanViewMemberNutrition, type GroupShareKind } from "./groups.ts";
+import { pushToUser } from "./api/push.ts";
+import { effectiveShares, notifyMemberOfMessage, requireOwnerCanViewMemberNutrition, type GroupShareKind } from "./groups.ts";
 import { GroupError, isDayPart, isDayReaction } from "./groups-core.ts";
 import { prisma } from "./prisma.ts";
 import { avatarUrl } from "./profile.ts";
@@ -14,6 +15,8 @@ export type ReviewBoardMember = {
   avatarUrl: string | null;
   // Owner comments and member replies about this day.
   comments: number;
+  // Comments and reactions the member doesn't see yet: they go out when the day is marked reviewed.
+  unsent: number;
   // Whether the member logged any food that day; null when they don't share meals or a summary.
   logged: boolean | null;
   name: string | null;
@@ -129,7 +132,7 @@ export async function loadReviewBoard(input: {
   }));
   const sharing = members.filter((member) => member.row.sharing);
   const userIds = sharing.map((member) => member.userId);
-  const [logged, reviews, comments] = await Promise.all([
+  const [logged, reviews, comments, draftMessages, draftReactions] = await Promise.all([
     loggedDays(sharing, from, to),
     prisma.groupDayReview.findMany({
       select: { date: true, memberId: true, reviewedAt: true },
@@ -140,7 +143,20 @@ export async function loadReviewBoard(input: {
       by: ["toUserId"],
       where: { groupId: group.id, targetDate: date, toUserId: { in: userIds } },
     }),
+    prisma.groupMessage.groupBy({
+      _count: { _all: true },
+      by: ["toUserId"],
+      where: { draftFor: date, groupId: group.id, toUserId: { in: userIds } },
+    }),
+    prisma.groupDayReaction.groupBy({
+      _count: { _all: true },
+      by: ["memberId"],
+      where: { date, groupId: group.id, memberId: { in: userIds }, sentAt: null },
+    }),
   ]);
+  const unsent = new Map<string, number>();
+  for (const row of draftMessages) unsent.set(row.toUserId, (unsent.get(row.toUserId) ?? 0) + row._count._all);
+  for (const row of draftReactions) unsent.set(row.memberId, (unsent.get(row.memberId) ?? 0) + row._count._all);
   const reviewedAt = new Map(reviews.map((review) => [`${review.memberId}|${review.date}`, review.reviewedAt]));
   const commentCount = new Map(comments.map((row) => [row.toUserId, row._count._all]));
   const knowsLogging = (shares: readonly GroupShareKind[]) => shares.includes("meals") || shares.includes("summary");
@@ -164,6 +180,7 @@ export async function loadReviewBoard(input: {
       shares: member.shares,
       sharing: member.row.sharing,
       status,
+      unsent: unsent.get(member.userId) ?? 0,
       userId: member.userId,
     };
   });
@@ -217,22 +234,88 @@ export async function setDayReviewed(input: {
   memberId: string;
   ownerId: string;
   reviewed: boolean;
-}): Promise<{ reviewedAt: string | null }> {
+}): Promise<{ reviewedAt: string | null; sent: number }> {
   await requireReviewableDay(input);
   const key = { groupId: input.groupId, memberId: input.memberId, date: input.date };
   if (!input.reviewed) {
+    // What was already sent stays with the member; only new notes wait for the next review.
     await prisma.groupDayReview.deleteMany({ where: key });
-    return { reviewedAt: null };
+    return { reviewedAt: null, sent: 0 };
   }
-  const row = await prisma.groupDayReview.upsert({
-    create: { ...key, reviewedById: input.ownerId },
-    update: {},
-    where: { groupId_memberId_date: key },
-  });
-  return { reviewedAt: row.reviewedAt.toISOString() };
+  const existing = await prisma.groupDayReview.findUnique({ where: { groupId_memberId_date: key } });
+  const row = existing ?? (await prisma.groupDayReview.create({ data: { ...key, reviewedById: input.ownerId } }));
+  const sent = await sendDrafts(input);
+  if (!existing || sent.comments + sent.reactions > 0) {
+    void notifyReviewed({ ...input, ...sent }).catch((error) => console.error("group review notify failed", error));
+  }
+  return { reviewedAt: row.reviewedAt.toISOString(), sent: sent.comments + sent.reactions };
 }
 
-export type DayReactionView = { date: string; emoji: string; part: string };
+// Whether the member already got the owner's review of that day, so new notes go out right away.
+export async function isDayReviewed(input: { date: string; groupId: string; memberId: string }): Promise<boolean> {
+  const row = await prisma.groupDayReview.findUnique({
+    select: { id: true },
+    where: { groupId_memberId_date: { date: input.date, groupId: input.groupId, memberId: input.memberId } },
+  });
+  return row !== null;
+}
+
+// Sends what the owner left while reviewing the day. Comments take the time they're sent, so they
+// count as new for the member and sort after what they had already read.
+async function sendDrafts(input: { date: string; groupId: string; memberId: string }) {
+  const now = new Date();
+  const where = { draftFor: input.date, groupId: input.groupId, toUserId: input.memberId };
+  const first = await prisma.groupMessage.findFirst({
+    orderBy: { createdAt: "asc" },
+    select: { body: true },
+    where: { ...where, replyToId: null },
+  });
+  const [comments, reactions] = await Promise.all([
+    prisma.groupMessage.updateMany({ data: { createdAt: now, draftFor: null }, where }),
+    prisma.groupDayReaction.updateMany({
+      data: { sentAt: now },
+      where: { date: input.date, groupId: input.groupId, memberId: input.memberId, sentAt: null },
+    }),
+  ]);
+  return { comments: comments.count, first: first?.body ?? null, reactions: reactions.count };
+}
+
+// One notification for the whole review: the first comment when there is one.
+async function notifyReviewed(input: {
+  comments: number;
+  date: string;
+  first: string | null;
+  groupId: string;
+  memberId: string;
+  ownerId: string;
+  reactions: number;
+}): Promise<void> {
+  const [group, owner] = await Promise.all([
+    prisma.group.findUnique({ select: { name: true }, where: { id: input.groupId } }),
+    prisma.user.findUnique({ select: { name: true }, where: { id: input.ownerId } }),
+  ]);
+  if (!group) {
+    return;
+  }
+  const who = owner?.name?.trim().split(/\s+/u)[0] || "Your coach";
+  const more = input.comments > 1 ? ` (+${input.comments - 1} more)` : "";
+  const body = input.first
+    ? `${input.first}${more}`
+    : input.comments > 0
+      ? `${who} left ${input.comments === 1 ? "a comment" : `${input.comments} comments`} on your day.`
+      : `${who} reviewed your day${input.reactions > 0 ? " and reacted to it" : ""}.`;
+  await pushToUser(input.memberId, {
+    body,
+    data: { date: input.date, groupId: input.groupId, type: "group_review" },
+    title: owner?.name ? `${owner.name} · ${group.name}` : group.name,
+  });
+  if (input.comments > 0) {
+    await notifyMemberOfMessage({ body, groupName: group.name, memberId: input.memberId });
+  }
+}
+
+// sent: whether the member sees it yet.
+export type DayReactionView = { date: string; emoji: string; part: string; sent: boolean };
 
 export async function setDayReaction(input: {
   date: string;
@@ -250,27 +333,29 @@ export async function setDayReaction(input: {
   }
   await requireReviewableDay(input);
   const key = { date: input.date, groupId: input.groupId, memberId: input.memberId, part: input.part };
+  // On a day already reviewed the member sees it right away; otherwise with the review.
+  const sentAt = (await isDayReviewed(input)) ? new Date() : null;
   if (input.emoji === null) {
     await prisma.groupDayReaction.deleteMany({ where: key });
     return { reaction: null };
   }
   const row = await prisma.groupDayReaction.upsert({
-    create: { ...key, emoji: input.emoji, fromUserId: input.ownerId },
-    update: { emoji: input.emoji, fromUserId: input.ownerId },
+    create: { ...key, emoji: input.emoji, fromUserId: input.ownerId, sentAt },
+    update: { emoji: input.emoji, fromUserId: input.ownerId, ...(sentAt ? { sentAt } : {}) },
     where: { groupId_memberId_date_part: key },
   });
-  return { reaction: { date: row.date, emoji: row.emoji, part: row.part } };
+  return { reaction: { date: row.date, emoji: row.emoji, part: row.part, sent: row.sentAt !== null } };
 }
 
 // What the owner left on a member's days besides comments: reactions and reviewed days. Only ever
-// loaded for one member, so a member sees their own and nobody else's.
-export async function loadDayExtras(groupId: string, memberId: string) {
+// loaded for one member, so a member sees their own and nobody else's, and only the sent reactions.
+export async function loadDayExtras(groupId: string, memberId: string, viewer: "member" | "owner") {
   const [reactions, reviews] = await Promise.all([
     prisma.groupDayReaction.findMany({
       orderBy: [{ date: "desc" }, { part: "asc" }],
-      select: { date: true, emoji: true, part: true },
+      select: { date: true, emoji: true, part: true, sentAt: true },
       take: 500,
-      where: { groupId, memberId },
+      where: { groupId, memberId, ...(viewer === "member" ? { sentAt: { not: null } } : {}) },
     }),
     prisma.groupDayReview.findMany({
       orderBy: { date: "desc" },
@@ -280,7 +365,7 @@ export async function loadDayExtras(groupId: string, memberId: string) {
     }),
   ]);
   return {
-    reactions,
+    reactions: reactions.map((row) => ({ date: row.date, emoji: row.emoji, part: row.part, sent: row.sentAt !== null })),
     reviews: reviews.map((review) => ({ date: review.date, reviewedAt: review.reviewedAt.toISOString() })),
   };
 }

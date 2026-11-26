@@ -550,6 +550,9 @@ model GroupMessage {
   // With targetDate: the part of the day the comment is about ("day", "total:protein",
   // "meal:lunch"); null means the whole day.
   targetPart String?
+  // Set while the owner's comment waits for them to finish reviewing that day (YYYY-MM-DD); the
+  // member sees it only once it's sent, when the owner marks the day reviewed.
+  draftFor   String?
   // Replies point at the thread's first message and share its target.
   replyToId  String?
   replyTo    GroupMessage?  @relation("GroupMessageReplies", fields: [replyToId], references: [id], onDelete: Cascade)
@@ -614,6 +617,8 @@ model GroupDayReaction {
   part       String
   emoji      String
   fromUserId String
+  // When the member got to see it: with the day's review, or right away on a reviewed day.
+  sentAt     DateTime?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 

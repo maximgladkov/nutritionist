@@ -1,6 +1,9 @@
 -- Group owners review members' days: which days they went through, quick reactions on parts of a
--- day, and comments about a part of the day (a total or a meal).
+-- day, and comments about a part of the day (a total or a meal). What the owner leaves while
+-- reviewing reaches the member when the day is marked reviewed.
 ALTER TABLE "GroupMessage" ADD COLUMN "targetPart" TEXT;
+-- Owner comments written while reviewing a day wait here until the day is marked reviewed.
+ALTER TABLE "GroupMessage" ADD COLUMN "draftFor" TEXT;
 
 CREATE TABLE "GroupDayReview" (
   "id" TEXT NOT NULL,
@@ -20,6 +23,7 @@ CREATE TABLE "GroupDayReaction" (
   "part" TEXT NOT NULL,
   "emoji" TEXT NOT NULL,
   "fromUserId" TEXT NOT NULL,
+  "sentAt" TIMESTAMP(3),
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" TIMESTAMP(3) NOT NULL,
   CONSTRAINT "GroupDayReaction_pkey" PRIMARY KEY ("id")

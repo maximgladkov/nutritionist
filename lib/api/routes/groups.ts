@@ -33,7 +33,7 @@ import {
   updateGroupNotice,
   type GroupNoticeView,
 } from "../../group-notices.ts";
-import { loadDayExtras, loadReviewBoard, setDayReaction, setDayReviewed } from "../../group-reviews.ts";
+import { isDayReviewed, loadDayExtras, loadReviewBoard, setDayReaction, setDayReviewed } from "../../group-reviews.ts";
 import {
   DAY_PARTS,
   DAY_REACTIONS,
@@ -77,6 +77,7 @@ async function unreadCount(member: Membership): Promise<number> {
   return prisma.groupMessage.count({
     where: {
       createdAt: member.lastReadAt ? { gt: member.lastReadAt } : undefined,
+      draftFor: null,
       fromUserId: { not: member.userId },
       groupId: member.groupId,
       toUserId: member.userId,
@@ -95,6 +96,7 @@ async function loadNotices(member: Membership): Promise<GroupNoticeView[]> {
 type MessageRow = {
   body: string;
   createdAt: Date;
+  draftFor: string | null;
   fromUser: { name: string | null };
   fromUserId: string;
   helpfulAt: Date | null;
@@ -151,6 +153,8 @@ function messageView(row: MessageRow, foods: ReadonlyMap<string, TargetFood> = n
   return {
     body: row.body,
     createdAt: row.createdAt.toISOString(),
+    // The owner's comment waits for the day's review; only the owner sees drafts.
+    draft: row.draftFor !== null,
     fromName: row.fromUser.name,
     fromUserId: row.fromUserId,
     helpful: row.helpfulAt !== null,
@@ -404,9 +408,12 @@ export const groupRoutes: RouteDefinition[] = [
         include: messageInclude,
         orderBy: { createdAt: "desc" },
         take: 200,
-        where: { groupId, toUserId: memberId },
+        where: { groupId, toUserId: memberId, ...(member.role === "owner" ? {} : { draftFor: null }) },
       });
-      const [foods, extras] = await Promise.all([loadTargetFoods(rows, memberId), loadDayExtras(groupId, memberId)]);
+      const [foods, extras] = await Promise.all([
+        loadTargetFoods(rows, memberId),
+        loadDayExtras(groupId, memberId, member.role === "owner" ? "owner" : "member"),
+      ]);
       return { messages: rows.map((row) => messageView(row, foods)), ...extras };
     },
     method: "GET",
@@ -421,6 +428,8 @@ export const groupRoutes: RouteDefinition[] = [
         request,
         z.object({
           body: z.string(),
+          // The day the owner is reviewing: the comment waits until that day is marked reviewed.
+          draftFor: ymdSchema.optional(),
           memberId: z.string().min(1).optional(),
           replyToId: z.string().min(1).optional(),
           target: z
@@ -433,7 +442,9 @@ export const groupRoutes: RouteDefinition[] = [
       );
       const member = await requireMembership(groupId, user.id);
       const parent = body.replyToId
-        ? await prisma.groupMessage.findFirst({ where: { groupId, id: body.replyToId } })
+        ? await prisma.groupMessage.findFirst({
+            where: { groupId, id: body.replyToId, ...(member.role === "member" ? { draftFor: null } : {}) },
+          })
         : null;
       if (body.replyToId && !parent) {
         throw notFound("That comment is not in this group.");
@@ -476,7 +487,9 @@ export const groupRoutes: RouteDefinition[] = [
           throw notFound("That food is not in this member's diary.");
         }
       }
-      const sent = await sendGroupMessage({ body: body.body, groupId, memberId, ownerId: user.id });
+      const draftFor =
+        body.draftFor && !(await isDayReviewed({ date: body.draftFor, groupId, memberId })) ? body.draftFor : null;
+      const sent = await sendGroupMessage({ body: body.body, draftFor, groupId, memberId, ownerId: user.id });
       const target = parent
         ? { targetDate: parent.targetDate, targetMealItemId: parent.targetMealItemId, targetPart: parent.targetPart }
         : {
@@ -490,11 +503,13 @@ export const groupRoutes: RouteDefinition[] = [
         include: { ...messageInclude, group: { select: { name: true } } },
         where: { id: sent.id },
       });
-      void pushToUser(memberId, {
-        body: row.body,
-        data: { date: row.targetDate, groupId, messageId: row.id, type: "group_message" },
-        title: row.fromUser.name ? `${row.fromUser.name} · ${row.group.name}` : row.group.name,
-      });
+      if (!draftFor) {
+        void pushToUser(memberId, {
+          body: row.body,
+          data: { date: row.targetDate, groupId, messageId: row.id, type: "group_message" },
+          title: row.fromUser.name ? `${row.fromUser.name} · ${row.group.name}` : row.group.name,
+        });
+      }
       return { message: messageView(row, await loadTargetFoods([row], memberId)) };
     },
     method: "POST",
@@ -520,7 +535,7 @@ export const groupRoutes: RouteDefinition[] = [
       const body = await readJson(request, z.object({ helpful: z.boolean() }));
       await requireMembership(groupId, user.id);
       const message = await prisma.groupMessage.findFirst({
-        where: { fromUserId: { not: user.id }, groupId, id: params.messageId ?? "", toUserId: user.id },
+        where: { draftFor: null, fromUserId: { not: user.id }, groupId, id: params.messageId ?? "", toUserId: user.id },
       });
       if (!message) {
         throw notFound("That comment is not in this group.");
