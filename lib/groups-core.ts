@@ -5,6 +5,14 @@ export class GroupError extends Error {
   }
 }
 
+// A Pro coach already has as many active clients as their plan allows.
+export class GroupFullError extends GroupError {
+  constructor() {
+    super("This coach has no spots left for new clients. Ask them to make room.");
+    this.name = "GroupFullError";
+  }
+}
+
 export const GROUP_NAME_MAX = 80;
 export const GROUP_DESCRIPTION_MAX = 500;
 export const GROUP_MESSAGE_MAX = 4000;

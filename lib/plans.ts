@@ -133,6 +133,21 @@ export async function activeClients(ownerId: string, members: number): Promise<s
   return [...new Set(rows.map((row) => row.userId))].slice(0, members);
 }
 
+// Whether a new client would take a Pro coach past their plan's cap. People already in one of the
+// coach's groups aren't new clients; owners on Free or Plus have no cap.
+export async function clientCapReached(ownerId: string, userId: string, now: Date): Promise<boolean> {
+  if (ownerId === userId) return false;
+  const plan = await paidPlan(ownerId, now);
+  if (!plan || !isPro(plan.id)) return false;
+  const rows = await prisma.groupMember.findMany({
+    distinct: ["userId"],
+    select: { userId: true },
+    where: { group: { ownerId }, role: "member", userId: { not: ownerId } },
+  });
+  if (rows.some((row) => row.userId === userId)) return false;
+  return rows.length >= plan.limits.members;
+}
+
 export async function loadPlan(userId: string, now: Date): Promise<CurrentPlan> {
   return (await paidPlan(userId, now)) ?? FREE;
 }

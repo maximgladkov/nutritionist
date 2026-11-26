@@ -191,7 +191,7 @@ describe("what plans allow", () => {
     await givePlan(me.userId, "pro10");
     const group = (await createGroup("Clients")).body.group;
     const members: Session[] = [];
-    for (let index = 0; index < 11; index += 1) {
+    for (let index = 0; index < 10; index += 1) {
       const member = await signIn(`member${index}@example.com`);
       assert.equal((await api("POST", `/invites/${group.joinCode}/join`, { token: member.accessToken })).status, 201);
       members.push(member);
@@ -202,7 +202,30 @@ describe("what plans allow", () => {
     assert.equal(first.usage.ai.limit, 30 * 60);
 
     const coach = await plan();
-    assert.deepEqual(coach.usage.members, { covered: 10, limit: 10, total: 11 });
+    assert.deepEqual(coach.usage.members, { covered: 10, limit: 10, total: 10 });
+  });
+
+  it("turns away new clients past a Pro coach's cap", async () => {
+    await givePlan(me.userId, "pro10");
+    const group = (await createGroup("Clients")).body.group;
+    const second = (await createGroup("Evening")).body.group;
+    const join = (code: string, session: Session) =>
+      api("POST", `/invites/${code}/join`, { token: session.accessToken });
+    const members: Session[] = [];
+    for (let index = 0; index < 10; index += 1) {
+      const member = await signIn(`member${index}@example.com`);
+      assert.equal((await join(group.joinCode, member)).status, 201);
+      members.push(member);
+    }
+    const late = await join(group.joinCode, await signIn("late@example.com"));
+    assert.equal(late.status, 409);
+    assert.equal(late.body.error.code, "group_full");
+    // A client already coached can join another of the coach's groups.
+    assert.equal((await join(second.joinCode, members[0])).status, 201);
+
+    // Pro 30 makes room.
+    await givePlan(me.userId, "pro30");
+    assert.equal((await join(group.joinCode, await signIn("late@example.com"))).status, 201);
   });
 
   it("caps live talk each week by plan, inside the AI minutes", async () => {
