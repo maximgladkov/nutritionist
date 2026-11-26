@@ -5,7 +5,7 @@ import { INFO_SECTIONS, myInfo } from "../assistant/my-info.ts";
 import { prisma } from "../prisma.ts";
 import { composeRecipe } from "../recipes.ts";
 import { upsertMealItems } from "../meals.ts";
-import { api, closeDatabase, installFakes, resetDatabase, seedGenericFood, seedOffProduct, signIn, type Session } from "./test/harness.ts";
+import { api, closeDatabase, installFakes, resetDatabase, seedGenericFood, seedOffProduct, signIn, type Session, givePlan } from "./test/harness.ts";
 
 const ITEMS = [
   { amount: 300, name: "Chicken", nutrimentsPer100g: { energyKcal100g: 200, proteins100g: 30 }, unit: "g" as const },
@@ -112,6 +112,7 @@ describe("foods and recipes in the conversation", () => {
 
 describe("what the agent can read", () => {
   it("is every section, all of it the person's own", async () => {
+    await givePlan(other.userId, "pro10");
     const group = (await api("POST", "/groups", { body: { name: "Fit" }, token: other.accessToken })).body.group;
     await prisma.groupMember.create({ data: { groupId: group.id, role: "member", userId: session.userId } });
     const third = await signIn("third@example.com");
@@ -139,6 +140,7 @@ describe("what the agent can read", () => {
   });
 
   it("loses the coach's comments when the person leaves the group", async () => {
+    await givePlan(other.userId, "pro10");
     const group = (await api("POST", "/groups", { body: { name: "Fit" }, token: other.accessToken })).body.group;
     const member = await prisma.groupMember.create({ data: { groupId: group.id, role: "member", userId: session.userId } });
     await prisma.groupMessage.create({ data: { body: "Hi", fromUserId: other.userId, groupId: group.id, toUserId: session.userId } });

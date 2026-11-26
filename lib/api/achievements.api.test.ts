@@ -3,7 +3,7 @@ import { after, before, describe, it } from "node:test";
 import { ACHIEVEMENT_FAMILIES } from "../achievements/catalog.ts";
 import { prisma } from "../prisma.ts";
 import { shiftYmd } from "../timezone.ts";
-import { api, closeDatabase, flushBackground, installFakes, resetDatabase, seedOffProduct, signIn, uploadPng, type Session } from "./test/harness.ts";
+import { api, closeDatabase, flushBackground, installFakes, resetDatabase, seedOffProduct, signIn, uploadPng, type Session, givePlan } from "./test/harness.ts";
 
 const BREAD = "8480000123459";
 let kira: Session;
@@ -178,6 +178,7 @@ describe("achievements", () => {
     const meal = await eat(kira.userId, today);
     const uploadId = await uploadPng(kira.accessToken);
     assert.ok((await api("POST", `/meals/${meal.id}/photos`, { body: { uploadId }, token: kira.accessToken })).status < 300);
+    await givePlan(newcomer.userId, "pro10");
     const group = await api("POST", "/groups", { body: { name: "Lean by Spring" }, token: newcomer.accessToken });
     await api("POST", `/invites/${group.body.group.inviteToken}/join`, { body: { sharing: false }, token: kira.accessToken });
 

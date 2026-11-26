@@ -1,5 +1,6 @@
 import { del, get, put } from "@vercel/blob";
 import { APP_NAME } from "../brand.ts";
+import { appleVerifier, type AppleVerifier } from "../apple-storekit.ts";
 import type { HomeWriter } from "../assistant/home-words.ts";
 import { mintTalkSecret, talkKey } from "../assistant/talk.ts";
 import { fatSecretClient, type FatSecretClient } from "../fatsecret.ts";
@@ -62,6 +63,8 @@ export type AudioTranscriber = (input: { bytes: Uint8Array; mediaType: string })
 }>;
 
 export type ApiDeps = {
+  // Checks App Store purchases and server notifications that Apple signed.
+  apple: AppleVerifier;
   // Runs work after the response is sent (embedding a saved food), so requests don't wait on it.
   background: (task: () => Promise<void>) => void;
   blobs: BlobStore;
@@ -202,6 +205,7 @@ async function writeHomeWithModel(input: Parameters<HomeWriter>[0]) {
 }
 
 const defaults: ApiDeps = {
+  apple: appleVerifier,
   background: runAfterResponse,
   blobs: vercelBlobStore,
   embedDocuments: embedDocumentsWithGateway,

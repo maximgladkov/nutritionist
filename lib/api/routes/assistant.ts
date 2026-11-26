@@ -7,10 +7,10 @@ import { homeCardMessages } from "../../assistant/home-card.ts";
 import { bookTalk, saveTalk, TALK_INSTRUCTIONS, TALK_MAX_SECONDS, TALK_MODEL, TALK_WEBSOCKET_URL } from "../../assistant/talk.ts";
 import { homeMessage, openHomeMessage, openingNotes } from "../../assistant/home-message.ts";
 import { loadSettings, talkSettingsLines } from "../../assistant/settings.ts";
-import { ASLEEP_MESSAGE, loadUsage, TALK_MIN_LEFT_S } from "../../assistant/usage.ts";
+import { ASLEEP_MESSAGE, loadUsage, TALK_MIN_LEFT_S, usageLeft } from "../../assistant/usage.ts";
 import { prisma } from "../../prisma.ts";
 import { apiDeps } from "../deps.ts";
-import { ApiError, notFound } from "../errors.ts";
+import { ApiError, notFound, planLimit } from "../errors.ts";
 import { json, readJson, readQuery } from "../http.ts";
 import type { RouteDefinition } from "../router.ts";
 
@@ -100,9 +100,12 @@ export const assistantRoutes: RouteDefinition[] = [
     async handler({ user }) {
       const { now, talk } = apiDeps();
       const [usage, settings] = await Promise.all([loadUsage(user.id, now()), loadSettings(user.id)]);
-      const left = usage.limit - usage.used;
-      if (left < TALK_MIN_LEFT_S) {
+      const { ai, talk: left } = usageLeft(usage);
+      if (ai < TALK_MIN_LEFT_S) {
         throw new ApiError(403, "asleep", ASLEEP_MESSAGE);
+      }
+      if (left < TALK_MIN_LEFT_S) {
+        throw planLimit("talk", usage.plan, "You've used this week's minutes for talking. Type instead, or upgrade for more.");
       }
       if (!talk.available()) {
         throw new ApiError(503, "talk_unavailable", "Talking isn't available right now.");

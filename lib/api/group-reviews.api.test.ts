@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import { shiftYmd } from "../timezone.ts";
-import { api, closeDatabase, installFakes, pushes, resetDatabase, seedOffProduct, signIn, type Session } from "./test/harness.ts";
+import { api, closeDatabase, installFakes, pushes, resetDatabase, seedOffProduct, signIn, type Session, givePlan } from "./test/harness.ts";
 
 // The group owner reviewing members' daily reports: the board of who logged and who's reviewed,
 // marking days reviewed, quick reactions, and comments on part of a day. Members see only what
@@ -40,6 +40,7 @@ before(async () => {
     await api("PATCH", "/me", { body: { name }, token: session.accessToken });
   }
   await api("POST", "/me/devices", { body: { platform: "ios", token: "ExponentPushToken[kira-review]" }, token: kira.accessToken });
+  await givePlan(coach.userId, "pro10");
   const created = await api("POST", "/groups", { body: { name: "Lean by Spring" }, token: coach.accessToken });
   groupId = created.body.group.id;
   const code = created.body.group.joinCode;

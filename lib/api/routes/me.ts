@@ -4,6 +4,7 @@ import { GOAL_FIELDS, GOAL_SPECS } from "../../goal-values.ts";
 import { getGoals, saveGoals } from "../../goals.ts";
 import { isLocale, locales, resolveLocale } from "../../i18n/locales.ts";
 import { consumeLinkCode, createLinkCode } from "../../identity.ts";
+import { loadPlan, type PlanId } from "../../plans.ts";
 import { prisma } from "../../prisma.ts";
 import {
   avatarUrl,
@@ -59,7 +60,7 @@ export type MeView = {
   linkedChannels: string[];
   locale: string;
   name: string | null;
-  plan: "free";
+  plan: PlanId;
   preferences: Preferences;
   // Details the person set or cleared themselves, which connected apps no longer fill in.
   settledFields: FillField[];
@@ -67,10 +68,13 @@ export type MeView = {
 };
 
 export async function toMeView(userId: string): Promise<MeView> {
-  const user = await prisma.user.findUnique({
-    include: { identities: { select: { provider: true } }, profile: true },
-    where: { id: userId },
-  });
+  const [user, plan] = await Promise.all([
+    prisma.user.findUnique({
+      include: { identities: { select: { provider: true } }, profile: true },
+      where: { id: userId },
+    }),
+    loadPlan(userId, apiDeps().now()),
+  ]);
   if (!user) {
     throw notFound("Account not found.");
   }
@@ -85,7 +89,7 @@ export async function toMeView(userId: string): Promise<MeView> {
     linkedChannels: [...new Set(user.identities.map((identity) => identity.provider))].sort(),
     locale: resolveLocale(user.profile?.locale),
     name: user.name,
-    plan: "free",
+    plan: plan.id,
     preferences: readPreferences(user.profile?.preferences),
     settledFields: readSettled(user.profile?.settledFields),
     timezone: user.profile?.timezone ?? null,

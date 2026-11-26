@@ -113,9 +113,9 @@ describe("time with the coach", () => {
   });
 
   it("lets a call last only as long as what's left", async () => {
-    await action("talk", before(60), { endedAt: before(50).toISOString() });
+    // 14 of Free's 15 minutes of talk.
     await action("talk", before(40), { endedAt: before(30).toISOString() });
-    await action("talk", before(20), { endedAt: before(11).toISOString() });
+    await action("talk", before(20), { endedAt: before(16).toISOString() });
     const { body } = await api("POST", "/assistant/talk", { token: session.accessToken });
     assert.equal(body.maxSeconds, 60);
   });
