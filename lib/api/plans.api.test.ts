@@ -187,7 +187,7 @@ describe("what plans allow", () => {
     assert.equal((await api("GET", `/groups/${group.id}/reviews`, { token: me.accessToken })).status, 200);
   });
 
-  it("gives a Pro coach's first members Plus, without more talk", async () => {
+  it("counts a Pro coach's active clients, who keep their own plan", async () => {
     await givePlan(me.userId, "pro10");
     const group = (await createGroup("Clients")).body.group;
     const members: Session[] = [];
@@ -197,13 +197,9 @@ describe("what plans allow", () => {
       members.push(member);
     }
     const first = await plan(members[0]);
-    assert.equal(first.plan.id, "plus");
-    assert.equal(first.plan.source, "coach");
-    assert.equal(first.plan.coach.name, null);
-    assert.equal(first.usage.ai.limit, null);
-    assert.equal(first.usage.talk.limit, 15 * 60);
-    assert.equal(first.plan.limits.groups, 0);
-    assert.equal((await plan(members[10])).plan.id, "free");
+    assert.equal(first.plan.id, "free");
+    assert.equal(first.plan.source, "free");
+    assert.equal(first.usage.ai.limit, 30 * 60);
 
     const coach = await plan();
     assert.deepEqual(coach.usage.members, { covered: 10, limit: 10, total: 11 });

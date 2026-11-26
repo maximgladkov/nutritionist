@@ -8,7 +8,7 @@ import {
   PLAN_NAMES,
   PLANS,
   PRODUCT_IDS,
-  sponsoredMembers,
+  activeClients,
 } from "../../plans.ts";
 import { prisma } from "../../prisma.ts";
 import { applyAppleNotification, saveAppleTransaction } from "../../subscriptions.ts";
@@ -28,7 +28,7 @@ export async function planView(userId: string, now: Date) {
         .findMany({ distinct: ["userId"], select: { userId: true }, where: { group: { ownerId: userId }, role: "member" } })
         .then((rows) => rows.length)
     : 0;
-  const covered = isPro(plan.id) ? (await sponsoredMembers(userId, plan.limits.members)).length : 0;
+  const covered = isPro(plan.id) ? (await activeClients(userId, plan.limits.members)).length : 0;
   const left = usageLeft(usage);
   return {
     appAccountToken: appAccountToken(userId),
