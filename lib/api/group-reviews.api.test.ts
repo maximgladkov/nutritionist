@@ -224,7 +224,15 @@ describe("reactions and comments on part of the day", () => {
     const cleared = await api("PUT", path, { body: { emoji: null, part: "day" }, token: coach.accessToken });
     assert.equal(cleared.body.reaction, null);
 
-    assert.equal((await api("PUT", path, { body: { emoji: "🍕", part: "day" }, token: coach.accessToken })).status, 400);
+    for (const emoji of ["🍕", "👍🏽", "👨‍👩‍👧", "🇪🇸", "❤️"]) {
+      const any = await api("PUT", path, { body: { emoji, part: "day" }, token: coach.accessToken });
+      assert.equal(any.status, 200, `${emoji} ${JSON.stringify(any.body)}`);
+      assert.equal(any.body.reaction.emoji, emoji);
+    }
+    await api("PUT", path, { body: { emoji: null, part: "day" }, token: coach.accessToken });
+    for (const emoji of ["ok", "👍👍", "", "👍 ", "<b>"]) {
+      assert.equal((await api("PUT", path, { body: { emoji, part: "day" }, token: coach.accessToken })).status, 400, emoji);
+    }
     assert.equal((await api("PUT", path, { body: { emoji: "👍", part: "meal:brunch" }, token: coach.accessToken })).status, 400);
     assert.equal((await api("PUT", path, { body: { emoji: "👍", part: "day" }, token: kira.accessToken })).status, 403);
   });

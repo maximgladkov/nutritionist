@@ -36,10 +36,10 @@ import {
 import { isDayReviewed, loadDayExtras, loadReviewBoard, setDayReaction, setDayReviewed } from "../../group-reviews.ts";
 import {
   DAY_PARTS,
-  DAY_REACTIONS,
   GROUP_INVITE_NOTE_MAX,
   GROUP_NOTICE_BODY_MAX,
   GROUP_NOTICE_TITLE_MAX,
+  isDayReaction,
 } from "../../groups-core.ts";
 import { formatDateInTimeZone } from "../../timezone.ts";
 import { readSummaryContext } from "../../summary.ts";
@@ -651,7 +651,10 @@ export const groupRoutes: RouteDefinition[] = [
   {
     // A quick reaction on the day, a total or a meal; null takes it back.
     async handler({ params, request, user }) {
-      const body = await readJson(request, z.object({ emoji: z.enum(DAY_REACTIONS).nullable(), part: z.enum(DAY_PARTS) }));
+      const body = await readJson(
+        request,
+        z.object({ emoji: z.string().refine(isDayReaction, "Use one emoji.").nullable(), part: z.enum(DAY_PARTS) }),
+      );
       const date = ymdSchema.parse(params.date ?? "");
       return setDayReaction({ ...body, date, groupId: params.id ?? "", memberId: params.memberId ?? "", ownerId: user.id });
     },

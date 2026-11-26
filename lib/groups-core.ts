@@ -64,9 +64,11 @@ export function isDayPart(value: string): value is DayPart {
   return (DAY_PARTS as readonly string[]).includes(value);
 }
 
-// The quick reactions owners leave, with or without a comment.
-export const DAY_REACTIONS = ["👍", "💪", "🔥", "❤️", "🤔"] as const;
+// The quick reaction owners leave, with or without a comment: any one emoji (with its skin tone,
+// joiners or a flag's pair), nothing else.
+const ONE_EMOJI =
+  /^(?:\p{Regional_Indicator}{2}|[#*0-9]\uFE0F?\u20E3|\p{Extended_Pictographic}(?:\p{Emoji_Modifier}|\uFE0F)?(?:\u200D\p{Extended_Pictographic}(?:\p{Emoji_Modifier}|\uFE0F)?)*)$/u;
 
 export function isDayReaction(value: string): boolean {
-  return (DAY_REACTIONS as readonly string[]).includes(value);
+  return value.length <= 32 && ONE_EMOJI.test(value);
 }

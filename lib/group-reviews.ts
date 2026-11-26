@@ -329,7 +329,7 @@ export async function setDayReaction(input: {
     throw new GroupError("Choose the day, a total or a meal to react to.");
   }
   if (input.emoji !== null && !isDayReaction(input.emoji)) {
-    throw new GroupError("Choose one of the quick reactions.");
+    throw new GroupError("React with one emoji.");
   }
   await requireReviewableDay(input);
   const key = { date: input.date, groupId: input.groupId, memberId: input.memberId, part: input.part };
