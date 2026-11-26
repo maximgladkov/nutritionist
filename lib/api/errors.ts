@@ -1,6 +1,6 @@
 import { ZodError } from "zod";
 import { GoalError } from "../goal-values.ts";
-import { GroupError } from "../groups-core.ts";
+import { GroupError, GroupFullError } from "../groups-core.ts";
 import { MealError } from "../meals.ts";
 import { ReminderError } from "../reminders.ts";
 import { StoreKitError } from "../apple-storekit.ts";
@@ -51,6 +51,9 @@ export function toApiError(error: unknown): ApiError {
     return NOT_FOUND_MESSAGES.test(error.message)
       ? new ApiError(404, "not_found", error.message)
       : new ApiError(400, "invalid_meal", error.message);
+  }
+  if (error instanceof GroupFullError) {
+    return new ApiError(409, "group_full", error.message);
   }
   if (error instanceof GroupError) {
     if (/cannot|owners/i.test(error.message)) {

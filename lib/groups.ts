@@ -3,6 +3,7 @@ import { groupInviteLinks } from "./app-url.ts";
 import { discardGroupCover, uploadGroupCover } from "./group-images.ts";
 import {
   GroupError,
+  GroupFullError,
   GROUP_DESCRIPTION_MAX,
   GROUP_MESSAGE_MAX,
   GROUP_NAME_MAX,
@@ -18,6 +19,7 @@ import {
 import { reassignDayReviewsOnUserMerge } from "./group-reviews.ts";
 import { generateJoinCode, normalizeJoinCode } from "./groups-join-code.ts";
 import { pushToUser } from "./api/push.ts";
+import { clientCapReached } from "./plans.ts";
 import { resolveLocale, type Locale } from "./i18n/locales.ts";
 import { avatarUrl, personSelect } from "./profile.ts";
 import { prisma } from "./prisma.ts";
@@ -451,6 +453,9 @@ export async function joinGroupByToken(input: {
   if (existing) {
     // Opening a personal invite you don't need leaves it for its person.
     return { alreadyMember: true, groupId: group.id, role: existing.role };
+  }
+  if (await clientCapReached(group.ownerId, input.userId, new Date())) {
+    throw new GroupFullError();
   }
   await prisma.$transaction(async (tx) => {
     if (personal) {
