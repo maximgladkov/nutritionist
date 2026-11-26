@@ -140,7 +140,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
     prisma.groupMessage.findMany({
       orderBy: { createdAt: "desc" },
       select: { body: true, createdAt: true, fromUser: { select: { name: true } } },
-      where: { fromUserId: { not: userId }, group: { members: { some: { userId } } }, replyToId: null, targetDate: today, toUserId: userId },
+      where: { draftFor: null, fromUserId: { not: userId }, group: { members: { some: { userId } } }, replyToId: null, targetDate: today, toUserId: userId },
     }),
     loadNutritionDays({ from: shiftYmd(today, -14), now, to: shiftYmd(today, -1), userId }),
     frequentFoods({ limit: 12, now, userId }),

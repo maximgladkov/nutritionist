@@ -34,6 +34,8 @@ model User {
   groupMessagesSent     GroupMessage[] @relation("GroupMessagesSent")
   groupMessagesReceived GroupMessage[] @relation("GroupMessagesReceived")
   groupNoticesAuthored  GroupNotice[]  @relation("GroupNoticesAuthored")
+  groupDayReviews       GroupDayReview[]   @relation("GroupDayReviews")
+  groupDayReactions     GroupDayReaction[] @relation("GroupDayReactions")
   groupInvitesCreated   GroupInvite[]  @relation("GroupInvitesCreated")
   groupInvitesUsed      GroupInvite[]  @relation("GroupInvitesUsed")
   refreshTokens RefreshToken[]
@@ -507,6 +509,8 @@ model Group {
   messages      GroupMessage[]
   notices       GroupNotice[]
   invites       GroupInvite[]
+  dayReviews    GroupDayReview[]
+  dayReactions  GroupDayReaction[]
 
   @@index([ownerId])
 }
@@ -543,6 +547,12 @@ model GroupMessage {
   body       String   @db.Text
   targetDate String?
   targetMealItemId String?
+  // With targetDate: the part of the day the comment is about ("day", "total:protein",
+  // "meal:lunch"); null means the whole day.
+  targetPart String?
+  // Set while the owner's comment waits for them to finish reviewing that day (YYYY-MM-DD); the
+  // member sees it only once it's sent, when the owner marks the day reviewed.
+  draftFor   String?
   // Replies point at the thread's first message and share its target.
   replyToId  String?
   replyTo    GroupMessage?  @relation("GroupMessageReplies", fields: [replyToId], references: [id], onDelete: Cascade)
@@ -578,6 +588,42 @@ model GroupInvite {
   @@index([groupId, createdAt])
   @@index([createdById])
   @@index([usedById])
+}
+
+// The owner went through a member's day and marked it reviewed. One row per member and day.
+model GroupDayReview {
+  id           String   @id @default(cuid())
+  groupId      String
+  group        Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  memberId     String
+  member       User     @relation("GroupDayReviews", fields: [memberId], references: [id], onDelete: Cascade)
+  // The member's local day, YYYY-MM-DD.
+  date         String
+  reviewedById String
+  reviewedAt   DateTime @default(now())
+
+  @@unique([groupId, memberId, date])
+  @@index([memberId])
+}
+
+// The owner's quick reaction (one emoji) on part of a member's day: the day, a total or a meal.
+model GroupDayReaction {
+  id         String   @id @default(cuid())
+  groupId    String
+  group      Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  memberId   String
+  member     User     @relation("GroupDayReactions", fields: [memberId], references: [id], onDelete: Cascade)
+  date       String
+  part       String
+  emoji      String
+  fromUserId String
+  // When the member got to see it: with the day's review, or right away on a reviewed day.
+  sentAt     DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([groupId, memberId, date, part])
+  @@index([memberId])
 }
 
 // A post from the group owner that every member sees.

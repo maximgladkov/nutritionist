@@ -15,6 +15,7 @@ import {
   isInviteToken,
   planMembershipMerge,
 } from "./groups-invite.ts";
+import { reassignDayReviewsOnUserMerge } from "./group-reviews.ts";
 import { generateJoinCode, normalizeJoinCode } from "./groups-join-code.ts";
 import { pushToUser } from "./api/push.ts";
 import { resolveLocale, type Locale } from "./i18n/locales.ts";
@@ -647,7 +648,7 @@ export async function getJoinedGroupDetail(input: {
   const messages = await prisma.groupMessage.findMany({
     include: { fromUser: { select: { name: true } } },
     orderBy: { createdAt: "desc" },
-    where: { groupId: input.groupId, toUserId: input.userId },
+    where: { draftFor: null, groupId: input.groupId, toUserId: input.userId },
   });
   return {
     description: member.group.description,
@@ -703,6 +704,8 @@ export async function listMessagesForMember(input: {
 
 export async function sendGroupMessage(input: {
   body: string;
+  // The member's day this waits on: it's kept from them until the owner marks that day reviewed.
+  draftFor?: string | null;
   groupId: string;
   memberId: string;
   ownerId: string;
@@ -712,12 +715,16 @@ export async function sendGroupMessage(input: {
   const created = await prisma.groupMessage.create({
     data: {
       body,
+      draftFor: input.draftFor ?? null,
       fromUserId: input.ownerId,
       groupId: input.groupId,
       toUserId: input.memberId,
     },
     include: { fromUser: { select: { name: true } } },
   });
+  if (input.draftFor) {
+    return { body: created.body, createdAt: created.createdAt.toISOString(), fromName: created.fromUser.name, helpful: false, id: created.id };
+  }
   void notifyMemberOfMessage({
     body,
     groupName: group.name,
@@ -759,6 +766,7 @@ export async function reassignGroupsOnUserMerge(
     data: { toUserId: survivorId },
     where: { toUserId: absorbedId },
   });
+  await reassignDayReviewsOnUserMerge(tx, survivorId, absorbedId);
   const [survivorMembers, absorbedMembers] = await Promise.all([
     tx.groupMember.findMany({ where: { userId: survivorId } }),
     tx.groupMember.findMany({ where: { userId: absorbedId } }),
@@ -907,7 +915,7 @@ async function requireOwnedMember(input: { groupId: string; memberId: string; ow
   return group;
 }
 
-async function notifyMemberOfMessage(input: {
+export async function notifyMemberOfMessage(input: {
   body: string;
   groupName: string;
   memberId: string;

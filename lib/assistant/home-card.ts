@@ -34,6 +34,7 @@ export async function homeCardMessages(userId: string, now: Date): Promise<HomeC
       orderBy: { createdAt: "desc" },
       select: { fromUser: { select: { name: true } } },
       where: {
+        draftFor: null,
         fromUserId: { not: userId },
         group: { members: { some: { userId } } },
         replyToId: null,
