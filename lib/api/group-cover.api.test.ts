@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
-import { api, closeDatabase, installFakes, resetDatabase, signIn, storedBlobCount, type Session, uploadPng } from "./test/harness.ts";
+import { api, closeDatabase, installFakes, resetDatabase, signIn, storedBlobCount, type Session, uploadPng, givePlan } from "./test/harness.ts";
 
 // The group's photo: only the owner sets, changes, or removes it, and each change gets a new URL so
 // no phone keeps showing the old one.
@@ -17,6 +17,7 @@ before(async () => {
   await resetDatabase();
   coach = await signIn("cover-coach@example.com");
   ana = await signIn("cover-ana@example.com");
+  await givePlan(coach.userId, "pro10");
   const created = await api("POST", "/groups", { body: { name: "Cover Club" }, token: coach.accessToken });
   assert.equal(created.status, 201, JSON.stringify(created.body));
   groupId = created.body.group.id;

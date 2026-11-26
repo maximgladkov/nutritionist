@@ -11,6 +11,7 @@ import { integrationRoutes } from "./routes/integrations.ts";
 import { mealRoutes } from "./routes/meals.ts";
 import { meRoutes } from "./routes/me.ts";
 import { notificationRoutes } from "./routes/notifications.ts";
+import { planRoutes } from "./routes/plans.ts";
 import { profileRoutes } from "./routes/profile.ts";
 import { recipeRoutes } from "./routes/recipes.ts";
 import { savedMealRoutes } from "./routes/saved-meals.ts";
@@ -21,6 +22,7 @@ import { voiceRoutes } from "./routes/voice.ts";
 export const apiRoutes: readonly RouteDefinition[] = [
   ...authRoutes,
   ...meRoutes,
+  ...planRoutes,
   ...profileRoutes,
   ...bodyRoutes,
   ...achievementRoutes,

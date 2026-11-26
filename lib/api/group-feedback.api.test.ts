@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
-import { api, closeDatabase, installFakes, pushes, resetDatabase, seedOffProduct, signIn, type Session } from "./test/harness.ts";
+import { api, closeDatabase, installFakes, pushes, resetDatabase, seedOffProduct, signIn, type Session, givePlan } from "./test/harness.ts";
 
 // Groups as members see them in the app: joining by typed code, notices from the owner, the member
 // list the owner can hide, and replying to (and marking helpful) the owner's comments on a day.
@@ -31,6 +31,7 @@ after(closeDatabase);
 
 describe("joining with a code", () => {
   it("gives every new group a typed code and an owner title", async () => {
+    await givePlan(coach.userId, "pro10");
     const created = await api("POST", "/groups", { body: { description: "Protein at every meal.", name: "Lean by Spring" }, token: coach.accessToken });
     assert.equal(created.status, 201, JSON.stringify(created.body));
     groupId = created.body.group.id;
@@ -86,6 +87,7 @@ describe("joining with a code", () => {
 
 describe("creating a group in the app", () => {
   it("sets the owner title and member-list visibility at creation", async () => {
+    await givePlan(kira.userId, "plus");
     const created = await api("POST", "/groups", {
       body: { membersVisible: false, name: "Morning Run Club", ownerTitle: "Running coach" },
       token: kira.accessToken,

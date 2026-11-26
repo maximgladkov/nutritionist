@@ -38,6 +38,7 @@ model User {
   groupDayReactions     GroupDayReaction[] @relation("GroupDayReactions")
   groupInvitesCreated   GroupInvite[]  @relation("GroupInvitesCreated")
   groupInvitesUsed      GroupInvite[]  @relation("GroupInvitesUsed")
+  appleSubscriptions    AppleSubscription[]
   refreshTokens RefreshToken[]
   pushDevices   PushDevice[]
   recipes       Recipe[]
@@ -904,4 +905,24 @@ model AchievementEvent {
   createdAt DateTime @default(now())
 
   @@id([userId, kind])
+}
+
+// An App Store subscription, one row per subscription (Apple's original transaction id), kept up to
+// date from what the app sends after a purchase and from App Store Server Notifications.
+model AppleSubscription {
+  originalTransactionId String    @id
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId             String
+  // Paid up to here, including any billing grace period.
+  expiresAt             DateTime
+  // Refunded or revoked by Apple.
+  revokedAt             DateTime?
+  willRenew             Boolean   @default(true)
+  // Production or Sandbox (TestFlight, Xcode).
+  environment           String
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId, expiresAt])
 }

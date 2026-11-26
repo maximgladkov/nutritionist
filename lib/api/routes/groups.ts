@@ -24,6 +24,7 @@ import {
   updateGroup,
 } from "../../groups.ts";
 import { groupInviteLinks } from "../../app-url.ts";
+import { loadPlan } from "../../plans.ts";
 import { prisma } from "../../prisma.ts";
 import {
   countUnreadNotices,
@@ -45,7 +46,7 @@ import { formatDateInTimeZone } from "../../timezone.ts";
 import { readSummaryContext } from "../../summary.ts";
 import { requireUser } from "../auth.ts";
 import { apiDeps } from "../deps.ts";
-import { ApiError, forbidden, notFound } from "../errors.ts";
+import { ApiError, forbidden, notFound, planLimit } from "../errors.ts";
 import { noContent, readJson, readQuery } from "../http.ts";
 import { pushToUser } from "../push.ts";
 import type { RouteDefinition } from "../router.ts";
@@ -235,6 +236,29 @@ const noticeBodySchema = z.object({
   title: z.string().max(GROUP_NOTICE_TITLE_MAX),
 });
 
+// Reviewing members' days is part of Pro.
+async function requireReviews(userId: string): Promise<void> {
+  const plan = await loadPlan(userId, apiDeps().now());
+  if (!plan.limits.reviews) {
+    throw planLimit("reviews", plan.id, "Reviewing members' days is part of Pro.");
+  }
+}
+
+// Free can't own groups and Plus can own a few; groups someone already has stay theirs.
+async function requireGroupRoom(userId: string): Promise<void> {
+  const plan = await loadPlan(userId, apiDeps().now());
+  const limit = plan.limits.groups;
+  if (limit === null) return;
+  const owned = await prisma.group.count({ where: { ownerId: userId } });
+  if (owned >= limit) {
+    throw planLimit(
+      "groups",
+      plan.id,
+      limit === 0 ? "Creating groups is part of Plus and Pro." : `Your plan includes up to ${limit} groups.`,
+    );
+  }
+}
+
 export const groupRoutes: RouteDefinition[] = [
   {
     async handler({ user }) {
@@ -263,6 +287,7 @@ export const groupRoutes: RouteDefinition[] = [
   {
     async handler({ request, user }) {
       const body = await readJson(request, groupBodySchema.extend({ name: z.string().trim().min(1).max(80) }));
+      await requireGroupRoom(user.id);
       const group = await createGroup({
         description: body.description ?? "",
         image: await coverFile(user.id, body.uploadId),
@@ -637,6 +662,7 @@ export const groupRoutes: RouteDefinition[] = [
     // The owner's review board for a day: each member's status, and a calendar of days to review.
     async handler({ params, url, user }) {
       const query = readQuery(url, z.object({ date: ymdSchema.optional(), from: ymdSchema.optional(), to: ymdSchema.optional() }));
+      await requireReviews(user.id);
       return loadReviewBoard({ ...query, groupId: params.id ?? "", ownerId: user.id });
     },
     method: "GET",
@@ -646,6 +672,7 @@ export const groupRoutes: RouteDefinition[] = [
     async handler({ params, request, user }) {
       const body = await readJson(request, z.object({ reviewed: z.boolean() }));
       const date = ymdSchema.parse(params.date ?? "");
+      await requireReviews(user.id);
       return setDayReviewed({ date, groupId: params.id ?? "", memberId: params.memberId ?? "", ownerId: user.id, reviewed: body.reviewed });
     },
     method: "PUT",
@@ -659,6 +686,7 @@ export const groupRoutes: RouteDefinition[] = [
         z.object({ emoji: z.string().refine(isDayReaction, "Use one emoji.").nullable(), part: z.enum(DAY_PARTS) }),
       );
       const date = ymdSchema.parse(params.date ?? "");
+      await requireReviews(user.id);
       return setDayReaction({ ...body, date, groupId: params.id ?? "", memberId: params.memberId ?? "", ownerId: user.id });
     },
     method: "PUT",

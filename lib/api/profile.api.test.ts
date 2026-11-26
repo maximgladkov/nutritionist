@@ -16,8 +16,7 @@ import {
   storedBlobCount,
   telegramPeople,
   uploadPng,
-  type Session,
-} from "./test/harness.ts";
+  type Session, givePlan } from "./test/harness.ts";
 
 let kira: Session;
 
@@ -201,6 +200,7 @@ describe("profile photo", () => {
     const stranger = await signIn("stranger@example.com");
     const photos = { ben: await setPhoto(ben), coach: await setPhoto(coach), kira: await setPhoto(kira) };
     const looseId = await uploadPng(kira.accessToken);
+    await givePlan(coach.userId, "pro10");
     const created = await api("POST", "/groups", { body: { name: "Lean" }, token: coach.accessToken });
     const { id, joinCode } = created.body.group;
     const join = (session: Session) => api("POST", `/invites/${joinCode}/join`, { token: session.accessToken });
@@ -244,6 +244,7 @@ describe("profile photo", () => {
     const owner = await signIn("owner2@example.com");
     const member = await signIn("member2@example.com");
     const first = await setPhoto(member);
+    await givePlan(owner.userId, "pro10");
     const created = await api("POST", "/groups", { body: { name: "Second" }, token: owner.accessToken });
     await api("POST", `/invites/${created.body.group.joinCode}/join`, { token: member.accessToken });
     assert.equal(await open(owner, first), 200);

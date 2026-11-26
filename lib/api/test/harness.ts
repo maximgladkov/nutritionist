@@ -306,3 +306,9 @@ export async function uploadPng(token: string): Promise<string> {
 export async function closeDatabase(): Promise<void> {
   await prisma.$disconnect();
 }
+
+// Puts someone on a paid plan, as if they'd bought it in the App Store.
+export async function givePlan(userId: string, plan: "plus" | "pro10" | "pro30" | "pro100", expiresAt = new Date("2100-01-01T00:00:00Z")): Promise<void> {
+  const data = { environment: "Sandbox", expiresAt, productId: `me.btr.${plan}.monthly`, revokedAt: null, userId };
+  await prisma.appleSubscription.upsert({ create: { ...data, originalTransactionId: `test:${userId}` }, update: data, where: { originalTransactionId: `test:${userId}` } });
+}

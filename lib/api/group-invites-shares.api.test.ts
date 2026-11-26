@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
-import { api, closeDatabase, installFakes, pushes, resetDatabase, signIn, type Session, uploadPng } from "./test/harness.ts";
+import { api, closeDatabase, installFakes, pushes, resetDatabase, signIn, type Session, uploadPng, givePlan } from "./test/harness.ts";
 
 // Personal one-time invites next to the group's reusable code, and the owner choosing what sharing
 // members show them.
@@ -19,6 +19,7 @@ before(async () => {
   ben = await signIn("ben3@example.com");
   cleo = await signIn("cleo3@example.com");
   await api("PATCH", "/me", { body: { name: "Ana" }, token: ana.accessToken });
+  await givePlan(coach.userId, "pro10");
   const created = await api("POST", "/groups", { body: { name: "Strength Club", shares: ["summary", "weight"] }, token: coach.accessToken });
   assert.equal(created.status, 201, JSON.stringify(created.body));
   groupId = created.body.group.id;
@@ -105,6 +106,7 @@ describe("personal invites", () => {
 
 describe("what members share", () => {
   it("defaults to everything but weight and needs at least one", async () => {
+    await givePlan(coach.userId, "pro10");
     const created = await api("POST", "/groups", { body: { name: "Defaults" }, token: coach.accessToken });
     assert.deepEqual(created.body.group.shares, ["summary", "meals", "photos", "activity"]);
     const none = await api("PATCH", `/groups/${created.body.group.id}`, { body: { shares: [] }, token: coach.accessToken });
@@ -174,6 +176,7 @@ describe("what members share", () => {
 describe("a member's meal photos", () => {
   it("open for the owner only while the member shares them", async () => {
     const dana = await signIn("dana3@example.com");
+    await givePlan(coach.userId, "pro10");
     const created = await api("POST", "/groups", { body: { name: "Photo Club", shares: ["meals", "photos"] }, token: coach.accessToken });
     const { id, joinCode } = created.body.group;
     assert.equal((await api("POST", `/invites/${joinCode}/join`, { token: dana.accessToken })).status, 201);

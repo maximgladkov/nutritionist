@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import { shiftYmd } from "../timezone.ts";
-import { api, closeDatabase, installFakes, PNG_BYTES, pushes, resetDatabase, seedOffProduct, signIn, uploadPng, type Session } from "./test/harness.ts";
+import { api, closeDatabase, installFakes, PNG_BYTES, pushes, resetDatabase, seedOffProduct, signIn, uploadPng, type Session, givePlan } from "./test/harness.ts";
 
 const BREAD = "8480000123459";
 let coach: Session;
@@ -90,6 +90,7 @@ describe("groups", () => {
   let itemId: string;
 
   it("creates a group and previews its invite without signing in", async () => {
+    await givePlan(coach.userId, "pro10");
     const created = await api("POST", "/groups", { body: { description: "Spring cut", name: "Elena's clients" }, token: coach.accessToken });
     assert.equal(created.status, 201, JSON.stringify(created.body));
     groupId = created.body.group.id;
