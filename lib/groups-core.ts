@@ -72,3 +72,10 @@ const ONE_EMOJI =
 export function isDayReaction(value: string): boolean {
   return value.length <= 32 && ONE_EMOJI.test(value);
 }
+
+// Each cover gets its own path, so a changed cover has a new URL and no cache keeps the old one.
+export function groupCoverBlobPath(groupId: string, mediaType: string, version: string): string {
+  const ext =
+    mediaType === "image/png" ? "png" : mediaType === "image/webp" ? "webp" : mediaType === "image/gif" ? "gif" : "jpg";
+  return `groups/${groupId}/cover-${version}.${ext}`;
+}

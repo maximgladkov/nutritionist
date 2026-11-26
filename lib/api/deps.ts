@@ -12,6 +12,8 @@ export type StoredBlob = { pathname: string; url: string };
 
 export type BlobStore = {
   put(pathname: string, bytes: Uint8Array, contentType: string): Promise<StoredBlob>;
+  // Anyone with the URL can open it (group covers).
+  putPublic(pathname: string, bytes: Uint8Array, contentType: string): Promise<StoredBlob>;
   read(url: string): Promise<{ body: ReadableStream<Uint8Array>; contentType: string } | null>;
   remove(url: string): Promise<void>;
 };
@@ -130,6 +132,16 @@ const vercelBlobStore: BlobStore = {
       addRandomSuffix: false,
       allowOverwrite: true,
       contentType,
+    });
+    return { pathname: stored.pathname, url: stored.url };
+  },
+  async putPublic(pathname, bytes, contentType) {
+    const stored = await put(pathname, Buffer.from(bytes), {
+      access: "public",
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      contentType,
+      multipart: bytes.byteLength > 4 * 1024 * 1024,
     });
     return { pathname: stored.pathname, url: stored.url };
   },

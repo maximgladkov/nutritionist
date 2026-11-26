@@ -90,6 +90,11 @@ export function installFakes(): void {
         blobs.set(url, { bytes, contentType });
         return { pathname, url };
       },
+      async putPublic(pathname, bytes, contentType) {
+        const url = `https://public.blob.test/${pathname}`;
+        blobs.set(url, { bytes, contentType });
+        return { pathname, url };
+      },
       async read(url) {
         const entry = blobs.get(url);
         return entry ? { body: new Response(Buffer.from(entry.bytes)).body!, contentType: entry.contentType } : null;

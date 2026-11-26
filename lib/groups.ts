@@ -1,6 +1,6 @@
 import type { GroupInvite, Prisma } from "../generated/prisma/client";
 import { groupInviteLinks } from "./app-url.ts";
-import { uploadGroupCover } from "./group-images.ts";
+import { discardGroupCover, uploadGroupCover } from "./group-images.ts";
 import {
   GroupError,
   GROUP_DESCRIPTION_MAX,
@@ -374,6 +374,8 @@ export async function updateGroup(input: {
   name?: string;
   ownerId: string;
   ownerTitle?: string;
+  // Back to the initials; a new image in the same request wins.
+  removeImage?: boolean;
   shares?: readonly GroupShareKind[];
 }): Promise<void> {
   await requireOwnedGroup(input.groupId, input.ownerId);
@@ -397,12 +399,21 @@ export async function updateGroup(input: {
     const cover = await uploadGroupCover({ file: input.image, groupId: input.groupId });
     data.imageBlobPath = cover.imageBlobPath;
     data.imageUrl = cover.imageUrl;
+  } else if (input.removeImage) {
+    data.imageBlobPath = "";
+    data.imageUrl = "";
   }
   if (Object.keys(data).length === 0) {
     throw new GroupError("Choose a name, description, or image to update.");
   }
-  const before = await prisma.group.findUnique({ select: { name: true, shares: true }, where: { id: input.groupId } });
+  const before = await prisma.group.findUnique({
+    select: { imageUrl: true, name: true, shares: true },
+    where: { id: input.groupId },
+  });
   await prisma.group.update({ data, where: { id: input.groupId } });
+  if (data.imageUrl !== undefined && before?.imageUrl && before.imageUrl !== data.imageUrl) {
+    await discardGroupCover(before.imageUrl);
+  }
   const added = (data.shares as GroupShareKind[] | undefined)?.filter((kind) => !before?.shares.includes(kind)) ?? [];
   if (added.length > 0) {
     void notifyShareAsk({ added, groupId: input.groupId, groupName: before?.name ?? "", ownerId: input.ownerId });
@@ -410,8 +421,9 @@ export async function updateGroup(input: {
 }
 
 export async function deleteGroup(input: { groupId: string; ownerId: string }): Promise<void> {
-  await requireOwnedGroup(input.groupId, input.ownerId);
+  const group = await requireOwnedGroup(input.groupId, input.ownerId);
   await prisma.group.delete({ where: { id: input.groupId } });
+  await discardGroupCover(group.imageUrl);
 }
 
 // Rotating revokes both the link and the typed code.
