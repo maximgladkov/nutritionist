@@ -227,6 +227,8 @@ const groupBodySchema = z.object({
   uploadId: z.string().min(1).optional(),
 });
 
+const groupUpdateSchema = groupBodySchema.extend({ removeImage: z.literal(true).optional() });
+
 const noticeBodySchema = z.object({
   body: z.string().max(GROUP_NOTICE_BODY_MAX),
   pinned: z.boolean().optional(),
@@ -299,7 +301,7 @@ export const groupRoutes: RouteDefinition[] = [
   },
   {
     async handler({ params, request, user }) {
-      const body = await readJson(request, groupBodySchema);
+      const body = await readJson(request, groupUpdateSchema);
       await updateGroup({
         description: body.description,
         groupId: params.id ?? "",
@@ -308,6 +310,7 @@ export const groupRoutes: RouteDefinition[] = [
         name: body.name,
         ownerId: user.id,
         ownerTitle: body.ownerTitle,
+        removeImage: body.removeImage,
         shares: body.shares,
       });
       return { group: await getOwnedGroupDetail({ groupId: params.id ?? "", ownerId: user.id }) };
