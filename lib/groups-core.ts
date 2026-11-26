@@ -52,3 +52,21 @@ export function leaveGroupDecision(input: {
   }
   return "leave";
 }
+
+// Parts of a member's day the owner can comment on or react to: the whole day, one of the day's
+// totals, or a meal.
+export const DAY_TOTAL_PARTS = ["total:kcal", "total:protein", "total:carbs", "total:fat"] as const;
+export const DAY_MEAL_PARTS = ["meal:breakfast", "meal:lunch", "meal:dinner", "meal:snack", "meal:other"] as const;
+export const DAY_PARTS = ["day", ...DAY_TOTAL_PARTS, ...DAY_MEAL_PARTS] as const;
+export type DayPart = (typeof DAY_PARTS)[number];
+
+export function isDayPart(value: string): value is DayPart {
+  return (DAY_PARTS as readonly string[]).includes(value);
+}
+
+// The quick reactions owners leave, with or without a comment.
+export const DAY_REACTIONS = ["👍", "💪", "🔥", "❤️", "🤔"] as const;
+
+export function isDayReaction(value: string): boolean {
+  return (DAY_REACTIONS as readonly string[]).includes(value);
+}

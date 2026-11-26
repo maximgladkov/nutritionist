@@ -33,7 +33,14 @@ import {
   updateGroupNotice,
   type GroupNoticeView,
 } from "../../group-notices.ts";
-import { GROUP_INVITE_NOTE_MAX, GROUP_NOTICE_BODY_MAX, GROUP_NOTICE_TITLE_MAX } from "../../groups-core.ts";
+import { loadDayExtras, loadReviewBoard, setDayReaction, setDayReviewed } from "../../group-reviews.ts";
+import {
+  DAY_PARTS,
+  DAY_REACTIONS,
+  GROUP_INVITE_NOTE_MAX,
+  GROUP_NOTICE_BODY_MAX,
+  GROUP_NOTICE_TITLE_MAX,
+} from "../../groups-core.ts";
 import { formatDateInTimeZone } from "../../timezone.ts";
 import { readSummaryContext } from "../../summary.ts";
 import { requireUser } from "../auth.ts";
@@ -95,6 +102,7 @@ type MessageRow = {
   replyToId: string | null;
   targetDate: string | null;
   targetMealItemId: string | null;
+  targetPart: string | null;
   toUserId: string;
 };
 
@@ -151,7 +159,7 @@ function messageView(row: MessageRow, foods: ReadonlyMap<string, TargetFood> = n
     target: row.targetMealItemId
       ? { food: foods.get(row.targetMealItemId) ?? null, mealItemId: row.targetMealItemId, type: "mealItem" as const }
       : row.targetDate
-        ? { date: row.targetDate, type: "day" as const }
+        ? { date: row.targetDate, part: row.targetPart ?? "day", type: "day" as const }
         : null,
     toUserId: row.toUserId,
   };
@@ -398,8 +406,8 @@ export const groupRoutes: RouteDefinition[] = [
         take: 200,
         where: { groupId, toUserId: memberId },
       });
-      const foods = await loadTargetFoods(rows, memberId);
-      return { messages: rows.map((row) => messageView(row, foods)) };
+      const [foods, extras] = await Promise.all([loadTargetFoods(rows, memberId), loadDayExtras(groupId, memberId)]);
+      return { messages: rows.map((row) => messageView(row, foods)), ...extras };
     },
     method: "GET",
     path: "/groups/:id/messages",
@@ -416,7 +424,10 @@ export const groupRoutes: RouteDefinition[] = [
           memberId: z.string().min(1).optional(),
           replyToId: z.string().min(1).optional(),
           target: z
-            .union([z.object({ date: ymdSchema, type: z.literal("day") }), z.object({ mealItemId: z.string().min(1), type: z.literal("mealItem") })])
+            .union([
+              z.object({ date: ymdSchema, part: z.enum(DAY_PARTS).optional(), type: z.literal("day") }),
+              z.object({ mealItemId: z.string().min(1), type: z.literal("mealItem") }),
+            ])
             .optional(),
         }),
       );
@@ -443,13 +454,14 @@ export const groupRoutes: RouteDefinition[] = [
             replyToId: parent.replyToId ?? parent.id,
             targetDate: parent.targetDate,
             targetMealItemId: parent.targetMealItemId,
+            targetPart: parent.targetPart,
             toUserId: user.id,
           },
           include: { ...messageInclude, group: { select: { name: true, ownerId: true } } },
         });
         void pushToUser(row.group.ownerId, {
           body: row.body,
-          data: { groupId, memberId: user.id, messageId: row.id, type: "group_reply" },
+          data: { date: row.targetDate, groupId, memberId: user.id, messageId: row.id, type: "group_reply" },
           title: row.fromUser.name ? `${row.fromUser.name} · ${row.group.name}` : row.group.name,
         });
         return { message: messageView(row, await loadTargetFoods([row], user.id)) };
@@ -466,10 +478,12 @@ export const groupRoutes: RouteDefinition[] = [
       }
       const sent = await sendGroupMessage({ body: body.body, groupId, memberId, ownerId: user.id });
       const target = parent
-        ? { targetDate: parent.targetDate, targetMealItemId: parent.targetMealItemId }
+        ? { targetDate: parent.targetDate, targetMealItemId: parent.targetMealItemId, targetPart: parent.targetPart }
         : {
             targetDate: body.target?.type === "day" ? body.target.date : null,
             targetMealItemId: body.target?.type === "mealItem" ? body.target.mealItemId : null,
+            // The whole day stays null, as comments from before parts existed.
+            targetPart: body.target?.type === "day" && body.target.part && body.target.part !== "day" ? body.target.part : null,
           };
       const row = await prisma.groupMessage.update({
         data: { ...target, replyToId: parent ? (parent.replyToId ?? parent.id) : null },
@@ -478,7 +492,7 @@ export const groupRoutes: RouteDefinition[] = [
       });
       void pushToUser(memberId, {
         body: row.body,
-        data: { groupId, messageId: row.id, type: "group_message" },
+        data: { date: row.targetDate, groupId, messageId: row.id, type: "group_message" },
         title: row.fromUser.name ? `${row.fromUser.name} · ${row.group.name}` : row.group.name,
       });
       return { message: messageView(row, await loadTargetFoods([row], memberId)) };
@@ -600,6 +614,34 @@ export const groupRoutes: RouteDefinition[] = [
     },
     method: "GET",
     path: "/groups/:id/members/:memberId/weights",
+  },
+  {
+    // The owner's review board for a day: each member's status, and a calendar of days to review.
+    async handler({ params, url, user }) {
+      const query = readQuery(url, z.object({ date: ymdSchema.optional(), from: ymdSchema.optional(), to: ymdSchema.optional() }));
+      return loadReviewBoard({ ...query, groupId: params.id ?? "", ownerId: user.id });
+    },
+    method: "GET",
+    path: "/groups/:id/reviews",
+  },
+  {
+    async handler({ params, request, user }) {
+      const body = await readJson(request, z.object({ reviewed: z.boolean() }));
+      const date = ymdSchema.parse(params.date ?? "");
+      return setDayReviewed({ date, groupId: params.id ?? "", memberId: params.memberId ?? "", ownerId: user.id, reviewed: body.reviewed });
+    },
+    method: "PUT",
+    path: "/groups/:id/members/:memberId/days/:date/review",
+  },
+  {
+    // A quick reaction on the day, a total or a meal; null takes it back.
+    async handler({ params, request, user }) {
+      const body = await readJson(request, z.object({ emoji: z.enum(DAY_REACTIONS).nullable(), part: z.enum(DAY_PARTS) }));
+      const date = ymdSchema.parse(params.date ?? "");
+      return setDayReaction({ ...body, date, groupId: params.id ?? "", memberId: params.memberId ?? "", ownerId: user.id });
+    },
+    method: "PUT",
+    path: "/groups/:id/members/:memberId/days/:date/reaction",
   },
   {
     async handler({ params, request, user }) {

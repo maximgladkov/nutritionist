@@ -15,6 +15,7 @@ import {
   isInviteToken,
   planMembershipMerge,
 } from "./groups-invite.ts";
+import { reassignDayReviewsOnUserMerge } from "./group-reviews.ts";
 import { generateJoinCode, normalizeJoinCode } from "./groups-join-code.ts";
 import { pushToUser } from "./api/push.ts";
 import { resolveLocale, type Locale } from "./i18n/locales.ts";
@@ -759,6 +760,7 @@ export async function reassignGroupsOnUserMerge(
     data: { toUserId: survivorId },
     where: { toUserId: absorbedId },
   });
+  await reassignDayReviewsOnUserMerge(tx, survivorId, absorbedId);
   const [survivorMembers, absorbedMembers] = await Promise.all([
     tx.groupMember.findMany({ where: { userId: survivorId } }),
     tx.groupMember.findMany({ where: { userId: absorbedId } }),
