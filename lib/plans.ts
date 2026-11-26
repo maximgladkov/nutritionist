@@ -7,7 +7,7 @@ export type PlanLimits = {
   aiWeeklyMinutes: number | null;
   // Groups someone may own.
   groups: number | null;
-  // People across all of a coach's groups who get Plus while they're in them.
+  // Active clients across all of a coach's groups.
   members: number;
   // Owners review members' days: marking them reviewed and reacting.
   reviews: boolean;
@@ -80,11 +80,9 @@ export function appAccountToken(userId: string): string {
   ].join("-");
 }
 
-export type PlanSource = "apple" | "coach" | "free";
+export type PlanSource = "apple" | "free";
 
 export type CurrentPlan = {
-  // Set when a coach's Pro plan gives someone Plus.
-  coach: { name: string | null } | null;
   expiresAt: string | null;
   id: PlanId;
   limits: PlanLimits;
@@ -94,7 +92,6 @@ export type CurrentPlan = {
 };
 
 const FREE: CurrentPlan = {
-  coach: null,
   expiresAt: null,
   id: "free",
   limits: PLANS.free,
@@ -113,7 +110,6 @@ async function paidPlan(userId: string, now: Date): Promise<CurrentPlan | null> 
     const id = planForProduct(subscription.productId);
     if (!id || (best && RANK[best.id] >= RANK[id])) continue;
     best = {
-      coach: null,
       expiresAt: subscription.expiresAt.toISOString(),
       id,
       limits: PLANS[id],
@@ -125,9 +121,9 @@ async function paidPlan(userId: string, now: Date): Promise<CurrentPlan | null> 
   return best;
 }
 
-// People in a coach's groups, earliest first, who get Plus from the coach's plan: the first
-// `members` of them, so someone joining past the cap doesn't take it from anyone.
-export async function sponsoredMembers(ownerId: string, members: number): Promise<string[]> {
+// People in a coach's groups, earliest first, counted against the plan's active clients: the first
+// `members` of them, so someone joining past the cap doesn't take a spot from anyone.
+export async function activeClients(ownerId: string, members: number): Promise<string[]> {
   if (members <= 0) return [];
   const rows = await prisma.groupMember.findMany({
     orderBy: { joinedAt: "asc" },
@@ -137,32 +133,6 @@ export async function sponsoredMembers(ownerId: string, members: number): Promis
   return [...new Set(rows.map((row) => row.userId))].slice(0, members);
 }
 
-// A Pro coach whose groups this person is in, and whose plan covers them.
-async function coachPlan(userId: string, now: Date): Promise<CurrentPlan | null> {
-  const memberships = await prisma.groupMember.findMany({
-    select: { group: { select: { owner: { select: { id: true, name: true } } } } },
-    where: { role: "member", userId },
-  });
-  const owners = new Map(memberships.map((row) => [row.group.owner.id, row.group.owner.name]));
-  owners.delete(userId);
-  for (const [ownerId, name] of owners) {
-    const plan = await paidPlan(ownerId, now);
-    if (!plan || !isPro(plan.id)) continue;
-    if (!(await sponsoredMembers(ownerId, plan.limits.members)).includes(userId)) continue;
-    return {
-      coach: { name },
-      expiresAt: null,
-      id: "plus",
-      // Calls cost the most, so they stay at what Free gets.
-      limits: { ...PLANS.plus, groups: PLANS.free.groups, talkWeeklyMinutes: PLANS.free.talkWeeklyMinutes },
-      productId: null,
-      source: "coach",
-      willRenew: false,
-    };
-  }
-  return null;
-}
-
 export async function loadPlan(userId: string, now: Date): Promise<CurrentPlan> {
-  return (await paidPlan(userId, now)) ?? (await coachPlan(userId, now)) ?? FREE;
+  return (await paidPlan(userId, now)) ?? FREE;
 }
