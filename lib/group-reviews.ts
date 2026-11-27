@@ -1,5 +1,6 @@
 import type { Prisma } from "../generated/prisma/client";
 import { pushToUser } from "./api/push.ts";
+import { pushCopy, userLocale } from "./push-copy.ts";
 import { effectiveShares, notifyMemberOfMessage, requireOwnerCanViewMemberNutrition, type GroupShareKind } from "./groups.ts";
 import { GroupError, isDayPart, isDayReaction } from "./groups-core.ts";
 import { prisma } from "./prisma.ts";
@@ -297,13 +298,14 @@ async function notifyReviewed(input: {
   if (!group) {
     return;
   }
-  const who = owner?.name?.trim().split(/\s+/u)[0] || "Your coach";
-  const more = input.comments > 1 ? ` (+${input.comments - 1} more)` : "";
+  const copy = pushCopy(await userLocale(input.memberId));
+  const who = owner?.name?.trim().split(/\s+/u)[0] || copy.yourCoach;
+  const more = input.comments > 1 ? copy.moreComments(input.comments - 1) : "";
   const body = input.first
     ? `${input.first}${more}`
     : input.comments > 0
-      ? `${who} left ${input.comments === 1 ? "a comment" : `${input.comments} comments`} on your day.`
-      : `${who} reviewed your day${input.reactions > 0 ? " and reacted to it" : ""}.`;
+      ? copy.commented(who, input.comments)
+      : copy.reviewed(who, input.reactions > 0);
   await pushToUser(input.memberId, {
     body,
     data: { date: input.date, groupId: input.groupId, type: "group_review" },

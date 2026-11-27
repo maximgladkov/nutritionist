@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { fatSecretReportText } from "../../fatsecret-import.ts";
+import type { Locale } from "../../i18n/locales.ts";
 import { prisma } from "../../prisma.ts";
 import { sealSecret, openSecret } from "../../secret-box.ts";
 import { apiDeps } from "../deps.ts";
@@ -33,7 +34,7 @@ export type FatSecretView = {
   status: "disconnected" | "pending" | "connected";
 };
 
-async function fatSecretView(userId: string): Promise<FatSecretView> {
+async function fatSecretView(userId: string, locale: Locale): Promise<FatSecretView> {
   const available = apiDeps().fatSecret.configured();
   const row = await prisma.fatSecretConnection.findUnique({ where: { userId } });
   if (!row || (row.status !== "connected" && !row.requestToken)) {
@@ -55,7 +56,7 @@ async function fatSecretView(userId: string): Promise<FatSecretView> {
             oldestDate: row.importOldestDate,
             report:
               status === "done"
-                ? fatSecretReportText({ days: row.importedDays, entries: row.importedEntries, weights: row.importedWeights })
+                ? fatSecretReportText({ days: row.importedDays, entries: row.importedEntries, weights: row.importedWeights }, locale)
                 : null,
             startedAt: row.importStartedAt?.toISOString() ?? null,
             status,
@@ -109,8 +110,8 @@ function donePage(message: string): Response {
 
 export const integrationRoutes: RouteDefinition[] = [
   {
-    async handler({ user }) {
-      return { fatsecret: await fatSecretView(user.id) };
+    async handler({ locale, user }) {
+      return { fatsecret: await fatSecretView(user.id, await locale()) };
     },
     method: "GET",
     path: "/integrations",
@@ -188,7 +189,7 @@ export const integrationRoutes: RouteDefinition[] = [
     path: "/integrations/fatsecret/callback",
   },
   {
-    async handler({ user }) {
+    async handler({ locale, user }) {
       const row = await prisma.fatSecretConnection.findUnique({ where: { userId: user.id } });
       if (!row || row.status !== "connected") {
         throw new ApiError(409, "not_connected", "Connect FatSecret first.");
@@ -196,7 +197,7 @@ export const integrationRoutes: RouteDefinition[] = [
       if (row.importStatus !== "running") {
         await queueImport(user.id);
       }
-      return { fatsecret: await fatSecretView(user.id) };
+      return { fatsecret: await fatSecretView(user.id, await locale()) };
     },
     method: "POST",
     path: "/integrations/fatsecret/import",

@@ -1,6 +1,8 @@
 import type { MealLabel } from "../generated/prisma/client.ts";
 import { apiDeps } from "./api/deps.ts";
 import { pushToUser } from "./api/push.ts";
+import type { Locale } from "./i18n/locales.ts";
+import { pushCopy, userLocale, type ImportCounts } from "./push-copy.ts";
 import { fatSecretDateInt, fatSecretYmd, type FatSecretFoodEntry, type FatSecretServing, type FatSecretTokens } from "./fatsecret.ts";
 import { upsertMealItems, type MealItemInput } from "./meals.ts";
 import { parseServingSize } from "./nutrition.ts";
@@ -226,15 +228,8 @@ export async function beginFatSecretImport(userId: string): Promise<string> {
   return now.toISOString().slice(0, 7);
 }
 
-export function fatSecretReportText(counts: { days: number; entries: number; weights: number }): string {
-  const plural = (count: number, one: string, many: string) => `${count.toLocaleString("en-US")} ${count === 1 ? one : many}`;
-  if (counts.entries === 0 && counts.weights === 0) {
-    return "Nothing new to bring over from FatSecret.";
-  }
-  const parts = [];
-  if (counts.entries > 0) parts.push(`${plural(counts.entries, "food", "foods")} across ${plural(counts.days, "day", "days")}`);
-  if (counts.weights > 0) parts.push(plural(counts.weights, "weigh-in", "weigh-ins"));
-  return `Imported ${parts.join(" and ")}.`;
+export function fatSecretReportText(counts: ImportCounts, locale: Locale = "en"): string {
+  return pushCopy(locale).fatSecret.report(counts);
 }
 
 export async function finishFatSecretImport(userId: string, error?: string): Promise<void> {
@@ -245,10 +240,11 @@ export async function finishFatSecretImport(userId: string, error?: string): Pro
   // Disconnected while importing: nothing to report.
   const connection = updated.count > 0 ? await prisma.fatSecretConnection.findUnique({ where: { userId } }) : null;
   if (!connection) return;
+  const { fatSecret } = pushCopy(await userLocale(userId));
   const body = error
-    ? "The FatSecret import stopped before it finished. Open Connections to try again."
-    : fatSecretReportText({ days: connection.importedDays, entries: connection.importedEntries, weights: connection.importedWeights });
-  await pushToUser(userId, { body, data: { type: "fatsecret_import" }, title: error ? "FatSecret import stopped" : "FatSecret import done" });
+    ? fatSecret.failed
+    : fatSecret.report({ days: connection.importedDays, entries: connection.importedEntries, weights: connection.importedWeights });
+  await pushToUser(userId, { body, data: { type: "fatsecret_import" }, title: error ? fatSecret.failedTitle : fatSecret.done });
 }
 
 // Runs the whole import in this process (tests and scripts); production runs it as a workflow.

@@ -210,6 +210,18 @@ describe("notes wait for the day's review", () => {
     await wait();
     assert.equal(pushes.length, 1);
   });
+
+  it("writes the notification in the member's language", async () => {
+    await api("PATCH", "/me", { body: { locale: "de" }, token: kira.accessToken });
+    pushes.length = 0;
+    const earlier = shiftYmd(yesterday, -1);
+    await api("PUT", `/groups/${groupId}/members/${kira.userId}/days/${earlier}/review`, { body: { reviewed: true }, token: coach.accessToken });
+    await wait();
+    await api("PATCH", "/me", { body: { locale: "en" }, token: kira.accessToken });
+    await api("PUT", `/groups/${groupId}/members/${kira.userId}/days/${earlier}/review`, { body: { reviewed: false }, token: coach.accessToken });
+    assert.equal(pushes.length, 1);
+    assert.match(pushes[0]?.body ?? "", / hat deinen Tag durchgesehen\.$/u);
+  });
 });
 
 describe("reactions and comments on part of the day", () => {

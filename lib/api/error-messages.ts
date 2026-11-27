@@ -4,7 +4,7 @@ type Translated = { de: string; es: string; ru: string };
 
 // Error messages the API writes in English, in the other languages the app speaks. Keyed by the
 // English text, so throw sites stay as they are and toApiError can keep reading English to pick a
-// status. Messages built from values (domain errors, validation) aren't here and stay English.
+// status. Messages with a value in them are in TEMPLATES below; developer-facing ones stay English.
 const MESSAGES: Record<string, Translated> = {
   // Defaults and the router's own.
   "Invalid request.": { de: "Ungültige Anfrage.", es: "La solicitud no es válida.", ru: "Неверный запрос." },
@@ -161,8 +161,177 @@ const MESSAGES: Record<string, Translated> = {
     ru: "Участник приостановил доступ группы к своему дневнику.",
   },
   "Write a message.": { de: "Schreib eine Nachricht.", es: "Escribe un mensaje.", ru: "Напишите сообщение." },
+  // Signing in and accounts, again.
+  "Too many codes requested. Try again in a few minutes.": {
+    de: "Zu viele Codes angefordert. Versuch es in ein paar Minuten noch mal.",
+    es: "Pediste demasiados códigos. Inténtalo de nuevo en unos minutos.",
+    ru: "Слишком много запросов кода. Попробуйте через несколько минут.",
+  },
+  "That Apple ID already opens another Btr.me account. Use a link code to join the two.": {
+    de: "Mit dieser Apple-ID wird schon ein anderes Btr.me-Konto geöffnet. Verbinde die beiden mit einem Verknüpfungscode.",
+    es: "Ese Apple ID ya abre otra cuenta de Btr.me. Usa un código de vinculación para unirlas.",
+    ru: "Этот Apple ID уже открывает другой аккаунт Btr.me. Объедините их с помощью кода привязки.",
+  },
+  "Add another way to sign in before removing this one.": {
+    de: "Füge erst eine andere Anmeldemethode hinzu, bevor du diese entfernst.",
+    es: "Añade otra forma de iniciar sesión antes de quitar esta.",
+    ru: "Добавьте другой способ входа, прежде чем удалять этот.",
+  },
+  "Telegram login expired. Try signing in again.": {
+    de: "Die Telegram-Anmeldung ist abgelaufen. Melde dich erneut an.",
+    es: "La sesión de Telegram caducó. Vuelve a iniciar sesión.",
+    ru: "Вход через Telegram истёк. Войдите снова.",
+  },
+  "Telegram login expired. Close and open the summary again.": {
+    de: "Die Telegram-Anmeldung ist abgelaufen. Schließ die Übersicht und öffne sie erneut.",
+    es: "La sesión de Telegram caducó. Cierra el resumen y vuelve a abrirlo.",
+    ru: "Вход через Telegram истёк. Закройте сводку и откройте её снова.",
+  },
+
+  // Plans and purchases.
+  "Creating groups is part of Plus and Pro.": {
+    de: "Gruppen erstellen gehört zu Plus und Pro.",
+    es: "Crear grupos es parte de Plus y Pro.",
+    ru: "Создание групп входит в Plus и Pro.",
+  },
+  "That purchase is for another app.": { de: "Dieser Kauf gehört zu einer anderen App.", es: "Esa compra es de otra app.", ru: "Эта покупка относится к другому приложению." },
+  "That isn't a Btr.me plan.": { de: "Das ist kein Btr.me-Plan.", es: "Ese no es un plan de Btr.me.", ru: "Это не тариф Btr.me." },
+  "This subscription belongs to another Btr.me account.": {
+    de: "Dieses Abo gehört zu einem anderen Btr.me-Konto.",
+    es: "Esta suscripción pertenece a otra cuenta de Btr.me.",
+    ru: "Эта подписка привязана к другому аккаунту Btr.me.",
+  },
+  "This coach has no spots left for new clients. Ask them to make room.": {
+    de: "Bei diesem Coach ist kein Platz mehr für neue Klienten frei. Bitte um einen freien Platz.",
+    es: "Este coach no tiene plazas para clientes nuevos. Pídele que haga sitio.",
+    ru: "У этого коуча нет мест для новых клиентов. Попросите освободить место.",
+  },
+
+  // FatSecret.
+  "FatSecret isn't available right now.": { de: "FatSecret ist gerade nicht verfügbar.", es: "FatSecret no está disponible ahora mismo.", ru: "FatSecret сейчас недоступен." },
+  "Connect FatSecret first.": { de: "Verbinde zuerst FatSecret.", es: "Conecta FatSecret primero.", ru: "Сначала подключите FatSecret." },
+
+  // Meals and reminders.
+  "Meal not found": { de: "Mahlzeit nicht gefunden.", es: "No se encontró la comida.", ru: "Приём пищи не найден." },
+  "Meal item not found": { de: "Eintrag nicht gefunden.", es: "No se encontró ese alimento.", ru: "Продукт в приёме пищи не найден." },
+  "Reminder not found": { de: "Erinnerung nicht gefunden.", es: "No se encontró el recordatorio.", ru: "Напоминание не найдено." },
+  "Save a timezone before changing reminders": {
+    de: "Speichere eine Zeitzone, bevor du Erinnerungen änderst.",
+    es: "Guarda una zona horaria antes de cambiar los recordatorios.",
+    ru: "Сохраните часовой пояс, прежде чем менять напоминания.",
+  },
+
+  // Groups, again.
+  "Choose a smaller image.": { de: "Wähle ein kleineres Bild.", es: "Elige una imagen más pequeña.", ru: "Выберите изображение поменьше." },
+  "Choose a group name.": { de: "Gib der Gruppe einen Namen.", es: "Ponle un nombre al grupo.", ru: "Придумайте название группы." },
+  "Choose a shorter group name.": { de: "Wähle einen kürzeren Gruppennamen.", es: "Elige un nombre de grupo más corto.", ru: "Сократите название группы." },
+  "Choose a shorter description.": { de: "Wähle eine kürzere Beschreibung.", es: "Elige una descripción más corta.", ru: "Сократите описание." },
+  "Choose a shorter message.": { de: "Schreib eine kürzere Nachricht.", es: "Escribe un mensaje más corto.", ru: "Сократите сообщение." },
+  "Choose a shorter note.": { de: "Schreib eine kürzere Notiz.", es: "Escribe una nota más corta.", ru: "Сократите заметку." },
+  "Choose a shorter title.": { de: "Wähle einen kürzeren Titel.", es: "Elige un título más corto.", ru: "Сократите заголовок." },
+  "Choose a shorter notice.": { de: "Schreib eine kürzere Mitteilung.", es: "Escribe un aviso más corto.", ru: "Сократите объявление." },
+  "Choose a name, description, or image to update.": {
+    de: "Wähle einen Namen, eine Beschreibung oder ein Bild zum Ändern.",
+    es: "Elige un nombre, una descripción o una imagen para cambiar.",
+    ru: "Выберите, что изменить: название, описание или изображение.",
+  },
+  "Choose at least one thing members share.": {
+    de: "Wähle mindestens eine Sache, die Mitglieder teilen.",
+    es: "Elige al menos una cosa que compartan los miembros.",
+    ru: "Выберите хотя бы одно, чем делятся участники.",
+  },
+  "Could not create that group.": { de: "Die Gruppe konnte nicht erstellt werden.", es: "No se pudo crear el grupo.", ru: "Не удалось создать группу." },
+  "Give the notice a title.": { de: "Gib der Mitteilung einen Titel.", es: "Ponle un título al aviso.", ru: "Добавьте заголовок объявления." },
+  "Write the notice.": { de: "Schreib die Mitteilung.", es: "Escribe el aviso.", ru: "Напишите объявление." },
+  "Notice not found.": { de: "Mitteilung nicht gefunden.", es: "No se encontró el aviso.", ru: "Объявление не найдено." },
+  "Only the group owner can post notices; you cannot edit them.": {
+    de: "Nur die Gruppenleitung kann Mitteilungen posten; du kannst sie nicht bearbeiten.",
+    es: "Solo quien creó el grupo puede publicar avisos; tú no puedes editarlos.",
+    ru: "Объявления публикует только владелец группы; изменить их вы не можете.",
+  },
+  "Invite not found.": { de: "Einladung nicht gefunden.", es: "No se encontró la invitación.", ru: "Приглашение не найдено." },
+  "That invite link is not valid.": { de: "Dieser Einladungslink ist ungültig.", es: "Ese enlace de invitación no es válido.", ru: "Эта ссылка-приглашение недействительна." },
+  "You are not a member of that group.": { de: "Du bist kein Mitglied dieser Gruppe.", es: "No eres miembro de ese grupo.", ru: "Вы не участник этой группы." },
+  "You are not in that group.": { de: "Du bist nicht in dieser Gruppe.", es: "No estás en ese grupo.", ru: "Вас нет в этой группе." },
+  "That person is not in this group.": { de: "Diese Person ist nicht in der Gruppe.", es: "Esa persona no está en este grupo.", ru: "Этого человека нет в группе." },
+  "Owners can delete the group instead of leaving.": {
+    de: "Als Gruppenleitung kannst du die Gruppe löschen, statt sie zu verlassen.",
+    es: "Quien creó el grupo puede eliminarlo en lugar de salir.",
+    ru: "Владелец может удалить группу, но не выйти из неё.",
+  },
+  "Owners cannot be removed.": { de: "Die Gruppenleitung kann nicht entfernt werden.", es: "No se puede quitar a quien creó el grupo.", ru: "Владельца нельзя удалить из группы." },
+  "You cannot edit that group.": { de: "Du kannst diese Gruppe nicht bearbeiten.", es: "No puedes editar ese grupo.", ru: "Вы не можете изменить эту группу." },
+  "You cannot review that group.": { de: "Du kannst die Tage dieser Gruppe nicht durchsehen.", es: "No puedes revisar ese grupo.", ru: "Вы не можете проверять дни этой группы." },
+  "That day hasn't happened yet": { de: "Dieser Tag kommt erst noch.", es: "Ese día todavía no ha llegado.", ru: "Этот день ещё не наступил." },
+  "React with one emoji.": { de: "Reagiere mit einem Emoji.", es: "Reacciona con un emoji.", ru: "Отреагируйте одним эмодзи." },
 };
 
+// Messages with a value in them, matched on the English and rewritten with that value.
+const TEMPLATES: { english: RegExp; de: string; es: string; ru: string }[] = [
+  {
+    english: /^Choose one of: (.+)\.$/,
+    de: "Wähle eins davon: $1.",
+    es: "Elige una de estas opciones: $1.",
+    ru: "Выберите одно из: $1.",
+  },
+  {
+    english: /^Your plan includes up to (\d+) groups\.$/,
+    de: "Dein Plan umfasst bis zu $1 Gruppen.",
+    es: "Tu plan incluye hasta $1 grupos.",
+    ru: "Ваш тариф включает до $1 групп.",
+  },
+  {
+    english: /^Attach up to (\d+) photos\.$/,
+    de: "Hänge bis zu $1 Fotos an.",
+    es: "Adjunta hasta $1 fotos.",
+    ru: "Прикрепите не больше $1 фото.",
+  },
+  {
+    english: /^A meal can have at most (\d+) items$/,
+    de: "Eine Mahlzeit kann höchstens $1 Einträge haben.",
+    es: "Una comida puede tener como máximo $1 alimentos.",
+    ru: "В приёме пищи может быть не больше $1 продуктов.",
+  },
+  {
+    english: /^Product not found for barcode (\S+)\.$/,
+    de: "Kein Produkt zum Barcode $1 gefunden.",
+    es: "No se encontró ningún producto con el código de barras $1.",
+    ru: "Продукт со штрихкодом $1 не найден.",
+  },
+  {
+    english: /^We know (.+) but not its nutrition yet\. Scan the nutrition label to add it\.$/,
+    de: "„$1“ kennen wir, aber noch nicht die Nährwerte. Scanne die Nährwerttabelle, um sie hinzuzufügen.",
+    es: "Conocemos «$1», pero aún no su información nutricional. Escanea la etiqueta nutricional para añadirla.",
+    ru: "Продукт «$1» нам известен, но его пищевой ценности пока нет. Отсканируйте этикетку, чтобы добавить её.",
+  },
+  // Goals: the goal's name comes in lower case.
+  ...(
+    [
+      ["calories", "kcal", { de: "Kalorien", es: "Las calorías diarias deben", ru: "Калории" }],
+      ["protein", "grams", { de: "Eiweiß", es: "La proteína diaria debe", ru: "Белок" }],
+      ["carbs", "grams", { de: "Kohlenhydrate", es: "Los carbohidratos diarios deben", ru: "Углеводы" }],
+      ["fat", "grams", { de: "Fett", es: "La grasa diaria debe", ru: "Жиры" }],
+      ["fiber", "grams", { de: "Ballaststoffe", es: "La fibra diaria debe", ru: "Клетчатка" }],
+    ] as const
+  ).map(([label, unit, name]) => {
+    const short = unit === "kcal" ? { de: "kcal", es: "kcal", ru: "ккал" } : { de: "g", es: "g", ru: "г" };
+    return {
+      english: new RegExp(`^Daily ${label} must be a whole number from (\\d+) to (\\d+) ${unit}\\.$`),
+      de: `Tageswert für ${name.de}: eine ganze Zahl von $1 bis $2 ${short.de}.`,
+      es: `${name.es} ser un número entero de $1 a $2 ${short.es}.`,
+      ru: `${name.ru} в день: целое число от $1 до $2 ${short.ru}.`,
+    };
+  }),
+];
+
 export function translateErrorMessage(message: string, locale: Locale): string {
-  return locale === "en" ? message : (MESSAGES[message]?.[locale] ?? message);
+  if (locale === "en") {
+    return message;
+  }
+  const known = MESSAGES[message]?.[locale];
+  if (known) {
+    return known;
+  }
+  const template = TEMPLATES.find(({ english }) => english.test(message));
+  return template ? message.replace(template.english, template[locale]) : message;
 }

@@ -19,6 +19,7 @@ import {
 import { reassignDayReviewsOnUserMerge } from "./group-reviews.ts";
 import { generateJoinCode, normalizeJoinCode } from "./groups-join-code.ts";
 import { pushToUser } from "./api/push.ts";
+import { pushCopy, userLocale } from "./push-copy.ts";
 import { clientCapReached } from "./plans.ts";
 import { resolveLocale, type Locale } from "./i18n/locales.ts";
 import { avatarUrl, personSelect } from "./profile.ts";
@@ -836,29 +837,22 @@ function normalizeMessage(value: string): string {
   return body;
 }
 
-const SHARE_NAMES: Record<GroupShareKind, string> = {
-  activity: "activity",
-  meals: "meal items",
-  photos: "meal photos",
-  summary: "daily summary",
-  weight: "weight",
-};
-
 // Tells members who haven't answered the new items that the owner asks for them.
 async function notifyShareAsk(input: { added: GroupShareKind[]; groupId: string; groupName: string; ownerId: string }): Promise<void> {
   const [owner, members] = await Promise.all([
     prisma.user.findUnique({ select: { name: true }, where: { id: input.ownerId } }),
     prisma.groupMember.findMany({ select: { answeredShares: true, userId: true }, where: { groupId: input.groupId, role: "member" } }),
   ]);
-  const who = owner?.name?.trim().split(/\s+/u)[0] || "Your coach";
   await Promise.all(
-    members.map((member) => {
+    members.map(async (member) => {
       const asked = input.added.filter((kind) => !member.answeredShares.includes(kind));
       if (asked.length === 0) {
-        return Promise.resolve(0);
+        return 0;
       }
+      const copy = pushCopy(await userLocale(member.userId));
+      const who = owner?.name?.trim().split(/\s+/u)[0] || copy.yourCoach;
       return pushToUser(member.userId, {
-        body: `${who} also asks to see your ${asked.map((kind) => SHARE_NAMES[kind]).join(", ")}. Open the group to allow it.`,
+        body: copy.shareAsk(who, asked),
         data: { groupId: input.groupId, type: "group_share_ask" },
         title: input.groupName,
       });
