@@ -34,15 +34,22 @@ describe("day flags", () => {
   it("flags fat over the limit, with what to skip and what to have for the next meal", () => {
     const [flag] = dayFlags(day({ eaten: { fat: 75 } }));
     assert.equal(flag!.key, "over:fat");
-    assert.match(flag!.plain, /^fat is at 75 g of a 60 g limit today\. For dinner, go lean: chicken or fish with vegetables, nothing fried or creamy\.$/);
+    assert.match(flag!.plain.en, /^fat is at 75 g of a 60 g limit today\. For dinner, go lean: chicken or fish with vegetables, nothing fried or creamy\.$/);
     assert.match(flag!.text, /they set/);
     assert.ok(flag!.score >= 95 && flag!.score < 100);
   });
 
+  it("says the same in the other languages when no model words it", () => {
+    const [flag] = dayFlags(day({ eaten: { fat: 75 } }));
+    assert.equal(flag!.plain.es, "grasa hoy: 75 g de un límite de 60 g. Para la cena, ve a lo ligero: pollo o pescado con verduras, nada frito ni con nata.");
+    assert.equal(flag!.plain.de, "Fett heute: 75 g bei einer Grenze von 60 g. Zum Abendessen: bleib mager: Hähnchen oder Fisch mit Gemüse, nichts Frittiertes oder Sahniges.");
+    assert.equal(flag!.plain.ru, "жиры сегодня: 75 г при норме 60 г. На ужин — выбирай нежирное: курица или рыба с овощами, ничего жареного и сливочного.");
+  });
+
   it("names a usual food only when it's lean, known and not already had", () => {
-    assert.match(dayFlags(day({ eaten: { fat: 75 }, usual: [BURGER, MYSTERY, COD] }))[0]!.plain, /your usual Baked cod fits\.$/);
-    assert.match(dayFlags(day({ eaten: { fat: 75 }, usual: [BURGER, MYSTERY] }))[0]!.plain, /go lean: chicken or fish/);
-    assert.match(dayFlags(day({ eaten: { fat: 75 }, had: new Set(["baked cod"]), usual: [COD] }))[0]!.plain, /go lean/);
+    assert.match(dayFlags(day({ eaten: { fat: 75 }, usual: [BURGER, MYSTERY, COD] }))[0]!.plain.en, /your usual Baked cod fits\.$/);
+    assert.match(dayFlags(day({ eaten: { fat: 75 }, usual: [BURGER, MYSTERY] }))[0]!.plain.en, /go lean: chicken or fish/);
+    assert.match(dayFlags(day({ eaten: { fat: 75 }, had: new Set(["baked cod"]), usual: [COD] }))[0]!.plain.en, /go lean/);
   });
 
   it("puts the limit passed furthest first, and ignores a crumb over", () => {
@@ -53,7 +60,7 @@ describe("day flags", () => {
   it("flags every limit: calories, saturated fat, sugar and salt", () => {
     const flags = keys(day({ eaten: { energyKcal: 2100, salt: 7, saturatedFat: 24, sugars: 110 } }));
     for (const key of ["over:energyKcal", "over:saturatedFat", "over:sugars", "over:salt"]) assert.ok(flags.includes(key), key);
-    assert.match(dayFlags(day({ eaten: { energyKcal: 2100 } }))[0]!.plain, /^calories are at 2,100 kcal of a 1,800 kcal goal today/);
+    assert.match(dayFlags(day({ eaten: { energyKcal: 2100 } }))[0]!.plain.en, /^calories are at 2,100 kcal of a 1,800 kcal goal today/);
   });
 
   it("flags an empty diary by evening, but not in the afternoon", () => {
@@ -64,7 +71,7 @@ describe("day flags", () => {
   it("flags protein far short late in the day, with a lean idea that fits what's left", () => {
     const [flag] = dayFlags(day({ eaten: { energyKcal: 1100, proteins: 50 }, hour: 18, usual: [BURGER, COD] }));
     assert.equal(flag!.key, "protein_low");
-    assert.match(flag!.plain, /^70 grams of protein still to go today\. Your Baked cod has 35\.$/);
+    assert.match(flag!.plain.en, /^70 grams of protein still to go today\. Your Baked cod has 35\.$/);
     assert.match(flag!.text, /with 700 kcal left/);
     assert.deepEqual(keys(day({ eaten: { energyKcal: 1100, proteins: 50 }, hour: 13 })), []);
   });

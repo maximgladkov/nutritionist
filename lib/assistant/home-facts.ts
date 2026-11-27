@@ -1,4 +1,4 @@
-import { achievementsView } from "../achievements/view.ts";
+import { achievementsViews } from "../achievements/view.ts";
 import { parseTranscript } from "../agent-turn-model.ts";
 import { conversationTextWithoutMediaStubs } from "../conversation-query.ts";
 import { computeItemNutrition, sumNutrients } from "../nutrition.ts";
@@ -13,6 +13,7 @@ import { frequentFoods, type FrequentFood } from "./frequent-foods.ts";
 import { coverage } from "./home-card.ts";
 import { dayInWords, mealNamed, nextMeal, type MainMeal } from "./home-day.ts";
 import { dayFlags, type ServingFood } from "./home-flags.ts";
+import { coverageWords, dayCount, MEAL_FOR, num, ruDaysOf, ruWord, tenth, upperFirst, type Plain } from "./home-plain.ts";
 
 export type HomeMood = "happy" | "idle" | "thinking";
 
@@ -27,7 +28,8 @@ export type HomeFact = {
   // Higher is better to say now.
   score: number;
   // What to say without the model, in the middle of a sentence after a name; null when only it can.
-  plain: string | null;
+  // What to show when no model words it; null for facts only the model can use.
+  plain: Plain | null;
   text: string;
 };
 
@@ -133,7 +135,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
   const { goals, timezone, today } = await readSummaryContext(userId, now);
   const clock = getZonedParts(now, timezone);
   const { hour } = clock;
-  const [user, profile, progress, comments, history, foods, kept, usual, badges, weights, activity, words, latestItem, logged] = await Promise.all([
+  const [user, profile, progress, comments, history, foods, kept, usual, badgeViews, weights, activity, words, latestItem, logged] = await Promise.all([
     prisma.user.findUnique({ select: { name: true }, where: { id: userId } }),
     prisma.userProfile.findUnique({ select: { goalWeightKg: true }, where: { userId } }),
     loadTodayNutritionProgress(userId, now),
@@ -146,7 +148,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
     frequentFoods({ limit: 12, now, userId }),
     dishes(userId),
     usualNow(userId, now, timezone, today),
-    achievementsView(userId),
+    achievementsViews(userId, ["de", "en", "es", "ru"]),
     prisma.weightEntry.findMany({ orderBy: { date: "desc" }, take: 60, where: { userId } }),
     prisma.dailyActivity.findMany({ orderBy: { date: "desc" }, where: { date: { gte: shiftYmd(today, -8), lt: today }, userId } }),
     recentWords(userId, now),
@@ -168,7 +170,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
   const isNew = (food: string) => !had.has(food.trim().toLowerCase());
 
   const facts: HomeFact[] = [];
-  const add = (key: string, score: number, mood: HomeMood, text: string, plain: string | null) => facts.push({ key, mood, plain, score, text });
+  const add = (key: string, score: number, mood: HomeMood, text: string, plain: Plain | null) => facts.push({ key, mood, plain, score, text });
 
   const eaten = progress.current.energyKcal ?? 0;
   const protein = progress.current.proteins ?? 0;
@@ -212,13 +214,19 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
     if (proteinLeft !== null && proteinLeft >= 15 && hour >= 10 && !flagged.has("protein_low")) {
       const best = (next ? foods : []).filter((food) => (food.proteins ?? 0) > 0 && isNew(food.name)).sort((a, b) => (b.proteins ?? 0) - (a.proteins ?? 0))[0];
       const share = best ? coverage(best.proteins ?? 0, proteinLeft) : null;
+      const covers = (locale: "de" | "es" | "ru") => (best && share ? ` ${upperFirst(best.name)} ${coverageWords(locale, best.proteins ?? 0, proteinLeft)}.` : "");
       const idea = best && share ? ` ${best.name}, which they often log, ${share}.` : "";
       add(
         "protein_left",
         hour >= 17 ? 84 : 74,
         "happy",
         `${n(protein)} of ${n(proteinGoal!)} grams of protein eaten so far today, so ${n(proteinLeft)} grams are left to eat.${idea}`,
-        `you still need ${n(proteinLeft)} grams of protein.${best && share ? ` ${best.name} ${share}.` : ""}`,
+        {
+          en: `you still need ${n(proteinLeft)} grams of protein.${best && share ? ` ${best.name} ${share}.` : ""}`,
+          es: `aún te faltan ${num("es", proteinLeft)} gramos de proteína.${covers("es")}`,
+          de: `du brauchst noch ${num("de", proteinLeft)} Gramm Eiweiß.${covers("de")}`,
+          ru: `тебе ещё нужно ${num("ru", proteinLeft)} г белка.${covers("ru")}`,
+        },
       );
     }
     if (kcalLeft !== null && kcalLeft >= 150 && hour >= 11 && ![...flagged].some((key) => key.startsWith("over:"))) {
@@ -236,14 +244,29 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
           80,
           "happy",
           `${n(eaten)} of ${n(kcalGoal!)} kcal eaten so far today, so ${n(kcalLeft)} kcal are left. Their ${dish.what} "${dish.name}" (${dish.foods.slice(0, 4).join(", ")}) fits for ${next}: ${n(dish.kcal!)} kcal${dish.proteins ? ` and ${n(dish.proteins)} grams of protein` : ""} a serving.`,
-          `you have ${n(kcalLeft)} kcal left. Your ${dish.name} fits for ${next}.`,
+          {
+            en: `you have ${n(kcalLeft)} kcal left. Your ${dish.name} fits for ${next}.`,
+            es: `te quedan ${num("es", kcalLeft)} kcal. Tu ${dish.name} encaja para ${MEAL_FOR.es[next!]}.`,
+            de: `du hast noch ${num("de", kcalLeft)} kcal übrig. ${upperFirst(dish.name)} passt ${MEAL_FOR.de[next!]}.`,
+            ru: `у тебя осталось ${num("ru", kcalLeft)} ккал. На ${MEAL_FOR.ru[next!]} подойдёт: ${dish.name}.`,
+          },
         );
       } else {
-        add("kcal_left", 60, "idle", `${n(eaten)} of ${n(kcalGoal!)} kcal eaten so far today, so ${n(kcalLeft)} kcal are left.`, `you have ${n(kcalLeft)} kcal left today.`);
+        add("kcal_left", 60, "idle", `${n(eaten)} of ${n(kcalGoal!)} kcal eaten so far today, so ${n(kcalLeft)} kcal are left.`, {
+          en: `you have ${n(kcalLeft)} kcal left today.`,
+          es: `hoy te quedan ${num("es", kcalLeft)} kcal.`,
+          de: `du hast heute noch ${num("de", kcalLeft)} kcal übrig.`,
+          ru: `на сегодня у тебя осталось ${num("ru", kcalLeft)} ккал.`,
+        });
       }
     }
     if (proteinLeft !== null && proteinLeft <= 0) {
-      add("protein_done", 78, "happy", `Protein goal reached today: ${n(protein)} of ${n(proteinGoal!)} grams.`, `your protein goal is done for today. Nice work.`);
+      add("protein_done", 78, "happy", `Protein goal reached today: ${n(protein)} of ${n(proteinGoal!)} grams.`, {
+        en: "your protein goal is done for today. Nice work.",
+        es: "tu meta de proteína de hoy está cumplida. ¡Buen trabajo!",
+        de: "dein Eiweißziel für heute ist erreicht. Gut gemacht!",
+        ru: "цель по белку на сегодня выполнена. Отличная работа!",
+      });
     }
   }
 
@@ -251,42 +274,93 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
     if (proteinGoal) {
       const hit = week.filter((day) => (day.totals.proteins ?? 0) >= proteinGoal).length;
       if (hit >= 2 && hit * 2 >= week.length) {
-        add("protein_week", 66, "happy", `Protein goal reached on ${hit} of the ${days(week.length)} logged in the last 7 days.`, `you hit your protein goal on ${hit} of ${days(week.length)} this past week.`);
+        add("protein_week", 66, "happy", `Protein goal reached on ${hit} of the ${days(week.length)} logged in the last 7 days.`, {
+          en: `you hit your protein goal on ${hit} of ${days(week.length)} this past week.`,
+          es: `esta semana cumpliste tu meta de proteína ${hit} de ${dayCount("es", week.length)}.`,
+          de: `diese Woche hast du dein Eiweißziel an ${hit} von ${dayCount("de", week.length)} erreicht.`,
+          ru: `за неделю цель по белку выполнена в ${hit} из ${ruDaysOf(week.length)}.`,
+        });
       }
     }
     if (kcalGoal) {
       const average = mean(week, "energyKcal");
       const ratio = average / kcalGoal;
       if (ratio < 0.75) {
-        add("week", 50, "thinking", `Logged ${n(average)} kcal a day on average over the last 7 days, well under the goal of ${n(kcalGoal)}. Ask whether something isn't being logged; never praise it.`, `you logged ${n(average)} kcal a day this past week, well under your goal. Is anything missing?`);
+        add("week", 50, "thinking", `Logged ${n(average)} kcal a day on average over the last 7 days, well under the goal of ${n(kcalGoal)}. Ask whether something isn't being logged; never praise it.`, {
+          en: `you logged ${n(average)} kcal a day this past week, well under your goal. Is anything missing?`,
+          es: `esta semana registraste una media de ${num("es", average)} kcal al día, muy por debajo de tu meta. ¿Falta algo?`,
+          de: `diese Woche hast du im Schnitt ${num("de", average)} kcal am Tag eingetragen, deutlich unter deinem Ziel. Fehlt etwas?`,
+          ru: `за неделю в среднем записано ${num("ru", average)} ккал в день — заметно меньше цели. Может, что-то не записано?`,
+        });
       } else if (ratio <= 1.05) {
-        add("week", 58, "happy", `Averaged ${n(average)} kcal a day over the last 7 days, close to the goal of ${n(kcalGoal)}.`, `you averaged ${n(average)} kcal a day this past week, close to your goal.`);
+        add("week", 58, "happy", `Averaged ${n(average)} kcal a day over the last 7 days, close to the goal of ${n(kcalGoal)}.`, {
+          en: `you averaged ${n(average)} kcal a day this past week, close to your goal.`,
+          es: `esta semana tuviste una media de ${num("es", average)} kcal al día, cerca de tu meta.`,
+          de: `diese Woche waren es im Schnitt ${num("de", average)} kcal am Tag, nah an deinem Ziel.`,
+          ru: `за неделю в среднем ${num("ru", average)} ккал в день — близко к цели.`,
+        });
       } else {
-        add("week", 46, "thinking", `Averaged ${n(average)} kcal a day over the last 7 days; the goal is ${n(kcalGoal)}. Be kind; offer help planning.`, `you averaged ${n(average)} kcal a day this past week. Want a hand planning the next one?`);
+        add("week", 46, "thinking", `Averaged ${n(average)} kcal a day over the last 7 days; the goal is ${n(kcalGoal)}. Be kind; offer help planning.`, {
+          en: `you averaged ${n(average)} kcal a day this past week. Want a hand planning the next one?`,
+          es: `esta semana tuviste una media de ${num("es", average)} kcal al día. ¿Te ayudo a planear la siguiente?`,
+          de: `diese Woche waren es im Schnitt ${num("de", average)} kcal am Tag. Soll ich dir helfen, die nächste zu planen?`,
+          ru: `за неделю в среднем ${num("ru", average)} ккал в день. Помочь спланировать следующую?`,
+        });
       }
     }
     if (before.length >= 3) {
       const [was, is] = [mean(before, "proteins"), mean(week, "proteins")];
       if (is >= was * 1.1 && is - was >= 5) {
-        add("protein_up", 64, "happy", `Protein is up: ${n(is)} grams a day in the last 7 days, from ${n(was)} the 7 days before.`, `your protein is up to ${n(is)} grams a day, from ${n(was)} the week before.`);
+        add("protein_up", 64, "happy", `Protein is up: ${n(is)} grams a day in the last 7 days, from ${n(was)} the 7 days before.`, {
+          en: `your protein is up to ${n(is)} grams a day, from ${n(was)} the week before.`,
+          es: `tu proteína subió a ${num("es", is)} gramos al día, desde ${num("es", was)} la semana anterior.`,
+          de: `dein Eiweiß ist gestiegen: ${num("de", is)} Gramm am Tag statt ${num("de", was)} in der Woche davor.`,
+          ru: `белка стало больше: ${num("ru", is)} г в день против ${num("ru", was)} неделей раньше.`,
+        });
       }
     }
   }
 
+  const badges = badgeViews.en;
   const { streak } = badges;
   if (streak.days >= 2) {
-    if (streak.loggedToday) add("streak", 52, "happy", `${days(streak.days)} in a row with something logged; today counts already.`, `that's ${days(streak.days)} logged in a row. Keep it rolling.`);
-    else add("streak", hour >= 17 ? 88 : 56, "idle", `${days(streak.days)} in a row with something logged. Nothing logged yet today; logging keeps the streak.`, `log something today to keep your ${streak.days}-day streak.`);
+    if (streak.loggedToday) add("streak", 52, "happy", `${days(streak.days)} in a row with something logged; today counts already.`, {
+      en: `that's ${days(streak.days)} logged in a row. Keep it rolling.`,
+      es: `ya llevas ${dayCount("es", streak.days)} seguidos registrando. ¡Sigue así!`,
+      de: `schon ${dayCount("de", streak.days)} in Folge eingetragen. Weiter so!`,
+      ru: `уже ${dayCount("ru", streak.days)} подряд с записями. Так держать!`,
+    });
+    else add("streak", hour >= 17 ? 88 : 56, "idle", `${days(streak.days)} in a row with something logged. Nothing logged yet today; logging keeps the streak.`, {
+      en: `log something today to keep your ${streak.days}-day streak.`,
+      es: `registra algo hoy para mantener tu racha de ${dayCount("es", streak.days)}.`,
+      de: `trag heute etwas ein, damit deine Serie von ${dayCount("de", streak.days)} hält.`,
+      ru: `запиши что-нибудь сегодня, чтобы не прервать серию из ${ruDaysOf(streak.days)}.`,
+    });
   }
   // A badge just earned has its own moment; the coach only mentions one that's close.
   const near = badges.closest[0];
-  if (near && near.progress >= 0.7) add("next_badge", 54, "happy", `Closest badge: "${near.title}", ${near.progressText}. ${near.description}`, `you're close to a badge: ${near.title}, ${near.progressText}.`);
+  // The same badge in another language.
+  const local = (locale: "de" | "es" | "ru") => {
+    const found = badgeViews[locale].families.flatMap((family) => family.badges).find((badge) => badge.id === near?.id);
+    return found ?? near!;
+  };
+  if (near && near.progress >= 0.7) add("next_badge", 54, "happy", `Closest badge: "${near.title}", ${near.progressText}. ${near.description}`, {
+    en: `you're close to a badge: ${near.title}, ${near.progressText}.`,
+    es: `estás cerca de una insignia: ${local("es").title}, ${local("es").progressText}.`,
+    de: `du bist nah an einem Abzeichen: ${local("de").title}, ${local("de").progressText}.`,
+    ru: `ты близко к новому значку: «${local("ru").title}», ${local("ru").progressText}.`,
+  });
 
   if (recentWeight && earlierWeight) {
     const closer = Math.abs(earlierWeight.weightKg - goalWeight!) - Math.abs(recentWeight.weightKg - goalWeight!);
     // Going where they want; the other way is a flag.
     if (closer >= 0.3) {
-      add("weight", 62, "happy", `Weight is ${one(closer)} kg closer to the goal than on ${earlierWeight.date}.`, `you're ${one(closer)} kg closer to your goal weight than a few weeks ago.`);
+      add("weight", 62, "happy", `Weight is ${one(closer)} kg closer to the goal than on ${earlierWeight.date}.`, {
+        en: `you're ${one(closer)} kg closer to your goal weight than a few weeks ago.`,
+        es: `estás ${tenth("es", closer)} kg más cerca de tu peso meta que hace unas semanas.`,
+        de: `du bist ${tenth("de", closer)} kg näher an deinem Zielgewicht als vor ein paar Wochen.`,
+        ru: `ты на ${tenth("ru", closer)} кг ближе к целевому весу, чем несколько недель назад.`,
+      });
     }
   }
 
@@ -294,21 +368,46 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
   const others = activity.filter((row) => row.date < shiftYmd(today, -1)).flatMap((row) => (row.steps ? [row.steps] : []));
   if (steps && others.length >= 4) {
     const usualSteps = others.reduce((sum, value) => sum + value, 0) / others.length;
-    if (steps >= usualSteps * 1.15) add("steps", 48, "happy", `${n(steps)} steps yesterday, above the usual ${n(usualSteps)}.`, `you walked ${n(steps)} steps yesterday, above your usual ${n(usualSteps)}.`);
+    if (steps >= usualSteps * 1.15) add("steps", 48, "happy", `${n(steps)} steps yesterday, above the usual ${n(usualSteps)}.`, {
+      en: `you walked ${n(steps)} steps yesterday, above your usual ${n(usualSteps)}.`,
+      es: `ayer caminaste ${num("es", steps)} pasos, más que tus ${num("es", usualSteps)} habituales.`,
+      de: `gestern bist du ${num("de", steps)} Schritte gegangen, mehr als deine üblichen ${num("de", usualSteps)}.`,
+      ru: `вчера ${num("ru", steps)} ${ruWord(Math.round(steps), "шаг", "шага", "шагов")} — больше обычных ${num("ru", usualSteps)}.`,
+    });
   }
 
   const comment = comments[0];
   if (comment) {
     const from = firstName(comment.fromUser.name) ?? "their coach";
     const count = comments.length === 1 ? "a comment" : `${comments.length} comments`;
-    add(`comments:${comments.length}`, 90, "idle", `${from} (their human coach, a different person from you) left ${count} on today: "${comment.body.slice(0, 160)}"`, `there's ${count} from ${from === "their coach" ? "your coach" : from} on your day.`);
+    add(`comments:${comments.length}`, 90, "idle", `${from} (their human coach, a different person from you) left ${count} on today: "${comment.body.slice(0, 160)}"`, {
+      en: `there's ${count} from ${from === "their coach" ? "your coach" : from} on your day.`,
+      es: `hay ${comments.length === 1 ? "un comentario" : `${comments.length} comentarios`} de ${from === "their coach" ? "tu coach" : from} sobre tu día.`,
+      de: `es gibt ${comments.length === 1 ? "einen Kommentar" : `${comments.length} Kommentare`} von ${from === "their coach" ? "deinem Coach" : from} zu deinem Tag.`,
+      ru: `к твоему дню ${comments.length === 1 ? "есть комментарий" : `есть ${comments.length} ${ruWord(comments.length, "комментарий", "комментария", "комментариев")}`} от ${from === "their coach" ? "твоего коуча" : from}.`,
+    });
   }
 
-  if (usual) add("usual", 70, "idle", `They usually have ${usual.name} around this time (${usual.count} of the last 21 days) and haven't logged it today.`, `time for your usual ${usual.name}? Tell me and I'll log it.`);
+  if (usual) add("usual", 70, "idle", `They usually have ${usual.name} around this time (${usual.count} of the last 21 days) and haven't logged it today.`, {
+    en: `time for your usual ${usual.name}? Tell me and I'll log it.`,
+    es: `¿toca tu ${usual.name} de siempre? Dímelo y lo registro.`,
+    de: `Zeit für dein übliches ${usual.name}? Sag Bescheid, dann trag ich es ein.`,
+    ru: `время для привычного: ${usual.name}? Скажи — и я запишу.`,
+  });
 
   if (eaten === 0 && !flagged.has("empty_evening")) {
-    if (hour >= 11) add("empty", 72, "idle", "Nothing logged yet today, and it's past 11. They can tell you what they ate, or send a photo, and you log it.", "nothing's logged yet today. Tell me what you ate and I'll add it.");
-    else if (hour >= 4) add("morning", 44, "happy", "A new day with nothing logged yet. Ask what's for breakfast, or wish them a good start.", "good morning! What's for breakfast?");
+    if (hour >= 11) add("empty", 72, "idle", "Nothing logged yet today, and it's past 11. They can tell you what they ate, or send a photo, and you log it.", {
+      en: "nothing's logged yet today. Tell me what you ate and I'll add it.",
+      es: "hoy aún no hay nada registrado. Dime qué comiste y lo añado.",
+      de: "heute ist noch nichts eingetragen. Sag mir, was du gegessen hast, und ich trag es ein.",
+      ru: "сегодня пока ничего не записано. Расскажи, что было на тарелке, — я добавлю.",
+    });
+    else if (hour >= 4) add("morning", 44, "happy", "A new day with nothing logged yet. Ask what's for breakfast, or wish them a good start.", {
+      en: "good morning! What's for breakfast?",
+      es: "¡buenos días! ¿Qué hay de desayuno?",
+      de: "guten Morgen! Was gibt es zum Frühstück?",
+      ru: "доброе утро! Что на завтрак?",
+    });
   }
 
   const said = words.at(-1);
@@ -319,7 +418,12 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
   }
 
   // Only for want of anything else.
-  if (facts.filter((fact) => fact.plain !== null).length < 3) add("hello", 5, "happy", "Nothing in particular to report. Offer help with a meal idea, or logging by text, voice or photo.", "ask me for a meal idea, or send a photo of what you're eating.");
+  if (facts.filter((fact) => fact.plain !== null).length < 3) add("hello", 5, "happy", "Nothing in particular to report. Offer help with a meal idea, or logging by text, voice or photo.", {
+    en: "ask me for a meal idea, or send a photo of what you're eating.",
+    es: "pídeme una idea de comida o mándame una foto de lo que comes.",
+    de: "frag mich nach einer Essensidee oder schick mir ein Foto von dem, was du isst.",
+    ru: "попроси у меня идею, что поесть, или пришли фото того, что ешь.",
+  });
 
   return {
     day: dayInWords(todays, next),
