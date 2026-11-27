@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { dailyLimits, dayFlags, rank, type DayFigures, type ServingFood } from "./assistant/home-flags.ts";
+import { dayCount } from "./assistant/home-plain.ts";
 
 const NONE = { energyKcal: 0, fat: 0, proteins: 0, salt: 0, saturatedFat: 0, sugars: 0 };
 const GOALS = { caloriesPerDay: 1800, fatGPerDay: 60, proteinGPerDay: 120 };
@@ -46,6 +47,7 @@ describe("day flags", () => {
     assert.equal(flag!.plain.fr, "lipides aujourd’hui\u202f: 75 g pour une limite de 60 g. Pour le dîner, reste léger\u202f: poulet ou poisson avec des légumes, rien de frit ni de crémeux.");
     assert.equal(flag!.plain.it, "grassi oggi: 75 g su un limite di 60 g. Per cena, scegli qualcosa di leggero: pollo o pesce con verdure, niente di fritto o cremoso.");
     assert.equal(flag!.plain.nl, "je zit vandaag op 75 g vet, bij een limiet van 60 g. Voor het avondeten: neem iets lichts, zoals kip of vis met groente, niets gefrituurds of romigs.");
+    assert.equal(flag!.plain.pl, "tłuszcz dziś: 75 g przy limicie 60 g. Na kolację: postaw na coś chudego, jak kurczak albo ryba z warzywami – nic smażonego ani śmietanowego.");
     assert.equal(flag!.plain.pt, "gorduras hoje: 75 g para um limite de 60 g. Para o jantar, escolha algo leve: frango ou peixe com legumes, nada frito ou cremoso.");
     assert.equal(flag!.plain.ru, "жиры сегодня: 75 г при норме 60 г. На ужин — выбирай нежирное: курица или рыба с овощами, ничего жареного и сливочного.");
   });
@@ -118,5 +120,11 @@ describe("ranking what to say", () => {
 
   it("moves on from a tip just said", () => {
     assert.equal(rank([fact("streak", 88), fact("week", 58)], ["streak"])[0]!.key, "week");
+  });
+});
+
+describe("day counts", () => {
+  it("puts Polish days in the right form, with 21 like 5 (not like 1, as in Russian)", () => {
+    assert.deepEqual([1, 2, 5, 12, 21, 22].map((count) => dayCount("pl", count)), ["1 dzień", "2 dni", "5 dni", "12 dni", "21 dni", "22 dni"]);
   });
 });
