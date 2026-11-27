@@ -92,7 +92,7 @@ function wanted(fact: HomeFact, settings: AssistantSettings): boolean {
 
 export function plainText(fact: HomeFact, name: string | null, locale: Locale = "en"): string {
   const plain = fact.plain?.[locale] ?? "";
-  return name ? `${name}, ${plain}` : upperFirst(plain);
+  return name ? `${name}, ${plain}` : upperFirst(plain, locale);
 }
 
 // Takes one of the day's model calls and returns its id; null when they're spent. Never more than the limit, however

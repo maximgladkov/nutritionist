@@ -7,6 +7,7 @@ import { nl } from "./copy.nl.ts";
 import { pl } from "./copy.pl.ts";
 import { pt } from "./copy.pt.ts";
 import { ru } from "./copy.ru.ts";
+import { tr } from "./copy.tr.ts";
 
 // Everything the achievements API says, per language. Whole sentences, not pieces glued together,
 // so each language can put numbers and plurals where they belong.
@@ -260,7 +261,7 @@ export const en: AchievementCopy = {
   },
 };
 
-const COPY: Record<Locale, AchievementCopy> = { de, en, es, fr, it, nl, pl, pt, ru };
+const COPY: Record<Locale, AchievementCopy> = { de, en, es, fr, it, nl, pl, pt, ru, tr };
 
 export function achievementCopy(locale: Locale): AchievementCopy {
   return COPY[locale];
