@@ -248,7 +248,39 @@ const pt: PushCopy = {
   yourCoach: "Seu coach",
 };
 
-const COPY: Record<Locale, PushCopy> = { de, en, es, fr, it, pt, ru };
+const nl: PushCopy = {
+  commented: (who, count) =>
+    count === 1 ? `${who} heeft een opmerking bij je dag achtergelaten.` : `${who} heeft ${n("nl")(count)} opmerkingen bij je dag achtergelaten.`,
+  fatSecret: {
+    done: "FatSecret-import voltooid",
+    failed: "De import uit FatSecret is gestopt voordat hij klaar was. Open “Inloggen en accounts” in het tabblad “Jij” om het opnieuw te proberen.",
+    failedTitle: "FatSecret-import gestopt",
+    report: ({ days, entries, weights }) => {
+      // Dutch is singular only at exactly 1.
+      const p = (count: number, one: string, other: string) => `${n("nl")(count)} ${pluralForm("nl", count, { one, other })}`;
+      if (entries === 0 && weights === 0) return "Niets nieuws om uit FatSecret over te zetten.";
+      const parts = [];
+      if (entries > 0) parts.push(`${p(entries, "voedingsmiddel", "voedingsmiddelen")} van ${p(days, "dag", "dagen")}`);
+      if (weights > 0) parts.push(p(weights, "weging", "wegingen"));
+      return `${parts.join(" en ")} geïmporteerd.`;
+    },
+  },
+  moreComments: (count) => ` (+${count} meer)`,
+  reviewed: (who, reacted) => `${who} heeft je dag nagekeken${reacted ? " en erop gereageerd" : ""}.`,
+  shareAsk: (who, kinds) => {
+    const names: Record<GroupShareKind, string> = {
+      activity: "activiteit",
+      meals: "maaltijden",
+      photos: "maaltijdfoto’s",
+      summary: "dagoverzicht",
+      weight: "gewicht",
+    };
+    return `${who} wil ook je ${joined(kinds.map((kind) => names[kind]), "en")} zien. Open de groep om dit toe te staan.`;
+  },
+  yourCoach: "Je coach",
+};
+
+const COPY: Record<Locale, PushCopy> = { de, en, es, fr, it, nl, pt, ru };
 
 export function pushCopy(locale: Locale): PushCopy {
   return COPY[locale];
