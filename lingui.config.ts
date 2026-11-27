@@ -9,6 +9,8 @@ export default defineConfig({
     },
   ],
   compileNamespace: "ts",
-  locales: ["en", "ru"],
+  // The web app isn't in Spanish yet; its Spanish catalog falls back to English.
+  fallbackLocales: { default: "en" },
+  locales: ["en", "ru", "es"],
   sourceLocale: "en",
 });
