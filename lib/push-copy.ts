@@ -318,7 +318,40 @@ const pl: PushCopy = {
   yourCoach: "Twój trener",
 };
 
-const COPY: Record<Locale, PushCopy> = { de, en, es, fr, it, nl, pl, pt, ru };
+// Turkish: `who` may be "Koçun", so lines start with it, and it takes no suffix (that would follow the
+// name's vowels): it's the bare subject, and suffixes go on fixed words. The comma keeps "Elena gününü"
+// from reading as "Elena's day": "Elena, gününü inceledi", as in the app.
+const tr: PushCopy = {
+  commented: (who, count) => `${who}, gününe ${count === 1 ? "yorum yaptı" : `${n("tr")(count)} yorum yaptı`}.`,
+  fatSecret: {
+    done: "FatSecret içe aktarımı tamamlandı",
+    failed: "FatSecret içe aktarımı bitmeden durdu. “Ben” sekmesindeki “Giriş ve hesaplar” bölümünden tekrar dene.",
+    failedTitle: "FatSecret içe aktarımı durdu",
+    report: ({ days, entries, weights }) => {
+      if (entries === 0 && weights === 0) return "FatSecret’te aktarılacak yeni bir şey yok.";
+      const parts = [];
+      // A noun after a number stays singular, and "-den" goes on "gün": "3 günden 40 yiyecek".
+      if (entries > 0) parts.push(`${n("tr")(days)} günden ${n("tr")(entries)} yiyecek`);
+      if (weights > 0) parts.push(`${n("tr")(weights)} tartım`);
+      return `İçe aktarıldı: ${parts.join(" ve ")}.`;
+    },
+  },
+  moreComments: (count) => ` (+${count})`,
+  reviewed: (who, reacted) => `${who}, gününü inceledi${reacted ? " ve tepki bıraktı" : ""}.`,
+  shareAsk: (who, kinds) => {
+    const names: Record<GroupShareKind, string> = {
+      activity: "aktivite",
+      meals: "öğün içerikleri",
+      photos: "öğün fotoğrafları",
+      summary: "günlük özet",
+      weight: "kilo",
+    };
+    return `${who} şunları da görmek istiyor: ${joined(kinds.map((kind) => names[kind]), "ve")}. İzin vermek için grubu aç.`;
+  },
+  yourCoach: "Koçun",
+};
+
+const COPY: Record<Locale, PushCopy> = { de, en, es, fr, it, nl, pl, pt, ru, tr };
 
 export function pushCopy(locale: Locale): PushCopy {
   return COPY[locale];

@@ -49,6 +49,7 @@ describe("day flags", () => {
     assert.equal(flag!.plain.nl, "je zit vandaag op 75 g vet, bij een limiet van 60 g. Voor het avondeten: neem iets lichts, zoals kip of vis met groente, niets gefrituurds of romigs.");
     assert.equal(flag!.plain.pl, "tłuszcz dziś: 75 g przy limicie 60 g. Na kolację: postaw na coś chudego, jak kurczak albo ryba z warzywami – nic smażonego ani śmietanowego.");
     assert.equal(flag!.plain.pt, "gorduras hoje: 75 g para um limite de 60 g. Para o jantar, escolha algo leve: frango ou peixe com legumes, nada frito ou cremoso.");
+    assert.equal(flag!.plain.tr, "bugün 75 g yağ aldın, limitin 60 g. Akşam yemeği için hafif bir şey seç: sebzeli tavuk ya da balık; kızartma ya da kremalı bir şey olmasın.");
     assert.equal(flag!.plain.ru, "жиры сегодня: 75 г при норме 60 г. На ужин — выбирай нежирное: курица или рыба с овощами, ничего жареного и сливочного.");
   });
 
@@ -126,5 +127,9 @@ describe("ranking what to say", () => {
 describe("day counts", () => {
   it("puts Polish days in the right form, with 21 like 5 (not like 1, as in Russian)", () => {
     assert.deepEqual([1, 2, 5, 12, 21, 22].map((count) => dayCount("pl", count)), ["1 dzień", "2 dni", "5 dni", "12 dni", "21 dni", "22 dni"]);
+  });
+
+  it("keeps the Turkish noun singular after any number", () => {
+    assert.deepEqual([1, 2, 5, 21].map((count) => dayCount("tr", count)), ["1 gün", "2 gün", "5 gün", "21 gün"]);
   });
 });

@@ -110,6 +110,14 @@ describe("home message", () => {
     assert.equal(polish.body.message.text, "Kira, potrzebujesz jeszcze 75 g białka.");
   });
 
+  it("says it in Turkish when the model can't", async () => {
+    // Its own test too, for the same reason.
+    await goals();
+    await eat();
+    const turkish = await api("GET", "/assistant/message", { headers: { "accept-language": "tr-TR" }, token: session.accessToken });
+    assert.equal(turkish.body.message.text, "Kira, bugün 75 g protein daha alman gerekiyor.");
+  });
+
   it("gives the model only facts, the name and the time, and shows its words", async () => {
     model(three);
     await goals();
