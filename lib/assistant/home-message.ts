@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { AssistantAction, Prisma } from "../../generated/prisma/client.ts";
 import { apiDeps } from "../api/deps.ts";
-import type { Locale } from "../i18n/locales.ts";
+import { isLocale, type Locale } from "../i18n/locales.ts";
 import { prisma } from "../prisma.ts";
 import { getZonedParts } from "../timezone.ts";
 import { readSummaryContext } from "../summary.ts";
@@ -9,6 +9,7 @@ import { namesWrongMeal } from "./home-day.ts";
 import { chosenLanguage, LANGUAGES, toneLine, type AssistantSettings, type HomeTopic } from "./settings.ts";
 import { loadHomeFacts, type HomeFact, type HomeMood } from "./home-facts.ts";
 import { acceptWords } from "./home-words.ts";
+import { upperFirst } from "./home-plain.ts";
 import { rank } from "./home-flags.ts";
 
 export const HOME_KIND = "home";
@@ -89,9 +90,9 @@ function wanted(fact: HomeFact, settings: AssistantSettings): boolean {
   return fact.flag === true || settings.homeTopics.includes(topicOf(fact.key));
 }
 
-export function plainText(fact: HomeFact, name: string | null): string {
-  const plain = fact.plain ?? "";
-  return name ? `${name}, ${plain}` : plain.charAt(0).toUpperCase() + plain.slice(1);
+export function plainText(fact: HomeFact, name: string | null, locale: Locale = "en"): string {
+  const plain = fact.plain?.[locale] ?? "";
+  return name ? `${name}, ${plain}` : upperFirst(plain);
 }
 
 // Takes one of the day's model calls and returns its id; null when they're spent. Never more than the limit, however
@@ -129,8 +130,10 @@ export async function homeMessage(
   }
   const fallback = settings.language === "auto" && info.lastWords.length === 0 && locale !== "en" ? locale : null;
   const language = chosenLanguage(settings) ?? (fallback ? LANGUAGES[fallback] : null);
+  // When no model words it: the coach's chosen language if the app has it, else the app's.
+  const plainLocale: Locale = isLocale(settings.language) ? settings.language : locale;
   // A change of language or tone is heard from the next message.
-  const style = `${settings.language}${fallback ? `>${fallback}` : ""}:${settings.tone}`;
+  const style = `${settings.language}${plainLocale !== "en" ? `>${plainLocale}` : ""}:${settings.tone}`;
   const shown = rows
     .filter((row) => read(row).shownAt)
     .sort((a, b) => read(b).shownAt!.localeCompare(read(a).shownAt!));
@@ -229,7 +232,7 @@ export async function homeMessage(
   if (!fact) {
     return null;
   }
-  return view(await create(0, batch, fact, plainText(fact, info.name), true));
+  return view(await create(0, batch, fact, plainText(fact, info.name, plainLocale), true));
 }
 
 export type HomeOpener = { at: string; id: string; text: string };

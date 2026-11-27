@@ -83,20 +83,20 @@ function streakView(copy: AchievementCopy, context: AchievementContext, metrics:
   };
 }
 
-// Where the person stands on every badge. Badges reached since the last look are stored on the way,
-// so they stay earned whatever changes afterwards. Written in `locale`; the coach's facts stay English.
-export async function achievementsView(userId: string, locale: Locale = "en") {
-  const copy = achievementCopy(locale);
+type AchievementState = { context: AchievementContext; earned: Map<string, string>; earnedIds: Set<string>; metrics: Metrics };
+
+// Where the person stands, looked up once. Badges reached since the last look are stored on the way,
+// so they stay earned whatever changes afterwards.
+async function loadAchievementState(userId: string): Promise<AchievementState> {
   const [{ context, metrics }, stored] = await Promise.all([
     computeMetrics(userId),
     prisma.userAchievement.findMany({ select: { achievementId: true, earnedOn: true }, where: { userId } }),
   ]);
   const earned = new Map(stored.map((row) => [row.achievementId, row.earnedOn]));
   const earnedIds = new Set(earned.keys());
-  const families = achievementFamilies(locale).map((family) => ({ badges: family.badges(context, earnedIds), family }));
-
   const reached: { achievementId: string; earnedOn: string; userId: string }[] = [];
-  for (const badge of families.flatMap(({ badges }) => badges)) {
+  // Ids and targets are the same in every language.
+  for (const badge of achievementFamilies("en").flatMap((family) => family.badges(context, earnedIds))) {
     if (earned.has(badge.id)) continue;
     const earnedOn = earnedDate(metrics[badge.metric], badge.target);
     if (earnedOn === null) continue;
@@ -106,6 +106,23 @@ export async function achievementsView(userId: string, locale: Locale = "en") {
   if (reached.length > 0) {
     await prisma.userAchievement.createMany({ data: reached, skipDuplicates: true });
   }
+  return { context, earned, earnedIds, metrics };
+}
+
+// Where the person stands on every badge, written in `locale`; the coach's facts stay English.
+export async function achievementsView(userId: string, locale: Locale = "en") {
+  return buildView(await loadAchievementState(userId), locale);
+}
+
+// The same in several languages from one look.
+export async function achievementsViews<L extends Locale>(userId: string, wanted: readonly L[]) {
+  const state = await loadAchievementState(userId);
+  return Object.fromEntries(wanted.map((locale) => [locale, buildView(state, locale)])) as Record<L, ReturnType<typeof buildView>>;
+}
+
+function buildView({ context, earned, earnedIds, metrics }: AchievementState, locale: Locale) {
+  const copy = achievementCopy(locale);
+  const families = achievementFamilies(locale).map((family) => ({ badges: family.badges(context, earnedIds), family }));
 
   const shown = families.map(({ badges, family }) => {
     const views = badges.map((badge) => badgeView(copy, badge, family, metrics, earned.get(badge.id) ?? null));

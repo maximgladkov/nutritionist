@@ -1,5 +1,6 @@
 import type { GoalsView } from "../goal-values.ts";
 import type { MainMeal } from "./home-day.ts";
+import { MEAL_FOR, num, tenth, upperFirst, type Plain } from "./home-plain.ts";
 
 // The things the coach must say before anything else, worked out from the day's figures alone so
 // they can be tested without a database. Each one carries what to do about it, for what's left of
@@ -10,7 +11,7 @@ export type FlagMood = "happy" | "idle" | "thinking";
 export type DayFlag = {
   key: string;
   mood: FlagMood;
-  plain: string;
+  plain: Plain;
   // Between 80 and 99: every flag outranks every other kind of fact, and these order the flags.
   score: number;
   text: string;
@@ -92,6 +93,35 @@ const TIP: Record<Limit, string> = {
   saturatedFat: "skip butter, cheese and fatty meat",
   sugars: "skip sweets and sweet drinks",
 };
+const TIP_RU: Record<Limit, string> = {
+  energyKcal: "если хочется есть, ограничься овощами или лёгким супом",
+  fat: "выбирай нежирное: курица или рыба с овощами, ничего жареного и сливочного",
+  salt: "пей воду и обойдись без солёных закусок и соусов",
+  saturatedFat: "обойдись без сливочного масла, сыра и жирного мяса",
+  sugars: "обойдись без сладкого и сладких напитков",
+};
+const TIP_ES: Record<Limit, string> = {
+  energyKcal: "si tienes hambre, que sean verduras o un caldo",
+  fat: "ve a lo ligero: pollo o pescado con verduras, nada frito ni con nata",
+  salt: "bebe agua y evita los snacks salados y las salsas",
+  saturatedFat: "evita la mantequilla, el queso y la carne grasa",
+  sugars: "evita los dulces y las bebidas azucaradas",
+};
+// Name (and, in Russian, "of" form for "осталось ..."), and unit, for the plain lines.
+const NAMES_RU: Record<Limit, { name: string; of: string; unit: string }> = {
+  energyKcal: { name: "калории", of: "калорий", unit: "ккал" },
+  fat: { name: "жиры", of: "жиров", unit: "г" },
+  salt: { name: "соль", of: "соли", unit: "г" },
+  saturatedFat: { name: "насыщенные жиры", of: "насыщенных жиров", unit: "г" },
+  sugars: { name: "сахар", of: "сахара", unit: "г" },
+};
+const NAMES_ES: Record<Limit, string> = {
+  energyKcal: "calorías",
+  fat: "grasa",
+  salt: "sal",
+  saturatedFat: "grasa saturada",
+  sugars: "azúcar",
+};
 
 const value = (food: ServingFood, key: Limit): number | null => (key === "energyKcal" ? food.kcal : food[key]);
 
@@ -110,6 +140,8 @@ function fitting(figures: DayFigures, over: readonly Limit[], kcalLeft: number |
 }
 
 const forNext = (next: MainMeal | null): string => (next ? `For ${next}` : "For the rest of today");
+const forNextRu = (next: MainMeal | null): string => (next ? `На ${MEAL_FOR.ru[next]}` : "До конца дня");
+const forNextEs = (next: MainMeal | null): string => (next ? `Para ${MEAL_FOR.es[next]}` : "Para el resto del día");
 
 // Everything worth flagging today, best first. Ranking: a limit passed (by how far), then
 // nothing logged by evening, then protein far short late in the day, then weight moving away from
@@ -130,13 +162,18 @@ export function dayFlags(figures: DayFigures): DayFlag[] {
     const { avoid, instead } = AVOID[key];
     const pick = fitting(figures, over, kcalLeft, key === "energyKcal" ? 15 : 10);
     const amount = key === "salt" ? one : n;
+    const local = (locale: "es" | "ru", value: number) => (key === "salt" ? tenth : num)(locale, value);
     const figure = `${amount(eaten[key])} ${unit} of a ${amount(limit)} ${unit} ${key === "energyKcal" ? "goal" : "limit"}`;
     const own = key === "energyKcal" || (key === "fat" && figures.goals.fatGPerDay !== null);
     const idea = pick ? ` Their usual ${pick.name} fits (${n(pick.kcal!)} kcal, ${n(pick.proteins ?? 0)} grams of protein).` : "";
     flags.push({
       key: `over:${key}`,
       mood: "thinking",
-      plain: `${name.toLowerCase()} ${verb} at ${figure} today. ${forNext(next)}, ${pick ? `your usual ${pick.name} fits` : TIP[key]}.`,
+      plain: {
+        en: `${name.toLowerCase()} ${verb} at ${figure} today. ${forNext(next)}, ${pick ? `your usual ${pick.name} fits` : TIP[key]}.`,
+        es: `${NAMES_ES[key]} hoy: ${local("es", eaten[key])} ${unit} de ${key === "energyKcal" ? "una meta" : "un límite"} de ${local("es", limit)} ${unit}. ${forNextEs(next)}, ${pick ? `tu ${pick.name} de siempre encaja` : TIP_ES[key]}.`,
+        ru: `${NAMES_RU[key].name} сегодня: ${local("ru", eaten[key])} ${NAMES_RU[key].unit} при ${key === "energyKcal" ? "цели" : "норме"} ${local("ru", limit)} ${NAMES_RU[key].unit}. ${forNextRu(next)} ${pick ? `подойдёт привычное: ${pick.name}` : `— ${TIP_RU[key]}`}.`,
+      },
       // 95 to 99 by how far over, so the worst comes first.
       score: 95 + Math.min(4, Math.floor((ratio - 1) * 10) + WEIGHT[key]),
       text: `${name} today: ${figure}${own ? " they set" : " (a standard daily reference)"}, so it's over. Say so plainly and kindly, then what to do: ${forNext(next).toLowerCase()}, skip ${avoid}; have ${instead} instead.${idea} No guilt; one day is fixable.`,
@@ -147,7 +184,11 @@ export function dayFlags(figures: DayFigures): DayFlag[] {
     flags.push({
       key: "empty_evening",
       mood: "thinking",
-      plain: "it's evening and nothing's logged today. Tell me what you ate, or send a photo, and I'll add it.",
+      plain: {
+        en: "it's evening and nothing's logged today. Tell me what you ate, or send a photo, and I'll add it.",
+        es: "ya es de noche y hoy no hay nada registrado. Dime qué comiste o mándame una foto y lo añado.",
+        ru: "уже вечер, а сегодня ничего не записано. Расскажи, что было на тарелке, или пришли фото — я добавлю.",
+      },
       score: 94,
       text: "It's evening and nothing at all is logged today, so the day can't be judged. Ask what they ate; they can say it or send a photo and you log it. Don't praise or scold.",
     });
@@ -155,7 +196,11 @@ export function dayFlags(figures: DayFigures): DayFlag[] {
     flags.push({
       key: "sparse",
       mood: "thinking",
-      plain: `only ${n(eaten.energyKcal)} kcal is logged today. Is anything missing?`,
+      plain: {
+        en: `only ${n(eaten.energyKcal)} kcal is logged today. Is anything missing?`,
+        es: `hoy solo hay ${num("es", eaten.energyKcal)} kcal registradas. ¿Falta algo?`,
+        ru: `сегодня записано всего ${num("ru", eaten.energyKcal)} ккал. Может, что-то забыто?`,
+      },
       score: 92,
       text: `Only ${n(eaten.energyKcal)} kcal is logged today and it's evening. Probably something is missing from the diary. Ask, don't praise.`,
     });
@@ -169,7 +214,11 @@ export function dayFlags(figures: DayFigures): DayFlag[] {
     flags.push({
       key: "protein_low",
       mood: "thinking",
-      plain: `${left} grams of protein still to go today. ${pick ? `Your ${pick.name} has ${n(pick.proteins ?? 0)}.` : "Pick a lean protein like chicken, fish, eggs or Greek yogurt."}`,
+      plain: {
+        en: `${left} grams of protein still to go today. ${pick ? `Your ${pick.name} has ${n(pick.proteins ?? 0)}.` : "Pick a lean protein like chicken, fish, eggs or Greek yogurt."}`,
+        es: `hoy aún faltan ${num("es", left)} gramos de proteína. ${pick ? `Tu ${pick.name} tiene ${num("es", pick.proteins ?? 0)}.` : "Elige una proteína magra como pollo, pescado, huevos o yogur griego."}`,
+        ru: `сегодня ещё нужно ${num("ru", left)} г белка. ${pick ? `${upperFirst(pick.name)}: ${num("ru", pick.proteins ?? 0)} г.` : "Выбери нежирный белок: курицу, рыбу, яйца или греческий йогурт."}`,
+      },
       score: 91,
       text: `Only ${n(eaten.proteins)} of ${n(proteinGoal)} grams of protein eaten so far and it's evening, so ${left} grams are left${room}. Suggest a lean, protein-rich ${next ?? "snack"}: ${pick ? `their usual ${pick.name} (${n(pick.proteins ?? 0)} grams of protein, ${n(pick.kcal!)} kcal)` : "chicken, fish, eggs, cottage cheese, Greek yogurt or tofu"}.`,
     });
@@ -184,7 +233,11 @@ export function dayFlags(figures: DayFigures): DayFlag[] {
       flags.push({
         key: "weight_away",
         mood: "thinking",
-        plain: `your weight is ${one(away)} kg further from your goal than on ${weight.earlierDate}. Want a hand with the next few days?`,
+        plain: {
+          en: `your weight is ${one(away)} kg further from your goal than on ${weight.earlierDate}. Want a hand with the next few days?`,
+          es: `tu peso está ${tenth("es", away)} kg más lejos de tu meta que el ${weight.earlierDate}. ¿Te echo una mano con los próximos días?`,
+          ru: `твой вес на ${tenth("ru", away)} кг дальше от цели, чем ${weight.earlierDate}. Помочь с ближайшими днями?`,
+        },
         score: 86,
         text: `Weight is ${one(weight.latestKg)} kg, ${one(away)} kg further from the ${one(weight.goalKg)} kg goal than on ${weight.earlierDate} (${one(weight.earlierKg)} kg).${week} Gently point to one concrete step: ${losing ? "staying within the calorie goal on most days and logging everything" : "eating up to the calorie goal every day, with protein at each meal"}. Offer to plan the next meal. Weight moves day to day; no alarm.`,
       });
@@ -200,11 +253,16 @@ export function dayFlags(figures: DayFigures): DayFlag[] {
       if (share < 0.9) continue;
       const { name, unit } = NAMES[key];
       const amount = key === "salt" ? one : n;
+      const local = (locale: "es" | "ru", value: number) => (key === "salt" ? tenth : num)(locale, value);
       const left = limit - eaten[key];
       flags.push({
         key: `near:${key}`,
         mood: "idle",
-        plain: `only ${amount(left)} ${unit} of ${name.toLowerCase()} left for today. For ${next}, ${TIP[key]}.`,
+        plain: {
+          en: `only ${amount(left)} ${unit} of ${name.toLowerCase()} left for today. For ${next}, ${TIP[key]}.`,
+          es: `solo te quedan ${local("es", left)} ${unit} de ${NAMES_ES[key]} para hoy. ${forNextEs(next)}, ${TIP_ES[key]}.`,
+          ru: `${NAMES_RU[key].of} на сегодня осталось всего ${local("ru", left)} ${NAMES_RU[key].unit}. ${forNextRu(next)} — ${TIP_RU[key]}.`,
+        },
         score: 80 + Math.min(4, Math.floor((share - 0.9) * 40)) + WEIGHT[key],
         text: `${name} today: ${amount(eaten[key])} of ${amount(limit)} ${unit}, so only ${amount(left)} ${unit} are left and ${next} is still ahead. Suggest a ${next} that keeps it low: skip ${AVOID[key].avoid}; have ${AVOID[key].instead}.`,
       });
