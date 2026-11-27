@@ -119,7 +119,11 @@ const MESSAGES: Record<string, Translated> = {
     es: "No se pudo empezar a hablar. Inténtalo de nuevo en un momento.",
     ru: "Не удалось начать разговор. Попробуйте ещё раз через минуту.",
   },
-  "Talking isn't available right now.": { es: "Ahora mismo no se puede hablar.", ru: "Разговор сейчас недоступен." },
+  "Your coach is asleep: you've used this week's free minutes. Come back next week for more, or upgrade.": {
+    es: "Tu coach está durmiendo: ya usaste los minutos gratis de esta semana. Vuelve la próxima semana o mejora tu plan para tener más.",
+    ru: "Ваш коуч спит: бесплатные минуты на эту неделю закончились. Возвращайтесь на следующей неделе или перейдите на платный тариф.",
+  },
+  "Talking isn't available right now.":{ es: "Ahora mismo no se puede hablar.", ru: "Разговор сейчас недоступен." },
   "That call is gone.": { es: "Esa llamada ya no existe.", ru: "Этого звонка больше нет." },
   "That conversation isn't yours.": { es: "Esa conversación no es tuya.", ru: "Это не ваш разговор." },
   "That idea is gone.": { es: "Esa idea ya no existe.", ru: "Этой идеи больше нет." },
