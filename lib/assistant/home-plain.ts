@@ -3,7 +3,7 @@ import type { MainMeal } from "./home-day.ts";
 
 // The coach's line on Today when no model words it: one per language the app speaks, picked when
 // it's shown. Starts in lower case, since it usually follows the person's name ("Kira, ...").
-// The other languages speak informally, like the model does (ты, tú, du, tu, tu).
+// The other languages speak informally, like the model does (ты, tú, du, tu, tu, você).
 export type Plain = Record<Locale, string>;
 
 export const num = (locale: Locale, value: number): string => formatNumber(locale, Math.round(value));
@@ -17,6 +17,8 @@ export function dayCount(locale: Locale, count: number): string {
   // French says the singular below 2: "0 jour", "1 jour".
   if (locale === "fr") return `${num("fr", count)} ${count < 2 ? "jour" : "jours"}`;
   if (locale === "it") return `${num("it", count)} ${count === 1 ? "giorno" : "giorni"}`;
+  // Portuguese too: "0 dia", "1 dia".
+  if (locale === "pt") return `${num("pt", count)} ${count < 2 ? "dia" : "dias"}`;
   return `${count} ${count === 1 ? "day" : "days"}`;
 }
 
@@ -30,11 +32,12 @@ export function ruWord(count: number, one: string, few: string, many: string): s
 }
 
 // "на ужин", "para la cena": what a suggestion is for.
-export const MEAL_FOR: Record<"de" | "es" | "fr" | "it" | "ru", Record<MainMeal, string>> = {
+export const MEAL_FOR: Record<"de" | "es" | "fr" | "it" | "pt" | "ru", Record<MainMeal, string>> = {
   de: { breakfast: "zum Frühstück", dinner: "zum Abendessen", lunch: "zum Mittagessen" },
   es: { breakfast: "el desayuno", dinner: "la cena", lunch: "el almuerzo" },
   fr: { breakfast: "le petit-déjeuner", dinner: "le dîner", lunch: "le déjeuner" },
   it: { breakfast: "colazione", dinner: "cena", lunch: "pranzo" },
+  pt: { breakfast: "o café da manhã", dinner: "o jantar", lunch: "o almoço" },
   ru: { breakfast: "завтрак", dinner: "ужин", lunch: "обед" },
 };
 
@@ -44,11 +47,11 @@ export function coverageWords(locale: Locale, part: number, whole: number): stri
   if (share < 0.2) return null;
   const level = share >= 0.9 ? 0 : share >= 0.6 ? 1 : share >= 0.42 ? 2 : share >= 0.29 ? 3 : 4;
   const words: Plain[] = [
-    { de: "deckt es ab", en: "covers it", es: "lo cubre", fr: "couvre tout", it: "copre tutto", ru: "закрывает всё" },
-    { de: "deckt das meiste ab", en: "covers most of it", es: "cubre la mayor parte", fr: "en couvre la plus grande partie", it: "ne copre la maggior parte", ru: "закрывает большую часть" },
-    { de: "deckt etwa die Hälfte ab", en: "covers about half", es: "cubre más o menos la mitad", fr: "en couvre environ la moitié", it: "ne copre circa la metà", ru: "закрывает примерно половину" },
-    { de: "deckt etwa ein Drittel ab", en: "covers about a third", es: "cubre más o menos un tercio", fr: "en couvre environ un tiers", it: "ne copre circa un terzo", ru: "закрывает примерно треть" },
-    { de: "deckt etwa ein Viertel ab", en: "covers about a quarter", es: "cubre más o menos un cuarto", fr: "en couvre environ un quart", it: "ne copre circa un quarto", ru: "закрывает примерно четверть" },
+    { de: "deckt es ab", en: "covers it", es: "lo cubre", fr: "couvre tout", it: "copre tutto", pt: "cobre tudo", ru: "закрывает всё" },
+    { de: "deckt das meiste ab", en: "covers most of it", es: "cubre la mayor parte", fr: "en couvre la plus grande partie", it: "ne copre la maggior parte", pt: "cobre a maior parte", ru: "закрывает большую часть" },
+    { de: "deckt etwa die Hälfte ab", en: "covers about half", es: "cubre más o menos la mitad", fr: "en couvre environ la moitié", it: "ne copre circa la metà", pt: "cobre mais ou menos a metade", ru: "закрывает примерно половину" },
+    { de: "deckt etwa ein Drittel ab", en: "covers about a third", es: "cubre más o menos un tercio", fr: "en couvre environ un tiers", it: "ne copre circa un terzo", pt: "cobre mais ou menos um terço", ru: "закрывает примерно треть" },
+    { de: "deckt etwa ein Viertel ab", en: "covers about a quarter", es: "cubre más o menos un cuarto", fr: "en couvre environ un quart", it: "ne copre circa un quarto", pt: "cobre mais ou menos um quarto", ru: "закрывает примерно четверть" },
   ];
   return words[level]![locale];
 }

@@ -3,6 +3,7 @@ import { de } from "./copy.de.ts";
 import { es } from "./copy.es.ts";
 import { fr } from "./copy.fr.ts";
 import { it } from "./copy.it.ts";
+import { pt } from "./copy.pt.ts";
 import { ru } from "./copy.ru.ts";
 
 // Everything the achievements API says, per language. Whole sentences, not pieces glued together,
@@ -257,7 +258,7 @@ export const en: AchievementCopy = {
   },
 };
 
-const COPY: Record<Locale, AchievementCopy> = { de, en, es, fr, it, ru };
+const COPY: Record<Locale, AchievementCopy> = { de, en, es, fr, it, pt, ru };
 
 export function achievementCopy(locale: Locale): AchievementCopy {
   return COPY[locale];
