@@ -270,6 +270,18 @@ describe("notes wait for the day's review", () => {
     assert.equal(pushes.length, 1);
     assert.match(pushes[0]?.body ?? "", / heeft je dag nagekeken\.$/u);
   });
+
+  it("and in Polish", async () => {
+    await api("PATCH", "/me", { body: { locale: "pl" }, token: kira.accessToken });
+    pushes.length = 0;
+    const earlier = shiftYmd(yesterday, -6);
+    await api("PUT", `/groups/${groupId}/members/${kira.userId}/days/${earlier}/review`, { body: { reviewed: true }, token: coach.accessToken });
+    await wait();
+    await api("PATCH", "/me", { body: { locale: "en" }, token: kira.accessToken });
+    await api("PUT", `/groups/${groupId}/members/${kira.userId}/days/${earlier}/review`, { body: { reviewed: false }, token: coach.accessToken });
+    assert.equal(pushes.length, 1);
+    assert.match(pushes[0]?.body ?? "", /: twój dzień sprawdzony\.$/u);
+  });
 });
 
 describe("reactions and comments on part of the day", () => {

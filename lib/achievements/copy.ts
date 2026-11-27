@@ -4,6 +4,7 @@ import { es } from "./copy.es.ts";
 import { fr } from "./copy.fr.ts";
 import { it } from "./copy.it.ts";
 import { nl } from "./copy.nl.ts";
+import { pl } from "./copy.pl.ts";
 import { pt } from "./copy.pt.ts";
 import { ru } from "./copy.ru.ts";
 
@@ -259,7 +260,7 @@ export const en: AchievementCopy = {
   },
 };
 
-const COPY: Record<Locale, AchievementCopy> = { de, en, es, fr, it, nl, pt, ru };
+const COPY: Record<Locale, AchievementCopy> = { de, en, es, fr, it, nl, pl, pt, ru };
 
 export function achievementCopy(locale: Locale): AchievementCopy {
   return COPY[locale];

@@ -3,7 +3,7 @@ import type { MainMeal } from "./home-day.ts";
 
 // The coach's line on Today when no model words it: one per language the app speaks, picked when
 // it's shown. Starts in lower case, since it usually follows the person's name ("Kira, ...").
-// The other languages speak informally, like the model does (ты, tú, du, tu, tu, você, je).
+// The other languages speak informally, like the model does (ты, tú, du, tu, tu, você, je, ty).
 export type Plain = Record<Locale, string>;
 
 export const num = (locale: Locale, value: number): string => formatNumber(locale, Math.round(value));
@@ -21,6 +21,8 @@ export function dayCount(locale: Locale, count: number): string {
   if (locale === "pt") return `${num("pt", count)} ${count < 2 ? "dia" : "dias"}`;
   // Dutch is singular only at exactly 1: "0 dagen", "1 dag".
   if (locale === "nl") return `${num("nl", count)} ${count === 1 ? "dag" : "dagen"}`;
+  // Polish has four forms, and 21 is "many" (unlike Russian): "1 dzień", "2 dni", "5 dni", "21 dni", "1,5 dnia".
+  if (locale === "pl") return `${num("pl", count)} ${pluralForm("pl", count, { few: "dni", many: "dni", one: "dzień", other: "dnia" })}`;
   return `${count} ${count === 1 ? "day" : "days"}`;
 }
 
@@ -34,28 +36,31 @@ export function ruWord(count: number, one: string, few: string, many: string): s
 }
 
 // "на ужин", "para la cena": what a suggestion is for.
-export const MEAL_FOR: Record<"de" | "es" | "fr" | "it" | "nl" | "pt" | "ru", Record<MainMeal, string>> = {
+export const MEAL_FOR: Record<"de" | "es" | "fr" | "it" | "nl" | "pl" | "pt" | "ru", Record<MainMeal, string>> = {
   de: { breakfast: "zum Frühstück", dinner: "zum Abendessen", lunch: "zum Mittagessen" },
   es: { breakfast: "el desayuno", dinner: "la cena", lunch: "el almuerzo" },
   fr: { breakfast: "le petit-déjeuner", dinner: "le dîner", lunch: "le déjeuner" },
   it: { breakfast: "colazione", dinner: "cena", lunch: "pranzo" },
   // After "voor": "voor het avondeten".
   nl: { breakfast: "het ontbijt", dinner: "het avondeten", lunch: "de lunch" },
+  // With its preposition, after "Pomysł": "Pomysł na kolację".
+  pl: { breakfast: "na śniadanie", dinner: "na kolację", lunch: "na obiad" },
   pt: { breakfast: "o café da manhã", dinner: "o jantar", lunch: "o almoço" },
   ru: { breakfast: "завтрак", dinner: "ужин", lunch: "обед" },
 };
 
-// How much of what's left a food covers, as said after its name.
+// How much of what's left a food covers, as said after its name. Polish says it with a dash and "to",
+// so the verb needn't agree with a plural food name: "Skyr – to mniej więcej połowa".
 export function coverageWords(locale: Locale, part: number, whole: number): string | null {
   const share = part / whole;
   if (share < 0.2) return null;
   const level = share >= 0.9 ? 0 : share >= 0.6 ? 1 : share >= 0.42 ? 2 : share >= 0.29 ? 3 : 4;
   const words: Plain[] = [
-    { de: "deckt es ab", en: "covers it", es: "lo cubre", fr: "couvre tout", it: "copre tutto", nl: "dekt het helemaal", pt: "cobre tudo", ru: "закрывает всё" },
-    { de: "deckt das meiste ab", en: "covers most of it", es: "cubre la mayor parte", fr: "en couvre la plus grande partie", it: "ne copre la maggior parte", nl: "dekt het grootste deel", pt: "cobre a maior parte", ru: "закрывает большую часть" },
-    { de: "deckt etwa die Hälfte ab", en: "covers about half", es: "cubre más o menos la mitad", fr: "en couvre environ la moitié", it: "ne copre circa la metà", nl: "dekt ongeveer de helft", pt: "cobre mais ou menos a metade", ru: "закрывает примерно половину" },
-    { de: "deckt etwa ein Drittel ab", en: "covers about a third", es: "cubre más o menos un tercio", fr: "en couvre environ un tiers", it: "ne copre circa un terzo", nl: "dekt ongeveer een derde", pt: "cobre mais ou menos um terço", ru: "закрывает примерно треть" },
-    { de: "deckt etwa ein Viertel ab", en: "covers about a quarter", es: "cubre más o menos un cuarto", fr: "en couvre environ un quart", it: "ne copre circa un quarto", nl: "dekt ongeveer een kwart", pt: "cobre mais ou menos um quarto", ru: "закрывает примерно четверть" },
+    { de: "deckt es ab", en: "covers it", es: "lo cubre", fr: "couvre tout", it: "copre tutto", nl: "dekt het helemaal", pl: "– to wystarczy", pt: "cobre tudo", ru: "закрывает всё" },
+    { de: "deckt das meiste ab", en: "covers most of it", es: "cubre la mayor parte", fr: "en couvre la plus grande partie", it: "ne copre la maggior parte", nl: "dekt het grootste deel", pl: "– to większość", pt: "cobre a maior parte", ru: "закрывает большую часть" },
+    { de: "deckt etwa die Hälfte ab", en: "covers about half", es: "cubre más o menos la mitad", fr: "en couvre environ la moitié", it: "ne copre circa la metà", nl: "dekt ongeveer de helft", pl: "– to mniej więcej połowa", pt: "cobre mais ou menos a metade", ru: "закрывает примерно половину" },
+    { de: "deckt etwa ein Drittel ab", en: "covers about a third", es: "cubre más o menos un tercio", fr: "en couvre environ un tiers", it: "ne copre circa un terzo", nl: "dekt ongeveer een derde", pl: "– to mniej więcej jedna trzecia", pt: "cobre mais ou menos um terço", ru: "закрывает примерно треть" },
+    { de: "deckt etwa ein Viertel ab", en: "covers about a quarter", es: "cubre más o menos un cuarto", fr: "en couvre environ un quart", it: "ne copre circa un quarto", nl: "dekt ongeveer een kwart", pl: "– to mniej więcej jedna czwarta", pt: "cobre mais ou menos um quarto", ru: "закрывает примерно четверть" },
   ];
   return words[level]![locale];
 }

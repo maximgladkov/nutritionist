@@ -280,7 +280,45 @@ const nl: PushCopy = {
   yourCoach: "Je coach",
 };
 
-const COPY: Record<Locale, PushCopy> = { de, en, es, fr, it, nl, pt, ru };
+// Polish: the sender's gender is unknown, so no past tense about them ("Anna: komentarz do twojego dnia").
+const pl: PushCopy = {
+  commented: (who, count) =>
+    count === 1
+      ? `${who}: komentarz do twojego dnia.`
+      : `${who}: ${n("pl")(count)} ${pluralForm("pl", count, { few: "komentarze", many: "komentarzy", one: "komentarz", other: "komentarza" })} do twojego dnia.`,
+  fatSecret: {
+    done: "Import z FatSecret zakończony",
+    failed: "Import z FatSecret zatrzymał się przed końcem. Otwórz „Logowanie i konta” na karcie „Ja”, aby spróbować ponownie.",
+    failedTitle: "Import z FatSecret zatrzymany",
+    report: ({ days, entries, weights }) => {
+      const p = (count: number, forms: { one: string; few: string; many: string; other: string }) => `${n("pl")(count)} ${pluralForm("pl", count, forms)}`;
+      if (entries === 0 && weights === 0) return "W FatSecret nie ma nic nowego do przeniesienia.";
+      const parts = [];
+      // Days after "z" are in the genitive: "z 1 dnia", "z 3 dni".
+      if (entries > 0)
+        parts.push(
+          `${p(entries, { few: "produkty", many: "produktów", one: "produkt", other: "produktu" })} z ${p(days, { few: "dni", many: "dni", one: "dnia", other: "dnia" })}`,
+        );
+      if (weights > 0) parts.push(p(weights, { few: "ważenia", many: "ważeń", one: "ważenie", other: "ważenia" }));
+      return `Zaimportowano: ${parts.join(" i ")}.`;
+    },
+  },
+  moreComments: (count) => ` (+${count})`,
+  reviewed: (who, reacted) => `${who}: twój dzień sprawdzony${reacted ? " (z reakcją)" : ""}.`,
+  shareAsk: (who, kinds) => {
+    const names: Record<GroupShareKind, string> = {
+      activity: "aktywność",
+      meals: "posiłki",
+      photos: "zdjęcia posiłków",
+      summary: "podsumowanie dnia",
+      weight: "waga",
+    };
+    return `${who} prosi też o dostęp do: ${joined(kinds.map((kind) => names[kind]), "i")}. Otwórz grupę, aby zezwolić.`;
+  },
+  yourCoach: "Twój trener",
+};
+
+const COPY: Record<Locale, PushCopy> = { de, en, es, fr, it, nl, pl, pt, ru };
 
 export function pushCopy(locale: Locale): PushCopy {
   return COPY[locale];

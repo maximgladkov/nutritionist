@@ -6,6 +6,7 @@ import { fr } from "../achievements/copy.fr.ts";
 // Not `it`: that is node:test's.
 import { it as italian } from "../achievements/copy.it.ts";
 import { nl } from "../achievements/copy.nl.ts";
+import { pl } from "../achievements/copy.pl.ts";
 import { pt } from "../achievements/copy.pt.ts";
 import { ru } from "../achievements/copy.ru.ts";
 import { prisma } from "../prisma.ts";
@@ -61,7 +62,7 @@ after(closeDatabase);
 describe("the catalogue", () => {
   it("has the same badges in every language", () => {
     const context = { goals: { caloriesPerDay: 2000, proteinGPerDay: 120 } as never, goalWeightKg: 55.5, loggedDates: new Set<string>(), startWeightKg: 65, today };
-    const ids = (locale: "de" | "en" | "es" | "fr" | "it" | "nl" | "pt" | "ru") =>
+    const ids = (locale: "de" | "en" | "es" | "fr" | "it" | "nl" | "pl" | "pt" | "ru") =>
       achievementFamilies(locale).flatMap((entry) => entry.badges(context, new Set(["weight-goal-60"])).map((item) => [item.id, item.tier, item.target]));
     assert.deepEqual(ids("ru"), ids("en"));
     assert.deepEqual(ids("es"), ids("en"));
@@ -70,6 +71,7 @@ describe("the catalogue", () => {
     assert.deepEqual(ids("it"), ids("en"));
     assert.deepEqual(ids("pt"), ids("en"));
     assert.deepEqual(ids("nl"), ids("en"));
+    assert.deepEqual(ids("pl"), ids("en"));
   });
 
   it("puts Russian counts in the right form", () => {
@@ -112,6 +114,33 @@ describe("the catalogue", () => {
     assert.deepEqual([0, 1, 3].map(nl.streak.daysToGo), ["Nog 0 dagen", "Nog 1 dag", "Nog 3 dagen"]);
     assert.deepEqual([1, 7].map(nl.streaks.badgeTitle), ["1 dag op rij", "7 dagen op rij"]);
     assert.equal(nl.count(10000, "steps"), "10.000 stappen");
+  });
+
+  it("puts Polish counts in the right form", () => {
+    // Four forms, and unlike Russian 21 and 101 are "many"; fractions take the genitive singular.
+    assert.deepEqual([1, 2, 5, 12, 21, 22, 25].map(pl.streak.daysToGo), [
+      "Jeszcze 1 dzień",
+      "Jeszcze 2 dni",
+      "Jeszcze 5 dni",
+      "Jeszcze 12 dni",
+      "Jeszcze 21 dni",
+      "Jeszcze 22 dni",
+      "Jeszcze 25 dni",
+    ]);
+    assert.deepEqual([1, 2, 5, 12, 21, 22, 25].map((count) => pl.count(count, "foods")), [
+      "1 produkt",
+      "2 produkty",
+      "5 produktów",
+      "12 produktów",
+      "21 produktów",
+      "22 produkty",
+      "25 produktów",
+    ]);
+    assert.deepEqual([1, 7].map(pl.streaks.badgeTitle), ["1 dzień z rzędu", "7 dni z rzędu"]);
+    assert.equal(pl.count(10000, "steps"), "10\u00a0000 kroków");
+    // 90 minutes with the coach is "1,5 godziny".
+    assert.equal(pl.assistant.minutes(90).name, "1,5 godziny");
+    assert.deepEqual([60, 120, 300].map((minutes) => pl.assistant.minutes(minutes).name), ["1 godzina", "2 godziny", "5 godzin"]);
   });
 
   it("uses each stored id once", () => {
@@ -210,6 +239,12 @@ describe("achievements", () => {
     assert.deepEqual(dutch.streak.next, { label: "Volgende badge: 14 dagen op rij", progress: 0.5, remaining: "Nog 7 dagen" });
     assert.equal(badge(dutch, "streak-14").progressText, "7 / 14 dagen");
     assert.equal(family(dutch, "streaks").title, "Reeksen");
+
+    const polish = await load(kira, "pl-PL,pl;q=0.9");
+    assert.equal(polish.streak.message, "To twoja najlepsza seria. Dodaj dziś posiłek, aby jej nie przerwać.");
+    assert.deepEqual(polish.streak.next, { label: "Następna odznaka: 14 dni z rzędu", progress: 0.5, remaining: "Jeszcze 7 dni" });
+    assert.equal(badge(polish, "streak-14").progressText, "7 / 14 dni");
+    assert.equal(family(polish, "streaks").title, "Serie");
 
     // Same badges whatever the language; only the words change.
     const english = await load(kira, "en");
