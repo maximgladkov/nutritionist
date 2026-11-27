@@ -184,7 +184,39 @@ const fr: PushCopy = {
   yourCoach: "Ton coach",
 };
 
-const COPY: Record<Locale, PushCopy> = { de, en, es, fr, ru };
+const it: PushCopy = {
+  commented: (who, count) =>
+    count === 1 ? `${who} ha commentato la tua giornata.` : `${who} ha lasciato ${n("it")(count)} commenti sulla tua giornata.`,
+  fatSecret: {
+    done: "Importazione da FatSecret completata",
+    failed: "L’importazione da FatSecret si è interrotta prima della fine. Apri “Connessioni” per riprovare.",
+    failedTitle: "Importazione da FatSecret interrotta",
+    report: ({ days, entries, weights }) => {
+      // Italian says the singular for exactly 1 only.
+      const p = (count: number, one: string, other: string) => `${n("it")(count)} ${pluralForm("it", count, { one, other })}`;
+      if (entries === 0 && weights === 0) return "Niente di nuovo da importare da FatSecret.";
+      const parts = [];
+      if (entries > 0) parts.push(`${p(entries, "alimento", "alimenti")} in ${p(days, "giorno", "giorni")}`);
+      if (weights > 0) parts.push(p(weights, "pesata", "pesate"));
+      return `Abbiamo importato ${parts.join(" e ")}.`;
+    },
+  },
+  moreComments: (count) => ` (+${count} ${count === 1 ? "altro" : "altri"})`,
+  reviewed: (who, reacted) => `${who} ha rivisto la tua giornata${reacted ? " e ha reagito" : ""}.`,
+  shareAsk: (who, kinds) => {
+    const names: Record<GroupShareKind, string> = {
+      activity: "attività",
+      meals: "alimenti dei pasti",
+      photos: "foto dei pasti",
+      summary: "riepilogo del giorno",
+      weight: "peso",
+    };
+    return `${who} vorrebbe vedere anche: ${joined(kinds.map((kind) => names[kind]), "e")}. Apri il gruppo per consentirlo.`;
+  },
+  yourCoach: "Il tuo coach",
+};
+
+const COPY: Record<Locale, PushCopy> = { de, en, es, fr, it, ru };
 
 export function pushCopy(locale: Locale): PushCopy {
   return COPY[locale];

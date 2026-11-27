@@ -78,6 +78,14 @@ describe("home message", () => {
     assert.equal(french.body.message.text, "Kira, il te faut encore 75 grammes de protéines.");
   });
 
+  it("says it in Italian when the model can't", async () => {
+    // Its own test: a fourth language in a row is ranked after the facts already shown.
+    await goals();
+    await eat();
+    const italian = await api("GET", "/assistant/message", { headers: { "accept-language": "it" }, token: session.accessToken });
+    assert.equal(italian.body.message.text, "Kira, ti servono ancora 75 grammi di proteine.");
+  });
+
   it("gives the model only facts, the name and the time, and shows its words", async () => {
     model(three);
     await goals();
