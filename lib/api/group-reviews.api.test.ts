@@ -292,7 +292,7 @@ describe("notes wait for the day's review", () => {
     await api("PATCH", "/me", { body: { locale: "en" }, token: kira.accessToken });
     await api("PUT", `/groups/${groupId}/members/${kira.userId}/days/${earlier}/review`, { body: { reviewed: false }, token: coach.accessToken });
     assert.equal(pushes.length, 1);
-    assert.match(pushes[0]?.body ?? "", /^Gününü .+ inceledi\.$/u);
+    assert.match(pushes[0]?.body ?? "", /^.+, gününü inceledi\.$/u);
   });
 });
 

@@ -319,9 +319,10 @@ const pl: PushCopy = {
 };
 
 // Turkish: `who` may be "Koçun", so lines start with it, and it takes no suffix (that would follow the
-// name's vowels): it's the bare subject, after the object so "Elena gününü" can't read as "Elena's day" ("Gününü Elena inceledi"), and suffixes go on fixed words.
+// name's vowels): it's the bare subject, and suffixes go on fixed words. The comma keeps "Elena gününü"
+// from reading as "Elena's day": "Elena, gününü inceledi", as in the app.
 const tr: PushCopy = {
-  commented: (who, count) => `Gününe ${who} ${count === 1 ? "yorum yaptı" : `${n("tr")(count)} yorum yaptı`}.`,
+  commented: (who, count) => `${who}, gününe ${count === 1 ? "yorum yaptı" : `${n("tr")(count)} yorum yaptı`}.`,
   fatSecret: {
     done: "FatSecret içe aktarımı tamamlandı",
     failed: "FatSecret içe aktarımı bitmeden durdu. “Ben” sekmesindeki “Giriş ve hesaplar” bölümünden tekrar dene.",
@@ -336,7 +337,7 @@ const tr: PushCopy = {
     },
   },
   moreComments: (count) => ` (+${count})`,
-  reviewed: (who, reacted) => `Gününü ${who} inceledi${reacted ? " ve tepki bıraktı" : ""}.`,
+  reviewed: (who, reacted) => `${who}, gününü inceledi${reacted ? " ve tepki bıraktı" : ""}.`,
   shareAsk: (who, kinds) => {
     const names: Record<GroupShareKind, string> = {
       activity: "aktivite",
