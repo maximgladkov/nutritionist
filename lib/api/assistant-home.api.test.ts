@@ -134,6 +134,14 @@ describe("home message", () => {
     assert.equal(japanese.body.message.text, "Kiraさん、今日はたんぱく質があと75 g必要です。");
   });
 
+  it("says it in Korean when the model can't", async () => {
+    // Its own test too, for the same reason; the name takes "님" in Korean.
+    await goals();
+    await eat();
+    const korean = await api("GET", "/assistant/message", { headers: { "accept-language": "ko-KR" }, token: session.accessToken });
+    assert.equal(korean.body.message.text, "Kira님, 오늘 단백질이 75 g 더 필요해요.");
+  });
+
   it("gives the model only facts, the name and the time, and shows its words", async () => {
     model(three);
     await goals();
@@ -228,6 +236,9 @@ describe("home message", () => {
     assert.equal(ok("Кира, на сегодня осталось 1 234 ккал."), "Кира, на сегодня осталось 1 234 ккал.");
     assert.equal(ok("You have 1,234 kcal left today."), null);
     assert.equal(ok("Kira, **75** grams to go."), null);
+    // Korean opens with "님" after the name, in Latin or in Hangul.
+    assert.equal(ok("Kira님, 오늘 단백질이 75 g 더 필요해요."), "Kira님, 오늘 단백질이 75 g 더 필요해요.");
+    assert.equal(ok("키라님, 오늘 1,234 kcal 더 먹을 수 있어요."), "키라님, 오늘 1,234 kcal 더 먹을 수 있어요.");
     assert.equal(ok("Kira, 75 grams to go.", 4), null);
     assert.equal(ok(`Kira, ${"more ".repeat(40)}`), null);
     assert.deepEqual(numbersIn("0.8 kg, 0,8 kg, 12,345"), ["0.8", "0.8", "12345"]);

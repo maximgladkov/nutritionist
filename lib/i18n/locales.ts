@@ -1,4 +1,4 @@
-export const locales = ["en", "ru", "es", "de", "fr", "it", "pt", "nl", "pl", "tr", "uk", "ja"] as const;
+export const locales = ["en", "ru", "es", "de", "fr", "it", "pt", "nl", "pl", "tr", "uk", "ja", "ko"] as const;
 export type Locale = (typeof locales)[number];
 export const sourceLocale: Locale = "en";
 
@@ -29,6 +29,7 @@ const LOCALE_DISPLAY_NAMES: Record<Locale, string> = {
   tr: "Türkçe",
   uk: "Українська",
   ja: "日本語",
+  ko: "한국어",
 };
 
 export function localeDisplayName(locale: string): string {

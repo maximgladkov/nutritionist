@@ -318,6 +318,18 @@ describe("notes wait for the day's review", () => {
     assert.equal(pushes.length, 1);
     assert.match(pushes[0]?.body ?? "", /^.+：1日の記録を確認しました。$/u);
   });
+
+  it("and in Korean", async () => {
+    await api("PATCH", "/me", { body: { locale: "ko" }, token: kira.accessToken });
+    pushes.length = 0;
+    const earlier = shiftYmd(yesterday, -10);
+    await api("PUT", `/groups/${groupId}/members/${kira.userId}/days/${earlier}/review`, { body: { reviewed: true }, token: coach.accessToken });
+    await wait();
+    await api("PATCH", "/me", { body: { locale: "en" }, token: kira.accessToken });
+    await api("PUT", `/groups/${groupId}/members/${kira.userId}/days/${earlier}/review`, { body: { reviewed: false }, token: coach.accessToken });
+    assert.equal(pushes.length, 1);
+    assert.match(pushes[0]?.body ?? "", /^.+: 하루 기록을 확인했어요\.$/u);
+  });
 });
 
 describe("reactions and comments on part of the day", () => {

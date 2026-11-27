@@ -94,6 +94,9 @@ export function plainText(fact: HomeFact, name: string | null, locale: Locale = 
   const plain = fact.plain?.[locale] ?? "";
   // Japanese addresses someone by name with "さん" ("Kiraさん、…"); a bare name reads rude.
   if (locale === "ja") return name ? `${name}さん、${plain}` : plain;
+  // Korean adds the polite "님", which doesn't change with the name: "Kira님, …". The line starts a
+  // sentence of its own, so there's no case to fix without a name.
+  if (locale === "ko") return name ? `${name}님, ${plain}` : plain;
   return name ? `${name}, ${plain}` : upperFirst(plain, locale);
 }
 

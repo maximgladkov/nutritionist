@@ -9,8 +9,8 @@ export default defineConfig({
     },
   ],
   compileNamespace: "ts",
-  // The web app isn't in Spanish, German, French, Italian, Portuguese, Dutch, Polish, Turkish, Ukrainian or Japanese yet; those catalogs fall back to English.
+  // The web app isn't in Spanish, German, French, Italian, Portuguese, Dutch, Polish, Turkish, Ukrainian, Japanese or Korean yet; those catalogs fall back to English.
   fallbackLocales: { default: "en" },
-  locales: ["en", "ru", "es", "de", "fr", "it", "pt", "nl", "pl", "tr", "uk", "ja"],
+  locales: ["en", "ru", "es", "de", "fr", "it", "pt", "nl", "pl", "tr", "uk", "ja", "ko"],
   sourceLocale: "en",
 });

@@ -5,6 +5,7 @@ import type { MainMeal } from "./home-day.ts";
 // it's shown. Starts in lower case, since it usually follows the person's name ("Kira, ...").
 // The other languages speak informally, like the model does (ты, tú, du, tu, tu, você, je, ty, sen, ти);
 // Japanese is the exception: polite です/ます sentences, after "Kiraさん、" rather than "Kira, ".
+// Korean too: polite 해요체 sentences after "Kira님, ", with no particle that depends on a name before it.
 export type Plain = Record<Locale, string>;
 
 export const num = (locale: Locale, value: number): string => formatNumber(locale, Math.round(value));
@@ -30,6 +31,8 @@ export function dayCount(locale: Locale, count: number): string {
   if (locale === "uk") return `${num("uk", count)} ${pluralForm("uk", count, { few: "дні", many: "днів", one: "день", other: "дня" })}`;
   // Japanese has no plural; the counter follows the number with no space: "1日", "21日".
   if (locale === "ja") return `${num("ja", count)}日`;
+  // Korean neither: "1일", "21일".
+  if (locale === "ko") return `${num("ko", count)}일`;
   return `${count} ${count === 1 ? "day" : "days"}`;
 }
 
@@ -48,7 +51,7 @@ export function ruWord(count: number, one: string, few: string, many: string): s
 }
 
 // "на ужин", "para la cena": what a suggestion is for.
-export const MEAL_FOR: Record<"de" | "es" | "fr" | "it" | "ja" | "nl" | "pl" | "pt" | "ru" | "tr" | "uk", Record<MainMeal, string>> = {
+export const MEAL_FOR: Record<"de" | "es" | "fr" | "it" | "ja" | "ko" | "nl" | "pl" | "pt" | "ru" | "tr" | "uk", Record<MainMeal, string>> = {
   de: { breakfast: "zum Frühstück", dinner: "zum Abendessen", lunch: "zum Mittagessen" },
   es: { breakfast: "el desayuno", dinner: "la cena", lunch: "el almuerzo" },
   fr: { breakfast: "le petit-déjeuner", dinner: "le dîner", lunch: "le déjeuner" },
@@ -65,6 +68,8 @@ export const MEAL_FOR: Record<"de" | "es" | "fr" | "it" | "ja" | "nl" | "pl" | "
   uk: { breakfast: "на сніданок", dinner: "на вечерю", lunch: "на обід" },
   // The bare noun; the particle goes with the sentence: "夕食には「…」", "夕食は、…".
   ja: { breakfast: "朝食", dinner: "夕食", lunch: "昼食" },
+  // The bare noun too, as Japanese: "저녁 메뉴로 ‘…’ 어때요?", "저녁에는 …".
+  ko: { breakfast: "아침", dinner: "저녁", lunch: "점심" },
 };
 
 // How much of what's left a food covers, as said after its name. Polish says it with a dash and "to",
@@ -72,16 +77,17 @@ export const MEAL_FOR: Record<"de" | "es" | "fr" | "it" | "ja" | "nl" | "pl" | "
 // as the bare subject and the suffixes on "kalan" (what's left): "Skyr kalanın yaklaşık yarısını karşılar".
 // Ukrainian says it as Polish does, with a dash and "це": "Скир — це приблизно половина".
 // Japanese follows the food in 「」 and ends the sentence itself: "「スキール」で残りの約半分をとれます".
+// Korean too, with 만 (which doesn't change with the name) right after the ‘’: "‘스키르’만 먹어도 남은 양의 절반 정도를 채울 수 있어요".
 export function coverageWords(locale: Locale, part: number, whole: number): string | null {
   const share = part / whole;
   if (share < 0.2) return null;
   const level = share >= 0.9 ? 0 : share >= 0.6 ? 1 : share >= 0.42 ? 2 : share >= 0.29 ? 3 : 4;
   const words: Plain[] = [
-    { de: "deckt es ab", en: "covers it", es: "lo cubre", fr: "couvre tout", it: "copre tutto", nl: "dekt het helemaal", pl: "– to wystarczy", pt: "cobre tudo", ru: "закрывает всё", tr: "kalanın tamamını karşılar", uk: "— цього вистачить", ja: "で残りを十分にとれます" },
-    { de: "deckt das meiste ab", en: "covers most of it", es: "cubre la mayor parte", fr: "en couvre la plus grande partie", it: "ne copre la maggior parte", nl: "dekt het grootste deel", pl: "– to większość", pt: "cobre a maior parte", ru: "закрывает большую часть", tr: "kalanın çoğunu karşılar", uk: "— це більша частина", ja: "で残りの大半をとれます" },
-    { de: "deckt etwa die Hälfte ab", en: "covers about half", es: "cubre más o menos la mitad", fr: "en couvre environ la moitié", it: "ne copre circa la metà", nl: "dekt ongeveer de helft", pl: "– to mniej więcej połowa", pt: "cobre mais ou menos a metade", ru: "закрывает примерно половину", tr: "kalanın yaklaşık yarısını karşılar", uk: "— це приблизно половина", ja: "で残りの約半分をとれます" },
-    { de: "deckt etwa ein Drittel ab", en: "covers about a third", es: "cubre más o menos un tercio", fr: "en couvre environ un tiers", it: "ne copre circa un terzo", nl: "dekt ongeveer een derde", pl: "– to mniej więcej jedna trzecia", pt: "cobre mais ou menos um terço", ru: "закрывает примерно треть", tr: "kalanın yaklaşık üçte birini karşılar", uk: "— це приблизно третина", ja: "で残りの約3分の1をとれます" },
-    { de: "deckt etwa ein Viertel ab", en: "covers about a quarter", es: "cubre más o menos un cuarto", fr: "en couvre environ un quart", it: "ne copre circa un quarto", nl: "dekt ongeveer een kwart", pl: "– to mniej więcej jedna czwarta", pt: "cobre mais ou menos um quarto", ru: "закрывает примерно четверть", tr: "kalanın yaklaşık dörtte birini karşılar", uk: "— це приблизно чверть", ja: "で残りの約4分の1をとれます" },
+    { de: "deckt es ab", en: "covers it", es: "lo cubre", fr: "couvre tout", it: "copre tutto", nl: "dekt het helemaal", pl: "– to wystarczy", pt: "cobre tudo", ru: "закрывает всё", tr: "kalanın tamamını karşılar", uk: "— цього вистачить", ja: "で残りを十分にとれます", ko: "만 먹어도 남은 양을 다 채울 수 있어요" },
+    { de: "deckt das meiste ab", en: "covers most of it", es: "cubre la mayor parte", fr: "en couvre la plus grande partie", it: "ne copre la maggior parte", nl: "dekt het grootste deel", pl: "– to większość", pt: "cobre a maior parte", ru: "закрывает большую часть", tr: "kalanın çoğunu karşılar", uk: "— це більша частина", ja: "で残りの大半をとれます", ko: "만 먹어도 남은 양의 대부분을 채울 수 있어요" },
+    { de: "deckt etwa die Hälfte ab", en: "covers about half", es: "cubre más o menos la mitad", fr: "en couvre environ la moitié", it: "ne copre circa la metà", nl: "dekt ongeveer de helft", pl: "– to mniej więcej połowa", pt: "cobre mais ou menos a metade", ru: "закрывает примерно половину", tr: "kalanın yaklaşık yarısını karşılar", uk: "— це приблизно половина", ja: "で残りの約半分をとれます", ko: "만 먹어도 남은 양의 절반 정도를 채울 수 있어요" },
+    { de: "deckt etwa ein Drittel ab", en: "covers about a third", es: "cubre más o menos un tercio", fr: "en couvre environ un tiers", it: "ne copre circa un terzo", nl: "dekt ongeveer een derde", pl: "– to mniej więcej jedna trzecia", pt: "cobre mais ou menos um terço", ru: "закрывает примерно треть", tr: "kalanın yaklaşık üçte birini karşılar", uk: "— це приблизно третина", ja: "で残りの約3分の1をとれます", ko: "만 먹어도 남은 양의 3분의 1 정도를 채울 수 있어요" },
+    { de: "deckt etwa ein Viertel ab", en: "covers about a quarter", es: "cubre más o menos un cuarto", fr: "en couvre environ un quart", it: "ne copre circa un quarto", nl: "dekt ongeveer een kwart", pl: "– to mniej więcej jedna czwarta", pt: "cobre mais ou menos um quarto", ru: "закрывает примерно четверть", tr: "kalanın yaklaşık dörtte birini karşılar", uk: "— це приблизно чверть", ja: "で残りの約4分の1をとれます", ko: "만 먹어도 남은 양의 4분의 1 정도를 채울 수 있어요" },
   ];
   return words[level]![locale];
 }
