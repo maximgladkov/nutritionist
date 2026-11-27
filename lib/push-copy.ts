@@ -253,7 +253,7 @@ const nl: PushCopy = {
     count === 1 ? `${who} heeft een opmerking bij je dag achtergelaten.` : `${who} heeft ${n("nl")(count)} opmerkingen bij je dag achtergelaten.`,
   fatSecret: {
     done: "FatSecret-import voltooid",
-    failed: "De import uit FatSecret is gestopt voordat hij klaar was. Open “Inloggen en accounts” in het tabblad “Ik” om het opnieuw te proberen.",
+    failed: "De import uit FatSecret is gestopt voordat hij klaar was. Open “Inloggen en accounts” in het tabblad “Jij” om het opnieuw te proberen.",
     failedTitle: "FatSecret-import gestopt",
     report: ({ days, entries, weights }) => {
       // Dutch is singular only at exactly 1.
