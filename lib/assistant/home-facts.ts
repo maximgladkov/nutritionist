@@ -148,7 +148,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
     frequentFoods({ limit: 12, now, userId }),
     dishes(userId),
     usualNow(userId, now, timezone, today),
-    achievementsViews(userId, ["de", "en", "es", "fr", "it", "pt", "ru"]),
+    achievementsViews(userId, ["de", "en", "es", "fr", "it", "nl", "pt", "ru"]),
     prisma.weightEntry.findMany({ orderBy: { date: "desc" }, take: 60, where: { userId } }),
     prisma.dailyActivity.findMany({ orderBy: { date: "desc" }, where: { date: { gte: shiftYmd(today, -8), lt: today }, userId } }),
     recentWords(userId, now),
@@ -214,7 +214,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
     if (proteinLeft !== null && proteinLeft >= 15 && hour >= 10 && !flagged.has("protein_low")) {
       const best = (next ? foods : []).filter((food) => (food.proteins ?? 0) > 0 && isNew(food.name)).sort((a, b) => (b.proteins ?? 0) - (a.proteins ?? 0))[0];
       const share = best ? coverage(best.proteins ?? 0, proteinLeft) : null;
-      const covers = (locale: "de" | "es" | "fr" | "it" | "pt" | "ru") => (best && share ? ` ${upperFirst(best.name)} ${coverageWords(locale, best.proteins ?? 0, proteinLeft)}.` : "");
+      const covers = (locale: "de" | "es" | "fr" | "it" | "nl" | "pt" | "ru") => (best && share ? ` ${upperFirst(best.name)} ${coverageWords(locale, best.proteins ?? 0, proteinLeft)}.` : "");
       const idea = best && share ? ` ${best.name}, which they often log, ${share}.` : "";
       add(
         "protein_left",
@@ -227,6 +227,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
           de: `du brauchst noch ${num("de", proteinLeft)} Gramm Eiweiß.${covers("de")}`,
           fr: `il te faut encore ${num("fr", proteinLeft)} grammes de protéines.${covers("fr")}`,
           it: `ti servono ancora ${num("it", proteinLeft)} grammi di proteine.${covers("it")}`,
+          nl: `je hebt nog ${num("nl", proteinLeft)} gram eiwit nodig.${covers("nl")}`,
           pt: `você ainda precisa de ${num("pt", proteinLeft)} gramas de proteínas.${covers("pt")}`,
           ru: `тебе ещё нужно ${num("ru", proteinLeft)} г белка.${covers("ru")}`,
         },
@@ -253,6 +254,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
             de: `du hast noch ${num("de", kcalLeft)} kcal übrig. ${upperFirst(dish.name)} passt ${MEAL_FOR.de[next!]}.`,
             fr: `il te reste ${num("fr", kcalLeft)} kcal. ${upperFirst(dish.name)} convient pour ${MEAL_FOR.fr[next!]}.`,
             it: `ti restano ${num("it", kcalLeft)} kcal. Per ${MEAL_FOR.it[next!]} puoi scegliere: ${dish.name}.`,
+            nl: `je hebt nog ${num("nl", kcalLeft)} kcal over. Een idee voor ${MEAL_FOR.nl[next!]}: ${dish.name}.`,
             pt: `você ainda tem ${num("pt", kcalLeft)} kcal. Para ${MEAL_FOR.pt[next!]}, uma opção é: ${dish.name}.`,
             ru: `у тебя осталось ${num("ru", kcalLeft)} ккал. На ${MEAL_FOR.ru[next!]} подойдёт: ${dish.name}.`,
           },
@@ -264,6 +266,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
           de: `du hast heute noch ${num("de", kcalLeft)} kcal übrig.`,
           fr: `il te reste ${num("fr", kcalLeft)} kcal aujourd’hui.`,
           it: `oggi ti restano ${num("it", kcalLeft)} kcal.`,
+          nl: `je hebt vandaag nog ${num("nl", kcalLeft)} kcal over.`,
           pt: `hoje você ainda tem ${num("pt", kcalLeft)} kcal.`,
           ru: `на сегодня у тебя осталось ${num("ru", kcalLeft)} ккал.`,
         });
@@ -276,6 +279,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
         de: "dein Eiweißziel für heute ist erreicht. Gut gemacht!",
         fr: "ton objectif de protéines du jour est atteint. Bravo !",
         it: "obiettivo di proteine raggiunto per oggi. Ottimo lavoro!",
+        nl: "je eiwitdoel voor vandaag is gehaald. Goed bezig!",
         pt: "sua meta de proteínas de hoje foi alcançada. Ótimo trabalho!",
         ru: "цель по белку на сегодня выполнена. Отличная работа!",
       });
@@ -292,6 +296,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
           de: `diese Woche hast du dein Eiweißziel an ${hit} von ${dayCount("de", week.length)} erreicht.`,
           fr: `cette semaine, tu as atteint ton objectif de protéines sur ${hit} des ${dayCount("fr", week.length)} notés.`,
           it: `questa settimana hai raggiunto l’obiettivo di proteine in ${hit} giorni su ${week.length} registrati.`,
+          nl: `deze week heb je je eiwitdoel gehaald op ${hit} van de ${dayCount("nl", week.length)} die je hebt bijgehouden.`,
           pt: `esta semana você bateu sua meta de proteínas em ${hit} de ${dayCount("pt", week.length)} registrados.`,
           ru: `за неделю цель по белку выполнена в ${hit} из ${ruDaysOf(week.length)}.`,
         });
@@ -307,6 +312,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
           de: `diese Woche hast du im Schnitt ${num("de", average)} kcal am Tag eingetragen, deutlich unter deinem Ziel. Fehlt etwas?`,
           fr: `cette semaine, tu as noté en moyenne ${num("fr", average)} kcal par jour, bien en dessous de ton objectif. Il manque quelque chose ?`,
           it: `questa settimana hai registrato in media ${num("it", average)} kcal al giorno, molto sotto il tuo obiettivo. Manca qualcosa?`,
+          nl: `deze week heb je gemiddeld ${num("nl", average)} kcal per dag bijgehouden, flink onder je doel. Mist er iets?`,
           pt: `esta semana você registrou em média ${num("pt", average)} kcal por dia, bem abaixo da sua meta. Está faltando alguma coisa?`,
           ru: `за неделю в среднем записано ${num("ru", average)} ккал в день — заметно меньше цели. Может, что-то не записано?`,
         });
@@ -317,6 +323,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
           de: `diese Woche waren es im Schnitt ${num("de", average)} kcal am Tag, nah an deinem Ziel.`,
           fr: `cette semaine, tu étais en moyenne à ${num("fr", average)} kcal par jour, proche de ton objectif.`,
           it: `questa settimana hai avuto una media di ${num("it", average)} kcal al giorno, vicina al tuo obiettivo.`,
+          nl: `deze week zat je gemiddeld op ${num("nl", average)} kcal per dag, dicht bij je doel.`,
           pt: `esta semana você teve uma média de ${num("pt", average)} kcal por dia, perto da sua meta.`,
           ru: `за неделю в среднем ${num("ru", average)} ккал в день — близко к цели.`,
         });
@@ -327,6 +334,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
           de: `diese Woche waren es im Schnitt ${num("de", average)} kcal am Tag. Soll ich dir helfen, die nächste zu planen?`,
           fr: `cette semaine, tu étais en moyenne à ${num("fr", average)} kcal par jour. Je t’aide à planifier la prochaine ?`,
           it: `questa settimana hai avuto una media di ${num("it", average)} kcal al giorno. Ti aiuto a pianificare la prossima?`,
+          nl: `deze week zat je gemiddeld op ${num("nl", average)} kcal per dag. Zal ik je helpen de volgende week te plannen?`,
           pt: `esta semana você teve uma média de ${num("pt", average)} kcal por dia. Quer ajuda para planejar a próxima?`,
           ru: `за неделю в среднем ${num("ru", average)} ккал в день. Помочь спланировать следующую?`,
         });
@@ -341,6 +349,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
           de: `dein Eiweiß ist gestiegen: ${num("de", is)} Gramm am Tag statt ${num("de", was)} in der Woche davor.`,
           fr: `tes protéines sont en hausse : ${num("fr", is)} grammes par jour, contre ${num("fr", was)} la semaine d’avant.`,
           it: `le tue proteine sono in aumento: ${num("it", is)} grammi al giorno, contro ${num("it", was)} della settimana prima.`,
+          nl: `je eet meer eiwit: ${num("nl", is)} gram per dag, tegen ${num("nl", was)} de week ervoor.`,
           pt: `suas proteínas subiram: ${num("pt", is)} gramas por dia, contra ${num("pt", was)} na semana anterior.`,
           ru: `белка стало больше: ${num("ru", is)} г в день против ${num("ru", was)} неделей раньше.`,
         });
@@ -357,6 +366,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
       de: `schon ${dayCount("de", streak.days)} in Folge eingetragen. Weiter so!`,
       fr: `déjà ${dayCount("fr", streak.days)} d’affilée avec des repas notés. Continue comme ça !`,
       it: `già ${dayCount("it", streak.days)} di fila con qualcosa registrato. Continua così!`,
+      nl: `al ${dayCount("nl", streak.days)} op rij bijgehouden. Ga zo door!`,
       pt: `já são ${dayCount("pt", streak.days)} seguidos com registros. Continue assim!`,
       ru: `уже ${dayCount("ru", streak.days)} подряд с записями. Так держать!`,
     });
@@ -366,6 +376,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
       de: `trag heute etwas ein, damit deine Serie von ${dayCount("de", streak.days)} hält.`,
       fr: `note quelque chose aujourd’hui pour garder ta série de ${dayCount("fr", streak.days)}.`,
       it: `registra qualcosa oggi per non interrompere la tua serie di ${dayCount("it", streak.days)}.`,
+      nl: `voeg vandaag iets toe, dan blijft je reeks van ${dayCount("nl", streak.days)} staan.`,
       pt: `registre algo hoje para não perder sua sequência de ${dayCount("pt", streak.days)}.`,
       ru: `запиши что-нибудь сегодня, чтобы не прервать серию из ${ruDaysOf(streak.days)}.`,
     });
@@ -373,7 +384,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
   // A badge just earned has its own moment; the coach only mentions one that's close.
   const near = badges.closest[0];
   // The same badge in another language.
-  const local = (locale: "de" | "es" | "fr" | "it" | "pt" | "ru") => {
+  const local = (locale: "de" | "es" | "fr" | "it" | "nl" | "pt" | "ru") => {
     const found = badgeViews[locale].families.flatMap((family) => family.badges).find((badge) => badge.id === near?.id);
     return found ?? near!;
   };
@@ -383,6 +394,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
     de: `du bist nah an einem Abzeichen: ${local("de").title}, ${local("de").progressText}.`,
     fr: `tu es tout près d’un badge : ${local("fr").title}, ${local("fr").progressText}.`,
     it: `manca poco a un nuovo badge: ${local("it").title}, ${local("it").progressText}.`,
+    nl: `je hebt bijna een nieuwe badge: ${local("nl").title}, ${local("nl").progressText}.`,
     pt: `falta pouco para uma nova medalha: ${local("pt").title}, ${local("pt").progressText}.`,
     ru: `ты близко к новому значку: «${local("ru").title}», ${local("ru").progressText}.`,
   });
@@ -397,6 +409,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
         de: `du bist ${tenth("de", closer)} kg näher an deinem Zielgewicht als vor ein paar Wochen.`,
         fr: `tu es ${tenth("fr", closer)} kg plus près de ton poids cible qu’il y a quelques semaines.`,
         it: `rispetto a qualche settimana fa, il tuo peso obiettivo è ${tenth("it", closer)} kg più vicino.`,
+        nl: `je zit ${tenth("nl", closer)} kg dichter bij je streefgewicht dan een paar weken geleden.`,
         pt: `você está ${tenth("pt", closer)} kg mais perto da sua meta de peso do que há algumas semanas.`,
         ru: `ты на ${tenth("ru", closer)} кг ближе к целевому весу, чем несколько недель назад.`,
       });
@@ -413,6 +426,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
       de: `gestern bist du ${num("de", steps)} Schritte gegangen, mehr als deine üblichen ${num("de", usualSteps)}.`,
       fr: `hier, tu as fait ${num("fr", steps)} pas, plus que tes ${num("fr", usualSteps)} habituels.`,
       it: `ieri hai fatto ${num("it", steps)} passi, più dei tuoi soliti ${num("it", usualSteps)}.`,
+      nl: `gisteren heb je ${num("nl", steps)} stappen gezet, meer dan de ${num("nl", usualSteps)} die je meestal zet.`,
       pt: `ontem você deu ${num("pt", steps)} passos, mais do que os seus ${num("pt", usualSteps)} de costume.`,
       ru: `вчера ${num("ru", steps)} ${ruWord(Math.round(steps), "шаг", "шага", "шагов")} — больше обычных ${num("ru", usualSteps)}.`,
     });
@@ -428,6 +442,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
       de: `es gibt ${comments.length === 1 ? "einen Kommentar" : `${comments.length} Kommentare`} von ${from === "their coach" ? "deinem Coach" : from} zu deinem Tag.`,
       fr: `${from === "their coach" ? "ton coach" : from} a laissé ${comments.length === 1 ? "un commentaire" : `${comments.length} commentaires`} sur ta journée.`,
       it: `${from === "their coach" ? "il tuo coach" : from} ha lasciato ${comments.length === 1 ? "un commento" : `${comments.length} commenti`} sulla tua giornata.`,
+      nl: `${from === "their coach" ? "je coach" : from} heeft ${comments.length === 1 ? "een opmerking" : `${comments.length} opmerkingen`} bij je dag achtergelaten.`,
       pt: `${from === "their coach" ? "seu coach" : from} deixou ${comments.length === 1 ? "um comentário" : `${comments.length} comentários`} no seu dia.`,
       ru: `к твоему дню ${comments.length === 1 ? "есть комментарий" : `есть ${comments.length} ${ruWord(comments.length, "комментарий", "комментария", "комментариев")}`} от ${from === "their coach" ? "твоего коуча" : from}.`,
     });
@@ -439,6 +454,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
     de: `Zeit für dein übliches ${usual.name}? Sag Bescheid, dann trag ich es ein.`,
     fr: `envie de ton classique (${usual.name}) ? Dis-le-moi et je le note.`,
     it: `ti va il solito (${usual.name})? Dimmelo e lo registro.`,
+    nl: `tijd voor wat je meestal neemt (${usual.name})? Zeg het maar, dan voeg ik het toe.`,
     pt: `que tal o de sempre (${usual.name})? Me diga e eu registro.`,
     ru: `время для привычного: ${usual.name}? Скажи — и я запишу.`,
   });
@@ -450,6 +466,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
       de: "heute ist noch nichts eingetragen. Sag mir, was du gegessen hast, und ich trag es ein.",
       fr: "rien n’est encore noté aujourd’hui. Dis-moi ce que tu as mangé et je l’ajoute.",
       it: "oggi non hai ancora registrato niente. Dimmi cosa hai mangiato e lo aggiungo.",
+      nl: "je hebt vandaag nog niets toegevoegd. Vertel me wat je hebt gegeten, dan voeg ik het toe.",
       pt: "hoje ainda não há nada registrado. Me conte o que você comeu e eu adiciono.",
       ru: "сегодня пока ничего не записано. Расскажи, что было на тарелке, — я добавлю.",
     });
@@ -459,6 +476,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
       de: "guten Morgen! Was gibt es zum Frühstück?",
       fr: "bonjour ! Qu’est-ce que tu prends au petit-déjeuner ?",
       it: "buongiorno! Cosa mangi a colazione?",
+      nl: "goedemorgen! Wat eet je als ontbijt?",
       pt: "bom dia! O que tem para o café da manhã?",
       ru: "доброе утро! Что на завтрак?",
     });
@@ -478,6 +496,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
     de: "frag mich nach einer Essensidee oder schick mir ein Foto von dem, was du isst.",
     fr: "demande-moi une idée de repas ou envoie-moi une photo de ce que tu manges.",
     it: "chiedimi un’idea per un pasto o mandami una foto di quello che mangi.",
+    nl: "vraag me om een idee voor een maaltijd, of stuur een foto van wat je eet.",
     pt: "me peça uma ideia de refeição ou mande uma foto do que você está comendo.",
     ru: "попроси у меня идею, что поесть, или пришли фото того, что ешь.",
   });
