@@ -22,7 +22,9 @@ describe("error messages", () => {
     assert.equal(russian.body.error.message, "Такого адреса нет.");
     const german = await api("GET", "/me", { headers: { "accept-language": "de-AT,de;q=0.9" } });
     assert.equal(german.body.error.message, "Melde dich an, um weiterzumachen.");
-    const other = await api("GET", "/me", { headers: { "accept-language": "fr" } });
+    const french = await api("GET", "/me", { headers: { "accept-language": "fr-CA,fr;q=0.9" } });
+    assert.equal(french.body.error.message, "Connecte-toi pour continuer.");
+    const other = await api("GET", "/me", { headers: { "accept-language": "sv" } });
     assert.equal(other.body.error.message, "Sign in to continue.");
   });
 
@@ -38,10 +40,14 @@ describe("error messages", () => {
     await api("PATCH", "/me", { body: { locale: "es" }, token: kira.accessToken });
     const result = await api("PATCH", "/me", { body: { locale: "xx" }, token: kira.accessToken });
     assert.equal(result.status, 400);
-    assert.equal(result.body.error.message, "Elige una de estas opciones: en, ru, es, de.");
+    assert.equal(result.body.error.message, "Elige una de estas opciones: en, ru, es, de, fr.");
     assert.equal(
       translateErrorMessage("Daily protein must be a whole number from 10 to 400 grams.", "de"),
       "Tageswert für Eiweiß: eine ganze Zahl von 10 bis 400 g.",
+    );
+    assert.equal(
+      translateErrorMessage("Daily protein must be a whole number from 10 to 400 grams.", "fr"),
+      "Objectif quotidien pour les protéines\u202f: un nombre entier de 10 à 400 g.",
     );
   });
 
