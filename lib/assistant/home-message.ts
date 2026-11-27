@@ -92,6 +92,8 @@ function wanted(fact: HomeFact, settings: AssistantSettings): boolean {
 
 export function plainText(fact: HomeFact, name: string | null, locale: Locale = "en"): string {
   const plain = fact.plain?.[locale] ?? "";
+  // Japanese addresses someone by name with "さん" ("Kiraさん、…"); a bare name reads rude.
+  if (locale === "ja") return name ? `${name}さん、${plain}` : plain;
   return name ? `${name}, ${plain}` : upperFirst(plain, locale);
 }
 

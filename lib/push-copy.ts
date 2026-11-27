@@ -390,7 +390,42 @@ const uk: PushCopy = {
   yourCoach: "Твій тренер",
 };
 
-const COPY: Record<Locale, PushCopy> = { de, en, es, fr, it, nl, pl, pt, ru, tr, uk };
+// Japanese: polite です/ます, no honorific after `who` (it may be the fallback "コーチ"), lists with "、",
+// full-width "：" and "（）". The FatSecret retry is in 「マイページ」 › 「ログインと連携」, as the app names them.
+const ja: PushCopy = {
+  commented: (who, count) => (count === 1 ? `${who}が1日の記録にコメントしました。` : `${who}が1日の記録に${n("ja")(count)}件コメントしました。`),
+  fatSecret: {
+    done: "FatSecretのインポート完了",
+    failed: "FatSecretのインポートが途中で止まりました。「マイページ」の「ログインと連携」からもう一度お試しください。",
+    failedTitle: "FatSecretのインポート停止",
+    report: ({ days, entries, weights }) => {
+      if (entries === 0 && weights === 0) return "FatSecretから取り込む新しいデータはありません。";
+      const parts = [];
+      // "30日分の食品120品".
+      if (entries > 0) parts.push(`${n("ja")(days)}日分の食品${n("ja")(entries)}品`);
+      if (weights > 0) parts.push(`体重記録${n("ja")(weights)}回`);
+      return `${parts.join("と")}を取り込みました。`;
+    },
+  },
+  moreComments: (count) => `（ほか${count}件）`,
+  reviewed: (who, reacted) => `${who}：1日の記録を確認しました${reacted ? "（リアクションあり）" : ""}。`,
+  shareAsk: (who, kinds) => {
+    const names: Record<GroupShareKind, string> = {
+      activity: "アクティビティ",
+      meals: "食事の内容",
+      photos: "食事の写真",
+      summary: "1日のまとめ",
+      weight: "体重",
+    };
+    // "体重と食事の写真", "体重、食事の写真と1日のまとめ".
+    const items = kinds.map((kind) => names[kind]);
+    const list = items.length <= 1 ? (items[0] ?? "") : `${items.slice(0, -1).join("、")}と${items.at(-1)}`;
+    return `${who}が${list}の共有もリクエストしています。グループを開くと許可できます。`;
+  },
+  yourCoach: "コーチ",
+};
+
+const COPY: Record<Locale, PushCopy> = { de, en, es, fr, it, ja, nl, pl, pt, ru, tr, uk };
 
 export function pushCopy(locale: Locale): PushCopy {
   return COPY[locale];
