@@ -1,4 +1,5 @@
 import { formatNumber, type Locale } from "../i18n/locales.ts";
+import { de } from "./copy.de.ts";
 import { es } from "./copy.es.ts";
 import { ru } from "./copy.ru.ts";
 
@@ -254,7 +255,7 @@ export const en: AchievementCopy = {
   },
 };
 
-const COPY: Record<Locale, AchievementCopy> = { en, es, ru };
+const COPY: Record<Locale, AchievementCopy> = { de, en, es, ru };
 
 export function achievementCopy(locale: Locale): AchievementCopy {
   return COPY[locale];

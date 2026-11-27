@@ -19,7 +19,9 @@ describe("error messages", () => {
     assert.equal(spanish.body.error.message, "Inicia sesión para continuar.");
     const russian = await api("GET", "/no-such-thing", { headers: { "accept-language": "ru-RU" } });
     assert.equal(russian.body.error.message, "Такого адреса нет.");
-    const other = await api("GET", "/me", { headers: { "accept-language": "de" } });
+    const german = await api("GET", "/me", { headers: { "accept-language": "de-AT,de;q=0.9" } });
+    assert.equal(german.body.error.message, "Melde dich an, um weiterzumachen.");
+    const other = await api("GET", "/me", { headers: { "accept-language": "fr" } });
     assert.equal(other.body.error.message, "Sign in to continue.");
   });
 
@@ -34,6 +36,6 @@ describe("error messages", () => {
   it("stay English for messages built from values", async () => {
     const result = await api("PATCH", "/me", { body: { locale: "xx" }, headers: { "accept-language": "es" }, token: kira.accessToken });
     assert.equal(result.status, 400);
-    assert.equal(result.body.error.message, "Choose one of: en, ru, es.");
+    assert.equal(result.body.error.message, "Choose one of: en, ru, es, de.");
   });
 });
