@@ -61,7 +61,8 @@ export async function draftHomeWords(input: HomeWordsInput): Promise<HomeWords[]
     providerOptions: { anthropic: { thinking: { type: "disabled" } } },
     prompt: [
       input.name
-        ? `Their name is ${input.name}. Start every message with "${input.name},".`
+        ? // Japanese addresses someone with "さん", as the plain lines do.
+          `Their name is ${input.name}. Start every message with "${input.language === "Japanese" ? `${input.name}さん、` : `${input.name},`}".`
         : "Don't use a name.",
       `It is ${input.localTime} where they are. ${input.day}`,
       input.tone,

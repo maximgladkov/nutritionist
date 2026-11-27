@@ -79,6 +79,12 @@ describe("profile", () => {
     assert.equal(result.body.locale, "uk");
   });
 
+  it("accepts Japanese", async () => {
+    const result = await api("PATCH", "/me", { body: { locale: "ja" }, token: session.accessToken });
+    assert.equal(result.status, 200, JSON.stringify(result.body));
+    assert.equal(result.body.locale, "ja");
+  });
+
   it("saves preferences in the account and merges updates", async () => {
     const empty = await api("GET", "/me", { token: session.accessToken });
     assert.deepEqual(empty.body.preferences, {});
@@ -118,7 +124,7 @@ describe("profile", () => {
     assert.equal(result.status, 200);
     assert.ok(result.body.countries.length > 50);
     assert.ok(result.body.timeZones.includes("Europe/Madrid"));
-    assert.deepEqual(result.body.locales, ["en", "ru", "es", "de", "fr", "it", "pt", "nl", "pl", "tr", "uk"]);
+    assert.deepEqual(result.body.locales, ["en", "ru", "es", "de", "fr", "it", "pt", "nl", "pl", "tr", "uk", "ja"]);
   });
 });
 

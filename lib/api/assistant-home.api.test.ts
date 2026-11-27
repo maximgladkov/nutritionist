@@ -126,6 +126,14 @@ describe("home message", () => {
     assert.equal(ukrainian.body.message.text, "Kira, тобі ще треба 75 г білків.");
   });
 
+  it("says it in Japanese when the model can't", async () => {
+    // Its own test too, for the same reason; the name takes "さん" in Japanese.
+    await goals();
+    await eat();
+    const japanese = await api("GET", "/assistant/message", { headers: { "accept-language": "ja-JP" }, token: session.accessToken });
+    assert.equal(japanese.body.message.text, "Kiraさん、今日はたんぱく質があと75 g必要です。");
+  });
+
   it("gives the model only facts, the name and the time, and shows its words", async () => {
     model(three);
     await goals();

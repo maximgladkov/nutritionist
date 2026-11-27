@@ -4,9 +4,9 @@ type LoggedMeal = { at: { hour: number; minute: number }; foods: readonly string
 
 // What someone calls a saved meal, in the languages the app's people write in.
 const NAMES: Record<MainMeal, readonly string[]> = {
-  breakfast: ["breakfast", "brunch", "porridge", "oatmeal", "завтрак", "сніданок", "каша", "овсян", "desayuno", "frühstück", "petit déjeuner", "petit-déjeuner", "colazione", "śniadanie", "kahvaltı"],
-  dinner: ["dinner", "supper", "ужин", "вечеря", "cena", "abendessen", "dîner", "kolacja"],
-  lunch: ["lunch", "обед", "обід", "almuerzo", "mittagessen", "déjeuner", "pranzo", "obiad"],
+  breakfast: ["breakfast", "brunch", "porridge", "oatmeal", "завтрак", "сніданок", "каша", "овсян", "desayuno", "frühstück", "petit déjeuner", "petit-déjeuner", "colazione", "śniadanie", "kahvaltı", "朝食", "朝ごはん"],
+  dinner: ["dinner", "supper", "ужин", "вечеря", "cena", "abendessen", "dîner", "kolacja", "夕食", "夕飯", "晩ごはん"],
+  lunch: ["lunch", "обед", "обід", "almuerzo", "mittagessen", "déjeuner", "pranzo", "obiad", "昼食", "昼ごはん", "ランチ"],
 };
 
 // The meal a dish is for, when its name says so; null when it could be any.
