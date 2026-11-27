@@ -9,6 +9,7 @@ import { messages as pl } from "../../locales/pl/messages";
 import { messages as pt } from "../../locales/pt/messages";
 import { messages as ru } from "../../locales/ru/messages";
 import { messages as tr } from "../../locales/tr/messages";
+import { messages as uk } from "../../locales/uk/messages";
 import type { Locale } from "./locales";
 
 export const allMessages: Record<Locale, Messages> = {
@@ -22,4 +23,5 @@ export const allMessages: Record<Locale, Messages> = {
   nl,
   pl,
   tr,
+  uk,
 };

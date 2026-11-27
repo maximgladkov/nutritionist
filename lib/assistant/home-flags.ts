@@ -227,6 +227,21 @@ const NAMES_TR: Record<Limit, string> = {
 };
 // "10 g yağ", "300 kcal".
 const amountTr = (key: Limit, amount: string, unit: string): string => [amount, unit, NAMES_TR[key]].filter(Boolean).join(" ");
+const TIP_UK: Record<Limit, string> = {
+  energyKcal: "якщо хочеться їсти, обмежся овочами або легким супом",
+  fat: "обирай нежирне: курка або риба з овочами, нічого смаженого й вершкового",
+  salt: "пий воду й обійдися без солоних закусок і соусів",
+  saturatedFat: "обійдися без вершкового масла, сиру й жирного м’яса",
+  sugars: "обійдися без солодкого й солодких напоїв",
+};
+// As Russian: the name, its genitive plural for "… залишилося …", and the Cyrillic unit.
+const NAMES_UK: Record<Limit, { name: string; of: string; unit: string }> = {
+  energyKcal: { name: "калорії", of: "калорій", unit: "ккал" },
+  fat: { name: "жири", of: "жирів", unit: "г" },
+  salt: { name: "сіль", of: "солі", unit: "г" },
+  saturatedFat: { name: "насичені жири", of: "насичених жирів", unit: "г" },
+  sugars: { name: "цукор", of: "цукру", unit: "г" },
+};
 const NAMES_ES: Record<Limit, string> = {
   energyKcal: "calorías",
   fat: "grasa",
@@ -262,6 +277,8 @@ const forNextNl = (next: MainMeal | null): string => (next ? `Voor ${MEAL_FOR.nl
 const forNextPl = (next: MainMeal | null): string => (next ? upperFirst(MEAL_FOR.pl[next]) : "Do końca dnia");
 // "Akşam yemeği için", with MEAL_FOR's "için".
 const forNextTr = (next: MainMeal | null): string => (next ? upperFirst(MEAL_FOR.tr[next], "tr") : "Günün geri kalanı için");
+// "На вечерю", with MEAL_FOR's preposition.
+const forNextUk = (next: MainMeal | null): string => (next ? upperFirst(MEAL_FOR.uk[next]) : "До кінця дня");
 const forNextEs = (next: MainMeal | null): string => (next ? `Para ${MEAL_FOR.es[next]}` : "Para el resto del día");
 
 // Everything worth flagging today, best first. Ranking: a limit passed (by how far), then
@@ -283,7 +300,7 @@ export function dayFlags(figures: DayFigures): DayFlag[] {
     const { avoid, instead } = AVOID[key];
     const pick = fitting(figures, over, kcalLeft, key === "energyKcal" ? 15 : 10);
     const amount = key === "salt" ? one : n;
-    const local = (locale: "de" | "es" | "fr" | "it" | "nl" | "pl" | "pt" | "ru" | "tr", value: number) => (key === "salt" ? tenth : num)(locale, value);
+    const local = (locale: "de" | "es" | "fr" | "it" | "nl" | "pl" | "pt" | "ru" | "tr" | "uk", value: number) => (key === "salt" ? tenth : num)(locale, value);
     const figure = `${amount(eaten[key])} ${unit} of a ${amount(limit)} ${unit} ${key === "energyKcal" ? "goal" : "limit"}`;
     const own = key === "energyKcal" || (key === "fat" && figures.goals.fatGPerDay !== null);
     const idea = pick ? ` Their usual ${pick.name} fits (${n(pick.kcal!)} kcal, ${n(pick.proteins ?? 0)} grams of protein).` : "";
@@ -301,6 +318,7 @@ export function dayFlags(figures: DayFigures): DayFlag[] {
         pt: `${NAMES_PT[key].name} hoje: ${local("pt", eaten[key])} ${unit} para ${key === "energyKcal" ? "uma meta" : "um limite"} de ${local("pt", limit)} ${unit}. ${forNextPt(next)}, ${pick ? `vale o de sempre: ${pick.name}` : TIP_PT[key]}.`,
         ru: `${NAMES_RU[key].name} сегодня: ${local("ru", eaten[key])} ${NAMES_RU[key].unit} при ${key === "energyKcal" ? "цели" : "норме"} ${local("ru", limit)} ${NAMES_RU[key].unit}. ${forNextRu(next)} ${pick ? `подойдёт привычное: ${pick.name}` : `— ${TIP_RU[key]}`}.`,
         tr: `bugün ${amountTr(key, local("tr", eaten[key]), unit)} aldın, ${key === "energyKcal" ? "hedefin" : "limitin"} ${local("tr", limit)} ${unit}. ${forNextTr(next)} ${pick ? `sık yediğin ${pick.name} uygun` : TIP_TR[key]}.`,
+        uk: `${NAMES_UK[key].name} сьогодні: ${local("uk", eaten[key])} ${NAMES_UK[key].unit}, а ${key === "energyKcal" ? "ціль" : "ліміт"} — ${local("uk", limit)} ${NAMES_UK[key].unit}. ${pick ? `${forNextUk(next)} підійде звичне: ${pick.name}` : `${forNextUk(next)} — ${TIP_UK[key]}`}.`,
       },
       // 95 to 99 by how far over, so the worst comes first.
       score: 95 + Math.min(4, Math.floor((ratio - 1) * 10) + WEIGHT[key]),
@@ -323,6 +341,7 @@ export function dayFlags(figures: DayFigures): DayFlag[] {
         pt: "já é noite e nada foi registrado hoje. Me conte o que você comeu ou mande uma foto, e eu adiciono.",
         ru: "уже вечер, а сегодня ничего не записано. Расскажи, что было на тарелке, или пришли фото — я добавлю.",
         tr: "akşam oldu ve bugün henüz bir şey eklenmedi. Ne yediğini söyle ya da bir fotoğraf gönder, ben eklerim.",
+        uk: "уже вечір, а сьогодні нічого не записано. Розкажи, що було на тарілці, або надішли фото — я додам.",
       },
       score: 94,
       text: "It's evening and nothing at all is logged today, so the day can't be judged. Ask what they ate; they can say it or send a photo and you log it. Don't praise or scold.",
@@ -342,6 +361,7 @@ export function dayFlags(figures: DayFigures): DayFlag[] {
         pt: `hoje você registrou só ${num("pt", eaten.energyKcal)} kcal. Está faltando alguma coisa?`,
         ru: `сегодня записано всего ${num("ru", eaten.energyKcal)} ккал. Может, что-то забыто?`,
         tr: `bugün sadece ${num("tr", eaten.energyKcal)} kcal kaydedildi. Eksik bir şey var mı?`,
+        uk: `сьогодні записано лише ${num("uk", eaten.energyKcal)} ккал. Може, щось забуто?`,
       },
       score: 92,
       text: `Only ${n(eaten.energyKcal)} kcal is logged today and it's evening. Probably something is missing from the diary. Ask, don't praise.`,
@@ -367,6 +387,7 @@ export function dayFlags(figures: DayFigures): DayFlag[] {
         pt: `hoje você ainda precisa de ${num("pt", left)} gramas de proteínas. ${pick ? `${upperFirst(pick.name)}: ${num("pt", pick.proteins ?? 0)} g.` : "Escolha uma proteína magra, como frango, peixe, ovos ou iogurte grego."}`,
         ru: `сегодня ещё нужно ${num("ru", left)} г белка. ${pick ? `${upperFirst(pick.name)}: ${num("ru", pick.proteins ?? 0)} г.` : "Выбери нежирный белок: курицу, рыбу, яйца или греческий йогурт."}`,
         tr: `bugün ${num("tr", left)} g protein daha alman gerekiyor. ${pick ? `${upperFirst(pick.name, "tr")}: ${num("tr", pick.proteins ?? 0)} g protein.` : "Tavuk, balık, yumurta ya da süzme yoğurt gibi yağsız bir protein seç."}`,
+        uk: `сьогодні ще треба ${num("uk", left)} г білків. ${pick ? `${upperFirst(pick.name)}: ${num("uk", pick.proteins ?? 0)} г.` : "Обери нежирний білок: курку, рибу, яйця або грецький йогурт."}`,
       },
       score: 91,
       text: `Only ${n(eaten.proteins)} of ${n(proteinGoal)} grams of protein eaten so far and it's evening, so ${left} grams are left${room}. Suggest a lean, protein-rich ${next ?? "snack"}: ${pick ? `their usual ${pick.name} (${n(pick.proteins ?? 0)} grams of protein, ${n(pick.kcal!)} kcal)` : "chicken, fish, eggs, cottage cheese, Greek yogurt or tofu"}.`,
@@ -393,6 +414,7 @@ export function dayFlags(figures: DayFigures): DayFlag[] {
           pt: `seu peso está ${tenth("pt", away)} kg mais longe da sua meta do que em ${weight.earlierDate}. Quer uma ajuda com os próximos dias?`,
           ru: `твой вес на ${tenth("ru", away)} кг дальше от цели, чем ${weight.earlierDate}. Помочь с ближайшими днями?`,
           tr: `kilon, ${weight.earlierDate} tarihine göre hedefinden ${tenth("tr", away)} kg daha uzak. Önümüzdeki günler için yardım ister misin?`,
+          uk: `твоя вага на ${tenth("uk", away)} кг далі від цілі, ніж станом на ${weight.earlierDate}. Допомогти з найближчими днями?`,
         },
         score: 86,
         text: `Weight is ${one(weight.latestKg)} kg, ${one(away)} kg further from the ${one(weight.goalKg)} kg goal than on ${weight.earlierDate} (${one(weight.earlierKg)} kg).${week} Gently point to one concrete step: ${losing ? "staying within the calorie goal on most days and logging everything" : "eating up to the calorie goal every day, with protein at each meal"}. Offer to plan the next meal. Weight moves day to day; no alarm.`,
@@ -409,7 +431,7 @@ export function dayFlags(figures: DayFigures): DayFlag[] {
       if (share < 0.9) continue;
       const { name, unit } = NAMES[key];
       const amount = key === "salt" ? one : n;
-      const local = (locale: "de" | "es" | "fr" | "it" | "nl" | "pl" | "pt" | "ru" | "tr", value: number) => (key === "salt" ? tenth : num)(locale, value);
+      const local = (locale: "de" | "es" | "fr" | "it" | "nl" | "pl" | "pt" | "ru" | "tr" | "uk", value: number) => (key === "salt" ? tenth : num)(locale, value);
       const left = limit - eaten[key];
       flags.push({
         key: `near:${key}`,
@@ -425,6 +447,7 @@ export function dayFlags(figures: DayFigures): DayFlag[] {
           pt: `hoje você só tem mais ${local("pt", left)} ${unit} ${NAMES_PT[key].of}. ${forNextPt(next)}, ${TIP_PT[key]}.`,
           ru: `${NAMES_RU[key].of} на сегодня осталось всего ${local("ru", left)} ${NAMES_RU[key].unit}. ${forNextRu(next)} — ${TIP_RU[key]}.`,
           tr: `bugün için yalnızca ${amountTr(key, local("tr", left), unit)} kaldı. ${forNextTr(next)} ${TIP_TR[key]}.`,
+          uk: `${NAMES_UK[key].of} на сьогодні залишилося лише ${local("uk", left)} ${NAMES_UK[key].unit}. ${forNextUk(next)} — ${TIP_UK[key]}.`,
         },
         score: 80 + Math.min(4, Math.floor((share - 0.9) * 40)) + WEIGHT[key],
         text: `${name} today: ${amount(eaten[key])} of ${amount(limit)} ${unit}, so only ${amount(left)} ${unit} are left and ${next} is still ahead. Suggest a ${next} that keeps it low: skip ${AVOID[key].avoid}; have ${AVOID[key].instead}.`,
