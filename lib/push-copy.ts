@@ -351,7 +351,46 @@ const tr: PushCopy = {
   yourCoach: "Koçun",
 };
 
-const COPY: Record<Locale, PushCopy> = { de, en, es, fr, it, nl, pl, pt, ru, tr };
+// Ukrainian: as Polish, the sender's gender is unknown, so no past tense about them, and `who` stays in
+// the nominative at the start (it may be "Твій тренер"): "Олена: твій день перевірено".
+const uk: PushCopy = {
+  commented: (who, count) =>
+    count === 1
+      ? `${who}: коментар до твого дня.`
+      : `${who}: ${n("uk")(count)} ${pluralForm("uk", count, { few: "коментарі", many: "коментарів", one: "коментар", other: "коментаря" })} до твого дня.`,
+  fatSecret: {
+    done: "Імпорт із FatSecret завершено",
+    failed: "Імпорт із FatSecret перервано до завершення. Спробуй ще раз у розділі «Вхід і акаунти» на вкладці «Я».",
+    failedTitle: "Імпорт із FatSecret перервано",
+    report: ({ days, entries, weights }) => {
+      const p = (count: number, forms: { one: string; few: string; many: string; other: string }) => `${n("uk")(count)} ${pluralForm("uk", count, forms)}`;
+      if (entries === 0 && weights === 0) return "У FatSecret немає нічого нового для перенесення.";
+      const parts = [];
+      // "за 1 день", "за 3 дні", "за 5 днів".
+      if (entries > 0)
+        parts.push(
+          `${p(entries, { few: "продукти", many: "продуктів", one: "продукт", other: "продукту" })} за ${p(days, { few: "дні", many: "днів", one: "день", other: "дня" })}`,
+        );
+      if (weights > 0) parts.push(p(weights, { few: "зважування", many: "зважувань", one: "зважування", other: "зважування" }));
+      return `Перенесено: ${parts.join(" і ")}.`;
+    },
+  },
+  moreComments: (count) => ` (+${count})`,
+  reviewed: (who, reacted) => `${who}: твій день перевірено${reacted ? ", є реакція" : ""}.`,
+  shareAsk: (who, kinds) => {
+    const names: Record<GroupShareKind, string> = {
+      activity: "активність",
+      meals: "продукти в прийомах їжі",
+      photos: "фото їжі",
+      summary: "підсумок дня",
+      weight: "вага",
+    };
+    return `${who} також просить доступ до: ${joined(kinds.map((kind) => names[kind]), "і")}. Відкрий групу, щоб дозволити.`;
+  },
+  yourCoach: "Твій тренер",
+};
+
+const COPY: Record<Locale, PushCopy> = { de, en, es, fr, it, nl, pl, pt, ru, tr, uk };
 
 export function pushCopy(locale: Locale): PushCopy {
   return COPY[locale];
