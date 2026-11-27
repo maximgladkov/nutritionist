@@ -246,6 +246,18 @@ describe("notes wait for the day's review", () => {
     assert.equal(pushes.length, 1);
     assert.match(pushes[0]?.body ?? "", / ha rivisto la tua giornata\.$/u);
   });
+
+  it("and in Portuguese", async () => {
+    await api("PATCH", "/me", { body: { locale: "pt" }, token: kira.accessToken });
+    pushes.length = 0;
+    const earlier = shiftYmd(yesterday, -4);
+    await api("PUT", `/groups/${groupId}/members/${kira.userId}/days/${earlier}/review`, { body: { reviewed: true }, token: coach.accessToken });
+    await wait();
+    await api("PATCH", "/me", { body: { locale: "en" }, token: kira.accessToken });
+    await api("PUT", `/groups/${groupId}/members/${kira.userId}/days/${earlier}/review`, { body: { reviewed: false }, token: coach.accessToken });
+    assert.equal(pushes.length, 1);
+    assert.match(pushes[0]?.body ?? "", / revisou seu dia\.$/u);
+  });
 });
 
 describe("reactions and comments on part of the day", () => {
