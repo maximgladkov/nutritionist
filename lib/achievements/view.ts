@@ -1,6 +1,8 @@
+import type { Locale } from "../i18n/locales.ts";
 import { prisma } from "../prisma.ts";
 import { shiftYmd } from "../timezone.ts";
-import { ACHIEVEMENT_FAMILIES, type Achievement, type AchievementFamily } from "./catalog.ts";
+import { achievementFamilies, type Achievement, type AchievementFamily } from "./catalog.ts";
+import { achievementCopy, type AchievementCopy } from "./copy.ts";
 import { computeMetrics, earnedDate, type AchievementContext, type Metrics } from "./metrics.ts";
 
 const CLOSEST = 3;
@@ -26,17 +28,20 @@ export type BadgeView = {
   value: number;
 };
 
-function badgeView(badge: Achievement, family: AchievementFamily, metrics: Metrics, earnedOn: string | null): BadgeView {
+function badgeView(
+  copy: AchievementCopy,
+  badge: Achievement,
+  family: AchievementFamily,
+  metrics: Metrics,
+  earnedOn: string | null,
+): BadgeView {
   const value = earnedOn ? badge.target : Math.max(0, metrics[badge.metric].value);
   const left = Math.max(0, Math.round((badge.target - value) * 10) / 10);
-  const progressText = badge.unit
-    ? value > 0
-      ? `${value.toLocaleString("en-US")} / ${badge.target.toLocaleString("en-US")} ${badge.unit}`
-      : "Not started"
-    : "Not started";
+  const progressText =
+    badge.unit && value > 0 ? `${copy.number(value)} / ${copy.count(badge.target, badge.unit)}` : copy.notStarted;
   return {
     color: badge.color,
-    description: earnedOn ? badge.description : (badge.toGo?.(left) ?? `${left} ${badge.unit || "more"} to go.`),
+    description: earnedOn ? badge.description : (badge.toGo?.(left) ?? copy.toGo(left, badge.unit)),
     earnedOn,
     familyContext: family.context,
     icon: badge.icon,
@@ -44,7 +49,7 @@ function badgeView(badge: Achievement, family: AchievementFamily, metrics: Metri
     name: badge.name,
     // Passed before but not now (a streak that has since broken) shows where it stands now.
     progress: earnedOn ? 1 : Math.min(0.99, value / badge.target),
-    progressText: earnedOn ? (badge.unit ? `${badge.target.toLocaleString("en-US")} ${badge.unit}` : "Unlocked") : progressText,
+    progressText: earnedOn ? (badge.unit ? copy.count(badge.target, badge.unit) : copy.unlocked) : progressText,
     target: badge.target,
     tier: badge.tier,
     title: badge.title,
@@ -56,29 +61,21 @@ function byCloseness(a: BadgeView, b: BadgeView): number {
   return b.progress - a.progress;
 }
 
-function streakView(context: AchievementContext, metrics: Metrics, streaks: readonly BadgeView[]) {
+function streakView(copy: AchievementCopy, context: AchievementContext, metrics: Metrics, streaks: readonly BadgeView[]) {
   const { loggedDates, today } = context;
   const days = metrics.logging_streak.value;
   const best = Math.max(days, ...metrics.logging_streak.history.map((point) => point.value));
   const loggedToday = loggedDates.has(today);
   const weekday = new Date(`${today}T12:00:00Z`).getUTCDay();
   const monday = shiftYmd(today, -((weekday + 6) % 7));
-  const standing = days === best ? "Your best so far." : `Your best is ${best} ${best === 1 ? "day" : "days"}.`;
   const next = streaks.find((badge) => badge.earnedOn === null);
   const left = next ? next.target - days : 0;
   return {
     best,
     days,
     loggedToday,
-    message:
-      days === 0
-        ? "Log a meal today to start a streak."
-        : loggedToday
-          ? `${standing} You’ve logged today.`
-          : `${standing} Log a meal today to keep it.`,
-    next: next
-      ? { label: `Next: ${next.title}`, progress: next.progress, remaining: `${left} ${left === 1 ? "day" : "days"} to go` }
-      : null,
+    message: copy.streak.message({ best, days, loggedToday }),
+    next: next ? { label: copy.streak.next(next.title), progress: next.progress, remaining: copy.streak.daysToGo(left) } : null,
     week: Array.from({ length: 7 }, (_, index) => {
       const date = shiftYmd(monday, index);
       return { date, future: date > today, logged: loggedDates.has(date) };
@@ -87,15 +84,16 @@ function streakView(context: AchievementContext, metrics: Metrics, streaks: read
 }
 
 // Where the person stands on every badge. Badges reached since the last look are stored on the way,
-// so they stay earned whatever changes afterwards.
-export async function achievementsView(userId: string) {
+// so they stay earned whatever changes afterwards. Written in `locale`; the coach's facts stay English.
+export async function achievementsView(userId: string, locale: Locale = "en") {
+  const copy = achievementCopy(locale);
   const [{ context, metrics }, stored] = await Promise.all([
     computeMetrics(userId),
     prisma.userAchievement.findMany({ select: { achievementId: true, earnedOn: true }, where: { userId } }),
   ]);
   const earned = new Map(stored.map((row) => [row.achievementId, row.earnedOn]));
   const earnedIds = new Set(earned.keys());
-  const families = ACHIEVEMENT_FAMILIES.map((family) => ({ badges: family.badges(context, earnedIds), family }));
+  const families = achievementFamilies(locale).map((family) => ({ badges: family.badges(context, earnedIds), family }));
 
   const reached: { achievementId: string; earnedOn: string; userId: string }[] = [];
   for (const badge of families.flatMap(({ badges }) => badges)) {
@@ -110,7 +108,7 @@ export async function achievementsView(userId: string) {
   }
 
   const shown = families.map(({ badges, family }) => {
-    const views = badges.map((badge) => badgeView(badge, family, metrics, earned.get(badge.id) ?? null));
+    const views = badges.map((badge) => badgeView(copy, badge, family, metrics, earned.get(badge.id) ?? null));
     const done = views.filter((badge) => badge.earnedOn !== null);
     const open = views.filter((badge) => badge.earnedOn === null);
     // Earned first, so what's behind is always to the left of what's next.
@@ -150,7 +148,7 @@ export async function achievementsView(userId: string) {
     earnedCount: all.filter((badge) => badge.earnedOn !== null).length,
     families: shown.map(({ ordered: _ordered, ...family }) => family),
     latest,
-    streak: streakView(context, metrics, shown.find((family) => family.id === "streaks")?.badges ?? []),
+    streak: streakView(copy, context, metrics, shown.find((family) => family.id === "streaks")?.badges ?? []),
     totalCount: all.length,
   };
 }

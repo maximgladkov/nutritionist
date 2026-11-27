@@ -1,8 +1,13 @@
+import type { Locale } from "../i18n/locales.ts";
 import { requireUser, type ApiUser } from "./auth.ts";
+import { translateErrorMessage } from "./error-messages.ts";
 import { toApiError } from "./errors.ts";
 import { CORS_HEADERS, json, noContent } from "./http.ts";
+import { localeResolver } from "./locale.ts";
 
 export type RouteContext = {
+  // The language to write in; see localeResolver.
+  locale: () => Promise<Locale>;
   params: Record<string, string>;
   request: Request;
   url: URL;
@@ -70,22 +75,24 @@ export function createRouter(routes: readonly RouteDefinition[]) {
       route.keys.forEach((key, index) => {
         params[key] = decodeURIComponent(match[index + 1] ?? "");
       });
+      let locale = localeResolver(request);
       try {
         if (route.auth === false) {
-          return toResponse(await route.handler({ params, request, url }), route.method);
+          return toResponse(await route.handler({ locale, params, request, url }), route.method);
         }
         const user = await requireUser(request);
-        return toResponse(await route.handler({ params, request, url, user }), route.method);
+        locale = localeResolver(request, user.id);
+        return toResponse(await route.handler({ locale, params, request, url, user }), route.method);
       } catch (error) {
         const apiError = toApiError(error);
-        return json(
-          { error: { code: apiError.code, details: apiError.details, message: apiError.message } },
-          apiError.status,
-        );
+        // Translated only here, after toApiError has read the English text for the status.
+        const message = translateErrorMessage(apiError.message, await locale().catch(() => "en" as const));
+        return json({ error: { code: apiError.code, details: apiError.details, message } }, apiError.status);
       }
     }
+    const locale = await localeResolver(request)();
     return pathMatched
-      ? json({ error: { code: "method_not_allowed", message: "Method not allowed." } }, 405)
-      : json({ error: { code: "not_found", message: "No such endpoint." } }, 404);
+      ? json({ error: { code: "method_not_allowed", message: translateErrorMessage("Method not allowed.", locale) } }, 405)
+      : json({ error: { code: "not_found", message: translateErrorMessage("No such endpoint.", locale) } }, 404);
   };
 }

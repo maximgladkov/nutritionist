@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
 import type { AssistantAction, Prisma } from "../../generated/prisma/client.ts";
 import { apiDeps } from "../api/deps.ts";
+import type { Locale } from "../i18n/locales.ts";
 import { prisma } from "../prisma.ts";
 import { getZonedParts } from "../timezone.ts";
 import { readSummaryContext } from "../summary.ts";
 import { namesWrongMeal } from "./home-day.ts";
-import { chosenLanguage, toneLine, type AssistantSettings, type HomeTopic } from "./settings.ts";
+import { chosenLanguage, LANGUAGES, toneLine, type AssistantSettings, type HomeTopic } from "./settings.ts";
 import { loadHomeFacts, type HomeFact, type HomeMood } from "./home-facts.ts";
 import { acceptWords } from "./home-words.ts";
 import { rank } from "./home-flags.ts";
@@ -110,7 +111,14 @@ async function takeRun(userId: string, today: string, now: Date): Promise<string
 
 // What the coach says on Today at this visit: the same while they stay, something else when they
 // come back or their day changes.
-export async function homeMessage(userId: string, now: Date, settings: AssistantSettings): Promise<HomeMessage | null> {
+// `locale` is the app's language (account, else Accept-Language). It's what the coach writes in when they
+// left the language on "auto" and haven't written anything yet to follow.
+export async function homeMessage(
+  userId: string,
+  now: Date,
+  settings: AssistantSettings,
+  locale: Locale = "en",
+): Promise<HomeMessage | null> {
   const [loaded, rows] = await Promise.all([
     loadHomeFacts(userId, now),
     prisma.assistantAction.findMany({ orderBy: { createdAt: "desc" }, take: 60, where: { kind: HOME_KIND, userId } }),
@@ -119,8 +127,10 @@ export async function homeMessage(userId: string, now: Date, settings: Assistant
   if (info.facts.length === 0) {
     return null;
   }
+  const fallback = settings.language === "auto" && info.lastWords.length === 0 && locale !== "en" ? locale : null;
+  const language = chosenLanguage(settings) ?? (fallback ? LANGUAGES[fallback] : null);
   // A change of language or tone is heard from the next message.
-  const style = `${settings.language}:${settings.tone}`;
+  const style = `${settings.language}${fallback ? `>${fallback}` : ""}:${settings.tone}`;
   const shown = rows
     .filter((row) => read(row).shownAt)
     .sort((a, b) => read(b).shownAt!.localeCompare(read(a).shownAt!));
@@ -178,7 +188,7 @@ export async function homeMessage(userId: string, now: Date, settings: Assistant
       const written = await apiDeps().writeHome({
         day: info.day,
         facts: texts,
-        language: chosenLanguage(settings),
+        language,
         lastWords: info.lastWords,
         localTime: info.localTime,
         name: info.name,

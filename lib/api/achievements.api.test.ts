@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
-import { ACHIEVEMENT_FAMILIES } from "../achievements/catalog.ts";
+import { ACHIEVEMENT_FAMILIES, achievementFamilies } from "../achievements/catalog.ts";
+import { ru } from "../achievements/copy.ru.ts";
 import { prisma } from "../prisma.ts";
 import { shiftYmd } from "../timezone.ts";
 import { api, closeDatabase, flushBackground, installFakes, resetDatabase, seedOffProduct, signIn, uploadPng, type Session, givePlan } from "./test/harness.ts";
@@ -24,8 +25,9 @@ async function eat(userId: string, date: string, totals: { energyKcal?: number; 
   });
 }
 
-async function load(session: Session) {
-  const result = await api("GET", "/me/achievements", { token: session.accessToken });
+async function load(session: Session, language?: string) {
+  const headers = language ? { "accept-language": language } : undefined;
+  const result = await api("GET", "/me/achievements", { headers, token: session.accessToken });
   assert.equal(result.status, 200, JSON.stringify(result.body));
   return result.body;
 }
@@ -51,6 +53,20 @@ before(async () => {
 after(closeDatabase);
 
 describe("the catalogue", () => {
+  it("has the same badges in every language", () => {
+    const context = { goals: { caloriesPerDay: 2000, proteinGPerDay: 120 } as never, goalWeightKg: 55.5, loggedDates: new Set<string>(), startWeightKg: 65, today };
+    const ids = (locale: "en" | "es" | "ru") =>
+      achievementFamilies(locale).flatMap((entry) => entry.badges(context, new Set(["weight-goal-60"])).map((item) => [item.id, item.tier, item.target]));
+    assert.deepEqual(ids("ru"), ids("en"));
+    assert.deepEqual(ids("es"), ids("en"));
+  });
+
+  it("puts Russian counts in the right form", () => {
+    assert.deepEqual([1, 3, 5, 21].map(ru.streak.daysToGo), ["Остался 1 день", "Осталось 3 дня", "Осталось 5 дней", "Остался 21 день"]);
+    // Russian groups thousands with a no-break space.
+    assert.equal(ru.count(1000, "steps"), "1\u00a0000 шагов");
+  });
+
   it("uses each stored id once", () => {
     const context = { goals: {} as never, goalWeightKg: 55, loggedDates: new Set<string>(), startWeightKg: 65, today };
     const ids = ACHIEVEMENT_FAMILIES.flatMap((entry) => entry.badges(context, new Set()).map((item) => item.id));
@@ -104,6 +120,34 @@ describe("achievements", () => {
     assert.equal(streaks.earned, 2);
     assert.equal(badge(view, "streak-14").progressText, "7 / 14 days");
     assert.equal(view.latest[0].id, "streak-7");
+  });
+
+  it("writes in the language the app asks for", async () => {
+    const russian = await load(kira, "ru");
+    assert.equal(russian.streak.message, "Это ваш рекорд. Запишите приём пищи сегодня, чтобы её не прервать.");
+    assert.deepEqual(russian.streak.next, { label: "Дальше: 14 дней подряд", progress: 0.5, remaining: "Осталось 7 дней" });
+    assert.equal(badge(russian, "streak-14").progressText, "7 / 14 дней");
+    assert.equal(family(russian, "streaks").title, "Серии");
+
+    const spanish = await load(kira, "es-ES,es;q=0.9");
+    assert.equal(spanish.streak.message, "Es tu mejor racha. Registra una comida hoy para no perderla.");
+    assert.deepEqual(spanish.streak.next, { label: "La siguiente: Racha de 14 días", progress: 0.5, remaining: "Faltan 7 días" });
+    assert.equal(badge(spanish, "streak-14").progressText, "7 / 14 días");
+
+    // Same badges whatever the language; only the words change.
+    const english = await load(kira, "en");
+    assert.deepEqual(
+      spanish.families.flatMap((entry: any) => entry.badges.map((item: Badge) => [item.id, item.earnedOn, item.progress])),
+      english.families.flatMap((entry: any) => entry.badges.map((item: Badge) => [item.id, item.earnedOn, item.progress])),
+    );
+  });
+
+  it("prefers the language chosen on the account to the app's", async () => {
+    const chosen = await signIn("polyglot@example.com");
+    await api("PATCH", "/me", { body: { locale: "ru" }, token: chosen.accessToken });
+    const view = await load(chosen, "es");
+    assert.equal(view.streak.message, "Запишите приём пищи сегодня, чтобы начать серию.");
+    assert.equal(badge(view, "streak-3").progressText, "Не начато");
   });
 
   it("offers only the next badge of an ordered family among the closest", async () => {

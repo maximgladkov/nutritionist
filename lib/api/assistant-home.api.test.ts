@@ -77,6 +77,34 @@ describe("home message", () => {
     assert.ok(!JSON.stringify(calls[0]).includes("assistant@example.com"));
   });
 
+  it("writes in the app's language until they've written something to follow", async () => {
+    model(three);
+    await goals();
+    await eat();
+    const spanish = await api("GET", "/assistant/message", { headers: { "accept-language": "es" }, token: session.accessToken });
+    assert.equal(spanish.status, 200, JSON.stringify(spanish.body));
+    assert.equal(calls.at(-1)!.language, "Spanish");
+
+    // English is what it wrote anyway, so nothing changes for it.
+    at(60 * 24);
+    await eat();
+    await api("GET", "/assistant/message", { headers: { "accept-language": "en" }, token: session.accessToken });
+    assert.equal(calls.at(-1)!.language, null);
+  });
+
+  it("follows the language they write in, or chose, over the app's", async () => {
+    model(three);
+    await goals();
+    await eat();
+    await prisma.userProfile.upsert({
+      create: { preferences: { assistant: { language: "ru" } }, userId: session.userId },
+      update: { preferences: { assistant: { language: "ru" } } },
+      where: { userId: session.userId },
+    });
+    await api("GET", "/assistant/message", { headers: { "accept-language": "es" }, token: session.accessToken });
+    assert.equal(calls.at(-1)!.language, "Russian");
+  });
+
   it("stays while they're here, then moves on without another call", async () => {
     model(three);
     await goals();
