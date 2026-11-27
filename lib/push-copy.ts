@@ -152,7 +152,39 @@ const de: PushCopy = {
   yourCoach: "Dein Coach",
 };
 
-const COPY: Record<Locale, PushCopy> = { de, en, es, ru };
+const fr: PushCopy = {
+  commented: (who, count) =>
+    count < 2 ? `${who} a commenté ta journée.` : `${who} a laissé ${n("fr")(count)} commentaires sur ta journée.`,
+  fatSecret: {
+    done: "Import FatSecret terminé",
+    failed: "L’import FatSecret s’est arrêté avant la fin. Ouvre « Connexions » pour réessayer.",
+    failedTitle: "Import FatSecret interrompu",
+    report: ({ days, entries, weights }) => {
+      // French says the singular below 2.
+      const p = (count: number, one: string, other: string) => `${n("fr")(count)} ${pluralForm("fr", count, { one, other })}`;
+      if (entries === 0 && weights === 0) return "Rien de nouveau à importer depuis FatSecret.";
+      const parts = [];
+      if (entries > 0) parts.push(`${p(entries, "aliment", "aliments")} sur ${p(days, "jour", "jours")}`);
+      if (weights > 0) parts.push(p(weights, "pesée", "pesées"));
+      return `Importé : ${parts.join(" et ")}.`;
+    },
+  },
+  moreComments: (count) => ` (+${count} autres)`,
+  reviewed: (who, reacted) => `${who} a vérifié ta journée${reacted ? " et y a réagi" : ""}.`,
+  shareAsk: (who, kinds) => {
+    const names: Record<GroupShareKind, string> = {
+      activity: "ton activité",
+      meals: "le détail de tes repas",
+      photos: "les photos de tes repas",
+      summary: "ton bilan du jour",
+      weight: "ton poids",
+    };
+    return `${who} aimerait aussi voir ${joined(kinds.map((kind) => names[kind]), "et")}. Ouvre le groupe pour l’autoriser.`;
+  },
+  yourCoach: "Ton coach",
+};
+
+const COPY: Record<Locale, PushCopy> = { de, en, es, fr, ru };
 
 export function pushCopy(locale: Locale): PushCopy {
   return COPY[locale];

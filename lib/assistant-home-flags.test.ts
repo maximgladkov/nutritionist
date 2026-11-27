@@ -43,6 +43,7 @@ describe("day flags", () => {
     const [flag] = dayFlags(day({ eaten: { fat: 75 } }));
     assert.equal(flag!.plain.es, "grasa hoy: 75 g de un límite de 60 g. Para la cena, ve a lo ligero: pollo o pescado con verduras, nada frito ni con nata.");
     assert.equal(flag!.plain.de, "Fett heute: 75 g bei einer Grenze von 60 g. Zum Abendessen: bleib mager: Hähnchen oder Fisch mit Gemüse, nichts Frittiertes oder Sahniges.");
+    assert.equal(flag!.plain.fr, "lipides aujourd’hui\u202f: 75 g pour une limite de 60 g. Pour le dîner, reste léger\u202f: poulet ou poisson avec des légumes, rien de frit ni de crémeux.");
     assert.equal(flag!.plain.ru, "жиры сегодня: 75 г при норме 60 г. На ужин — выбирай нежирное: курица или рыба с овощами, ничего жареного и сливочного.");
   });
 

@@ -74,6 +74,8 @@ describe("home message", () => {
     // Another language is another message, not the Spanish one already shown.
     const russian = await api("GET", "/assistant/message", { headers: { "accept-language": "ru" }, token: session.accessToken });
     assert.match(russian.body.message.text, /^Kira, [а-яё]/u);
+    const french = await api("GET", "/assistant/message", { headers: { "accept-language": "fr" }, token: session.accessToken });
+    assert.equal(french.body.message.text, "Kira, il te faut encore 75 grammes de protéines.");
   });
 
   it("gives the model only facts, the name and the time, and shows its words", async () => {
