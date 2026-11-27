@@ -66,6 +66,16 @@ describe("home message", () => {
     assert.equal((await api("GET", "/assistant/message")).status, 401);
   });
 
+  it("says it in the app's language when the model can't", async () => {
+    await goals();
+    await eat();
+    const spanish = await api("GET", "/assistant/message", { headers: { "accept-language": "es" }, token: session.accessToken });
+    assert.equal(spanish.body.message.text, "Kira, aún te faltan 75 gramos de proteína.");
+    // Another language is another message, not the Spanish one already shown.
+    const russian = await api("GET", "/assistant/message", { headers: { "accept-language": "ru" }, token: session.accessToken });
+    assert.match(russian.body.message.text, /^Kira, [а-яё]/u);
+  });
+
   it("gives the model only facts, the name and the time, and shows its words", async () => {
     model(three);
     await goals();
