@@ -46,10 +46,10 @@ export const assistantRoutes: RouteDefinition[] = [
   },
   {
     // Something new to say at each visit, where /assistant/card has the fixed messages older apps show.
-    async handler({ user }) {
+    async handler({ locale, user }) {
       const now = apiDeps().now();
       const [usage, settings] = await Promise.all([loadUsage(user.id, now), loadSettings(user.id)]);
-      const message = usage.asleep || !settings.homeMessages ? null : await homeMessage(user.id, now, settings);
+      const message = usage.asleep || !settings.homeMessages ? null : await homeMessage(user.id, now, settings, await locale());
       return { asleep: usage.asleep, message, resetsAt: usage.resetsAt };
     },
     method: "GET",
