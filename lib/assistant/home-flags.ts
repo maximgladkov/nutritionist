@@ -115,6 +115,20 @@ const NAMES_RU: Record<Limit, { name: string; of: string; unit: string }> = {
   saturatedFat: { name: "насыщенные жиры", of: "насыщенных жиров", unit: "г" },
   sugars: { name: "сахар", of: "сахара", unit: "г" },
 };
+const TIP_DE: Record<Limit, string> = {
+  energyKcal: "wenn du Hunger hast, dann Gemüse oder eine klare Suppe",
+  fat: "bleib mager: Hähnchen oder Fisch mit Gemüse, nichts Frittiertes oder Sahniges",
+  salt: "trink Wasser und lass salzige Snacks und Soßen weg",
+  saturatedFat: "lass Butter, Käse und fettes Fleisch weg",
+  sugars: "lass Süßes und süße Getränke weg",
+};
+const NAMES_DE: Record<Limit, string> = {
+  energyKcal: "Kalorien",
+  fat: "Fett",
+  salt: "Salz",
+  saturatedFat: "gesättigte Fettsäuren",
+  sugars: "Zucker",
+};
 const NAMES_ES: Record<Limit, string> = {
   energyKcal: "calorías",
   fat: "grasa",
@@ -141,6 +155,7 @@ function fitting(figures: DayFigures, over: readonly Limit[], kcalLeft: number |
 
 const forNext = (next: MainMeal | null): string => (next ? `For ${next}` : "For the rest of today");
 const forNextRu = (next: MainMeal | null): string => (next ? `На ${MEAL_FOR.ru[next]}` : "До конца дня");
+const forNextDe = (next: MainMeal | null): string => (next ? upperFirst(MEAL_FOR.de[next]) : "Für den Rest des Tages");
 const forNextEs = (next: MainMeal | null): string => (next ? `Para ${MEAL_FOR.es[next]}` : "Para el resto del día");
 
 // Everything worth flagging today, best first. Ranking: a limit passed (by how far), then
@@ -162,7 +177,7 @@ export function dayFlags(figures: DayFigures): DayFlag[] {
     const { avoid, instead } = AVOID[key];
     const pick = fitting(figures, over, kcalLeft, key === "energyKcal" ? 15 : 10);
     const amount = key === "salt" ? one : n;
-    const local = (locale: "es" | "ru", value: number) => (key === "salt" ? tenth : num)(locale, value);
+    const local = (locale: "de" | "es" | "ru", value: number) => (key === "salt" ? tenth : num)(locale, value);
     const figure = `${amount(eaten[key])} ${unit} of a ${amount(limit)} ${unit} ${key === "energyKcal" ? "goal" : "limit"}`;
     const own = key === "energyKcal" || (key === "fat" && figures.goals.fatGPerDay !== null);
     const idea = pick ? ` Their usual ${pick.name} fits (${n(pick.kcal!)} kcal, ${n(pick.proteins ?? 0)} grams of protein).` : "";
@@ -172,6 +187,7 @@ export function dayFlags(figures: DayFigures): DayFlag[] {
       plain: {
         en: `${name.toLowerCase()} ${verb} at ${figure} today. ${forNext(next)}, ${pick ? `your usual ${pick.name} fits` : TIP[key]}.`,
         es: `${NAMES_ES[key]} hoy: ${local("es", eaten[key])} ${unit} de ${key === "energyKcal" ? "una meta" : "un límite"} de ${local("es", limit)} ${unit}. ${forNextEs(next)}, ${pick ? `tu ${pick.name} de siempre encaja` : TIP_ES[key]}.`,
+        de: `${NAMES_DE[key]} heute: ${local("de", eaten[key])} ${unit} bei ${key === "energyKcal" ? "einem Ziel" : "einer Grenze"} von ${local("de", limit)} ${unit}. ${forNextDe(next)}: ${pick ? `dein übliches ${pick.name} passt` : TIP_DE[key]}.`,
         ru: `${NAMES_RU[key].name} сегодня: ${local("ru", eaten[key])} ${NAMES_RU[key].unit} при ${key === "energyKcal" ? "цели" : "норме"} ${local("ru", limit)} ${NAMES_RU[key].unit}. ${forNextRu(next)} ${pick ? `подойдёт привычное: ${pick.name}` : `— ${TIP_RU[key]}`}.`,
       },
       // 95 to 99 by how far over, so the worst comes first.
@@ -187,6 +203,7 @@ export function dayFlags(figures: DayFigures): DayFlag[] {
       plain: {
         en: "it's evening and nothing's logged today. Tell me what you ate, or send a photo, and I'll add it.",
         es: "ya es de noche y hoy no hay nada registrado. Dime qué comiste o mándame una foto y lo añado.",
+        de: "es ist Abend und heute ist noch nichts eingetragen. Sag mir, was du gegessen hast, oder schick ein Foto, und ich trag es ein.",
         ru: "уже вечер, а сегодня ничего не записано. Расскажи, что было на тарелке, или пришли фото — я добавлю.",
       },
       score: 94,
@@ -199,6 +216,7 @@ export function dayFlags(figures: DayFigures): DayFlag[] {
       plain: {
         en: `only ${n(eaten.energyKcal)} kcal is logged today. Is anything missing?`,
         es: `hoy solo hay ${num("es", eaten.energyKcal)} kcal registradas. ¿Falta algo?`,
+        de: `heute sind erst ${num("de", eaten.energyKcal)} kcal eingetragen. Fehlt etwas?`,
         ru: `сегодня записано всего ${num("ru", eaten.energyKcal)} ккал. Может, что-то забыто?`,
       },
       score: 92,
@@ -217,6 +235,7 @@ export function dayFlags(figures: DayFigures): DayFlag[] {
       plain: {
         en: `${left} grams of protein still to go today. ${pick ? `Your ${pick.name} has ${n(pick.proteins ?? 0)}.` : "Pick a lean protein like chicken, fish, eggs or Greek yogurt."}`,
         es: `hoy aún faltan ${num("es", left)} gramos de proteína. ${pick ? `Tu ${pick.name} tiene ${num("es", pick.proteins ?? 0)}.` : "Elige una proteína magra como pollo, pescado, huevos o yogur griego."}`,
+        de: `heute fehlen noch ${num("de", left)} Gramm Eiweiß. ${pick ? `${upperFirst(pick.name)} hat ${num("de", pick.proteins ?? 0)}.` : "Nimm mageres Eiweiß wie Hähnchen, Fisch, Eier oder griechischen Joghurt."}`,
         ru: `сегодня ещё нужно ${num("ru", left)} г белка. ${pick ? `${upperFirst(pick.name)}: ${num("ru", pick.proteins ?? 0)} г.` : "Выбери нежирный белок: курицу, рыбу, яйца или греческий йогурт."}`,
       },
       score: 91,
@@ -236,6 +255,7 @@ export function dayFlags(figures: DayFigures): DayFlag[] {
         plain: {
           en: `your weight is ${one(away)} kg further from your goal than on ${weight.earlierDate}. Want a hand with the next few days?`,
           es: `tu peso está ${tenth("es", away)} kg más lejos de tu meta que el ${weight.earlierDate}. ¿Te echo una mano con los próximos días?`,
+          de: `dein Gewicht ist ${tenth("de", away)} kg weiter von deinem Ziel entfernt als am ${weight.earlierDate}. Soll ich dir bei den nächsten Tagen helfen?`,
           ru: `твой вес на ${tenth("ru", away)} кг дальше от цели, чем ${weight.earlierDate}. Помочь с ближайшими днями?`,
         },
         score: 86,
@@ -253,7 +273,7 @@ export function dayFlags(figures: DayFigures): DayFlag[] {
       if (share < 0.9) continue;
       const { name, unit } = NAMES[key];
       const amount = key === "salt" ? one : n;
-      const local = (locale: "es" | "ru", value: number) => (key === "salt" ? tenth : num)(locale, value);
+      const local = (locale: "de" | "es" | "ru", value: number) => (key === "salt" ? tenth : num)(locale, value);
       const left = limit - eaten[key];
       flags.push({
         key: `near:${key}`,
@@ -261,6 +281,7 @@ export function dayFlags(figures: DayFigures): DayFlag[] {
         plain: {
           en: `only ${amount(left)} ${unit} of ${name.toLowerCase()} left for today. For ${next}, ${TIP[key]}.`,
           es: `solo te quedan ${local("es", left)} ${unit} de ${NAMES_ES[key]} para hoy. ${forNextEs(next)}, ${TIP_ES[key]}.`,
+          de: `für heute bleiben nur noch ${local("de", left)} ${unit} ${NAMES_DE[key]}. ${forNextDe(next)}: ${TIP_DE[key]}.`,
           ru: `${NAMES_RU[key].of} на сегодня осталось всего ${local("ru", left)} ${NAMES_RU[key].unit}. ${forNextRu(next)} — ${TIP_RU[key]}.`,
         },
         score: 80 + Math.min(4, Math.floor((share - 0.9) * 40)) + WEIGHT[key],

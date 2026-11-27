@@ -39,9 +39,10 @@ describe("day flags", () => {
     assert.ok(flag!.score >= 95 && flag!.score < 100);
   });
 
-  it("says the same in Russian and Spanish when no model words it", () => {
+  it("says the same in the other languages when no model words it", () => {
     const [flag] = dayFlags(day({ eaten: { fat: 75 } }));
     assert.equal(flag!.plain.es, "grasa hoy: 75 g de un límite de 60 g. Para la cena, ve a lo ligero: pollo o pescado con verduras, nada frito ni con nata.");
+    assert.equal(flag!.plain.de, "Fett heute: 75 g bei einer Grenze von 60 g. Zum Abendessen: bleib mager: Hähnchen oder Fisch mit Gemüse, nichts Frittiertes oder Sahniges.");
     assert.equal(flag!.plain.ru, "жиры сегодня: 75 г при норме 60 г. На ужин — выбирай нежирное: курица или рыба с овощами, ничего жареного и сливочного.");
   });
 
