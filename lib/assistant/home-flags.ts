@@ -257,6 +257,21 @@ const NAMES_JA: Record<Limit, string> = {
   saturatedFat: "飽和脂肪酸",
   sugars: "糖類",
 };
+// Korean: polite 해요체 advice ending in "…세요"; the sentence's "." comes after. Each follows forNextKo.
+const TIP_KO: Record<Limit, string> = {
+  energyKcal: "배가 고프면 채소나 가벼운 수프를 드세요",
+  fat: "닭고기나 생선에 채소를 곁들인 담백한 메뉴로 고르고, 튀김이나 크림 요리는 피하세요",
+  salt: "짠 간식이나 소스는 피하고 물을 마시세요",
+  saturatedFat: "버터, 치즈, 기름진 고기는 피하세요",
+  sugars: "단 음식과 단 음료는 피하세요",
+};
+const NAMES_KO: Record<Limit, string> = {
+  energyKcal: "칼로리",
+  fat: "지방",
+  salt: "염분",
+  saturatedFat: "포화지방",
+  sugars: "당류",
+};
 const NAMES_ES: Record<Limit, string> = {
   energyKcal: "calorías",
   fat: "grasa",
@@ -296,6 +311,8 @@ const forNextTr = (next: MainMeal | null): string => (next ? upperFirst(MEAL_FOR
 const forNextUk = (next: MainMeal | null): string => (next ? upperFirst(MEAL_FOR.uk[next]) : "До кінця дня");
 // "夕食は、". No upperFirst: it would capitalise a Latin food name further on.
 const forNextJa = (next: MainMeal | null): string => (next ? `${MEAL_FOR.ja[next]}は、` : "今日はこの後、");
+// "저녁에는", with the invariant 에는.
+const forNextKo = (next: MainMeal | null): string => (next ? `${MEAL_FOR.ko[next]}에는` : "남은 시간에는");
 const forNextEs = (next: MainMeal | null): string => (next ? `Para ${MEAL_FOR.es[next]}` : "Para el resto del día");
 
 // Everything worth flagging today, best first. Ranking: a limit passed (by how far), then
@@ -317,7 +334,7 @@ export function dayFlags(figures: DayFigures): DayFlag[] {
     const { avoid, instead } = AVOID[key];
     const pick = fitting(figures, over, kcalLeft, key === "energyKcal" ? 15 : 10);
     const amount = key === "salt" ? one : n;
-    const local = (locale: "de" | "es" | "fr" | "it" | "ja" | "nl" | "pl" | "pt" | "ru" | "tr" | "uk", value: number) => (key === "salt" ? tenth : num)(locale, value);
+    const local = (locale: "de" | "es" | "fr" | "it" | "ja" | "ko" | "nl" | "pl" | "pt" | "ru" | "tr" | "uk", value: number) => (key === "salt" ? tenth : num)(locale, value);
     const figure = `${amount(eaten[key])} ${unit} of a ${amount(limit)} ${unit} ${key === "energyKcal" ? "goal" : "limit"}`;
     const own = key === "energyKcal" || (key === "fat" && figures.goals.fatGPerDay !== null);
     const idea = pick ? ` Their usual ${pick.name} fits (${n(pick.kcal!)} kcal, ${n(pick.proteins ?? 0)} grams of protein).` : "";
@@ -337,6 +354,7 @@ export function dayFlags(figures: DayFigures): DayFlag[] {
         tr: `bugün ${amountTr(key, local("tr", eaten[key]), unit)} aldın, ${key === "energyKcal" ? "hedefin" : "limitin"} ${local("tr", limit)} ${unit}. ${forNextTr(next)} ${pick ? `sık yediğin ${pick.name} uygun` : TIP_TR[key]}.`,
         uk: `${NAMES_UK[key].name} сьогодні: ${local("uk", eaten[key])} ${NAMES_UK[key].unit}, а ${key === "energyKcal" ? "ціль" : "ліміт"} — ${local("uk", limit)} ${NAMES_UK[key].unit}. ${pick ? `${forNextUk(next)} підійде звичне: ${pick.name}` : `${forNextUk(next)} — ${TIP_UK[key]}`}.`,
         ja: `今日の${NAMES_JA[key]}は${local("ja", eaten[key])} ${unit}で、${key === "energyKcal" ? "目標" : "上限"}の${local("ja", limit)} ${unit}を超えています。${forNextJa(next)}${pick ? `いつもの「${pick.name}」がおすすめです` : TIP_JA[key]}。`,
+        ko: `오늘 ${NAMES_KO[key]} 섭취량이 ${key === "energyKcal" ? "목표를" : "한도를"} 넘었어요(${local("ko", eaten[key])} ${unit} / ${local("ko", limit)} ${unit}). ${forNextKo(next)} ${pick ? `평소 먹는 ‘${pick.name}’ 어때요?` : `${TIP_KO[key]}.`}`,
       },
       // 95 to 99 by how far over, so the worst comes first.
       score: 95 + Math.min(4, Math.floor((ratio - 1) * 10) + WEIGHT[key]),
@@ -361,6 +379,7 @@ export function dayFlags(figures: DayFigures): DayFlag[] {
         tr: "akşam oldu ve bugün henüz bir şey eklenmedi. Ne yediğini söyle ya da bir fotoğraf gönder, ben eklerim.",
         uk: "уже вечір, а сьогодні нічого не записано. Розкажи, що було на тарілці, або надішли фото — я додам.",
         ja: "もう夜ですが、今日はまだ何も記録されていません。食べたものを教えてくれるか写真を送ってくれたら、追加します。",
+        ko: "벌써 저녁인데 오늘은 아직 아무것도 기록하지 않았어요. 먹은 음식을 알려 주거나 사진을 보내 주면 추가할게요.",
       },
       score: 94,
       text: "It's evening and nothing at all is logged today, so the day can't be judged. Ask what they ate; they can say it or send a photo and you log it. Don't praise or scold.",
@@ -382,6 +401,7 @@ export function dayFlags(figures: DayFigures): DayFlag[] {
         tr: `bugün sadece ${num("tr", eaten.energyKcal)} kcal kaydedildi. Eksik bir şey var mı?`,
         uk: `сьогодні записано лише ${num("uk", eaten.energyKcal)} ккал. Може, щось забуто?`,
         ja: `今日の記録はまだ${num("ja", eaten.energyKcal)} kcalだけです。記録し忘れはありませんか？`,
+        ko: `오늘 기록은 아직 ${num("ko", eaten.energyKcal)} kcal뿐이에요. 빠뜨린 기록은 없나요?`,
       },
       score: 92,
       text: `Only ${n(eaten.energyKcal)} kcal is logged today and it's evening. Probably something is missing from the diary. Ask, don't praise.`,
@@ -409,6 +429,7 @@ export function dayFlags(figures: DayFigures): DayFlag[] {
         tr: `bugün ${num("tr", left)} g protein daha alman gerekiyor. ${pick ? `${upperFirst(pick.name, "tr")}: ${num("tr", pick.proteins ?? 0)} g protein.` : "Tavuk, balık, yumurta ya da süzme yoğurt gibi yağsız bir protein seç."}`,
         uk: `сьогодні ще треба ${num("uk", left)} г білків. ${pick ? `${upperFirst(pick.name)}: ${num("uk", pick.proteins ?? 0)} г.` : "Обери нежирний білок: курку, рибу, яйця або грецький йогурт."}`,
         ja: `今日はたんぱく質があと${num("ja", left)} g必要です。${pick ? `「${pick.name}」なら${num("ja", pick.proteins ?? 0)} gとれます。` : "鶏肉、魚、卵、ギリシャヨーグルトなど、脂質の少ないたんぱく質を選びましょう。"}`,
+        ko: `오늘 단백질이 ${num("ko", left)} g 더 필요해요. ${pick ? `‘${pick.name}’에는 단백질이 ${num("ko", pick.proteins ?? 0)} g 들어 있어요.` : "닭고기, 생선, 달걀, 그릭 요거트처럼 지방이 적은 단백질을 골라 보세요."}`,
       },
       score: 91,
       text: `Only ${n(eaten.proteins)} of ${n(proteinGoal)} grams of protein eaten so far and it's evening, so ${left} grams are left${room}. Suggest a lean, protein-rich ${next ?? "snack"}: ${pick ? `their usual ${pick.name} (${n(pick.proteins ?? 0)} grams of protein, ${n(pick.kcal!)} kcal)` : "chicken, fish, eggs, cottage cheese, Greek yogurt or tofu"}.`,
@@ -437,6 +458,7 @@ export function dayFlags(figures: DayFigures): DayFlag[] {
           tr: `kilon, ${weight.earlierDate} tarihine göre hedefinden ${tenth("tr", away)} kg daha uzak. Önümüzdeki günler için yardım ister misin?`,
           uk: `твоя вага на ${tenth("uk", away)} кг далі від цілі, ніж станом на ${weight.earlierDate}. Допомогти з найближчими днями?`,
           ja: `体重が${weight.earlierDate}の時点より目標から${tenth("ja", away)} kg離れました。これからの数日、一緒に計画しましょうか？`,
+          ko: `${weight.earlierDate}보다 체중이 목표에서 ${tenth("ko", away)} kg 더 멀어졌어요. 앞으로 며칠, 같이 계획해 볼까요?`,
         },
         score: 86,
         text: `Weight is ${one(weight.latestKg)} kg, ${one(away)} kg further from the ${one(weight.goalKg)} kg goal than on ${weight.earlierDate} (${one(weight.earlierKg)} kg).${week} Gently point to one concrete step: ${losing ? "staying within the calorie goal on most days and logging everything" : "eating up to the calorie goal every day, with protein at each meal"}. Offer to plan the next meal. Weight moves day to day; no alarm.`,
@@ -453,7 +475,7 @@ export function dayFlags(figures: DayFigures): DayFlag[] {
       if (share < 0.9) continue;
       const { name, unit } = NAMES[key];
       const amount = key === "salt" ? one : n;
-      const local = (locale: "de" | "es" | "fr" | "it" | "ja" | "nl" | "pl" | "pt" | "ru" | "tr" | "uk", value: number) => (key === "salt" ? tenth : num)(locale, value);
+      const local = (locale: "de" | "es" | "fr" | "it" | "ja" | "ko" | "nl" | "pl" | "pt" | "ru" | "tr" | "uk", value: number) => (key === "salt" ? tenth : num)(locale, value);
       const left = limit - eaten[key];
       flags.push({
         key: `near:${key}`,
@@ -471,6 +493,7 @@ export function dayFlags(figures: DayFigures): DayFlag[] {
           tr: `bugün için yalnızca ${amountTr(key, local("tr", left), unit)} kaldı. ${forNextTr(next)} ${TIP_TR[key]}.`,
           uk: `${NAMES_UK[key].of} на сьогодні залишилося лише ${local("uk", left)} ${NAMES_UK[key].unit}. ${forNextUk(next)} — ${TIP_UK[key]}.`,
           ja: `今日の${NAMES_JA[key]}は残り${local("ja", left)} ${unit}だけです。${forNextJa(next)}${TIP_JA[key]}。`,
+          ko: `오늘 ${key === "energyKcal" ? "목표까지 남은 칼로리는" : `남은 ${NAMES_KO[key]} 한도는`} ${local("ko", left)} ${unit}뿐이에요. ${forNextKo(next)} ${TIP_KO[key]}.`,
         },
         score: 80 + Math.min(4, Math.floor((share - 0.9) * 40)) + WEIGHT[key],
         text: `${name} today: ${amount(eaten[key])} of ${amount(limit)} ${unit}, so only ${amount(left)} ${unit} are left and ${next} is still ahead. Suggest a ${next} that keeps it low: skip ${AVOID[key].avoid}; have ${AVOID[key].instead}.`,

@@ -425,7 +425,42 @@ const ja: PushCopy = {
   yourCoach: "コーチ",
 };
 
-const COPY: Record<Locale, PushCopy> = { de, en, es, fr, it, ja, nl, pl, pt, ru, tr, uk };
+// Korean: polite 해요체, label style after `who` ("Elena: …"), since 이/가 and 을/를 depend on the
+// name's last sound and `who` may be the fallback "코치". Lists with ", " (와/과 vary too). The FatSecret
+// retry is in ‘마이’ › ‘로그인 및 연결’, as the app names them.
+const ko: PushCopy = {
+  commented: (who, count) => (count === 1 ? `${who}: 하루 기록에 댓글을 남겼어요.` : `${who}: 하루 기록에 댓글 ${n("ko")(count)}개를 남겼어요.`),
+  fatSecret: {
+    done: "FatSecret 가져오기 완료",
+    failed: "FatSecret 가져오기가 중간에 멈췄어요. ‘마이’ 탭의 ‘로그인 및 연결’에서 다시 시도해 주세요.",
+    failedTitle: "FatSecret 가져오기 중단",
+    report: ({ days, entries, weights }) => {
+      if (entries === 0 && weights === 0) return "FatSecret에서 새로 가져올 데이터가 없어요.";
+      const parts = [];
+      // "FatSecret에서 가져왔어요: 30일 동안의 음식 120개, 체중 기록 4회.", label style.
+      if (entries > 0) parts.push(`${n("ko")(days)}일 동안의 음식 ${n("ko")(entries)}개`);
+      if (weights > 0) parts.push(`체중 기록 ${n("ko")(weights)}회`);
+      return `FatSecret에서 가져왔어요: ${parts.join(", ")}.`;
+    },
+  },
+  moreComments: (count) => `(외 ${count}개)`,
+  reviewed: (who, reacted) => (reacted ? `${who}: 하루 기록을 확인하고 반응을 남겼어요.` : `${who}: 하루 기록을 확인했어요.`),
+  shareAsk: (who, kinds) => {
+    const names: Record<GroupShareKind, string> = {
+      activity: "활동",
+      meals: "식사 내용",
+      photos: "식사 사진",
+      summary: "하루 요약",
+      weight: "체중",
+    };
+    // "체중, 식사 사진, 하루 요약 공유도".
+    const list = kinds.map((kind) => names[kind]).join(", ");
+    return `${who}: ${list} 공유도 요청했어요. 그룹을 열면 허용할 수 있어요.`;
+  },
+  yourCoach: "코치",
+};
+
+const COPY: Record<Locale, PushCopy> = { de, en, es, fr, it, ja, ko, nl, pl, pt, ru, tr, uk };
 
 export function pushCopy(locale: Locale): PushCopy {
   return COPY[locale];

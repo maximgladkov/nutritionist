@@ -51,6 +51,7 @@ describe("day flags", () => {
     assert.equal(flag!.plain.pt, "gorduras hoje: 75 g para um limite de 60 g. Para o jantar, escolha algo leve: frango ou peixe com legumes, nada frito ou cremoso.");
     assert.equal(flag!.plain.uk, "жири сьогодні: 75 г, а ліміт — 60 г. На вечерю — обирай нежирне: курка або риба з овочами, нічого смаженого й вершкового.");
     assert.equal(flag!.plain.tr, "bugün 75 g yağ aldın, limitin 60 g. Akşam yemeği için hafif bir şey seç: sebzeli tavuk ya da balık; kızartma ya da kremalı bir şey olmasın.");
+    assert.equal(flag!.plain.ko, "오늘 지방 섭취량이 한도를 넘었어요(75 g / 60 g). 저녁에는 닭고기나 생선에 채소를 곁들인 담백한 메뉴로 고르고, 튀김이나 크림 요리는 피하세요.");
     assert.equal(flag!.plain.ja, "今日の脂質は75 gで、上限の60 gを超えています。夕食は、鶏肉や魚と野菜など脂質の少ないものを選び、揚げ物やクリーム系は控えましょう。");
     assert.equal(flag!.plain.ru, "жиры сегодня: 75 г при норме 60 г. На ужин — выбирай нежирное: курица или рыба с овощами, ничего жареного и сливочного.");
   });
@@ -141,5 +142,9 @@ describe("day counts", () => {
 
   it("writes Japanese days with the counter and no plural", () => {
     assert.deepEqual([1, 5, 21].map((count) => dayCount("ja", count)), ["1日", "5日", "21日"]);
+  });
+
+  it("writes Korean days with the counter and no plural", () => {
+    assert.deepEqual([1, 5, 21].map((count) => dayCount("ko", count)), ["1일", "5일", "21일"]);
   });
 });

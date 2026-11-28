@@ -38,6 +38,8 @@ describe("error messages", () => {
     assert.equal(ukrainian.body.error.message, "Увійди, щоб продовжити.");
     const japanese = await api("GET", "/me", { headers: { "accept-language": "ja-JP,ja;q=0.9" } });
     assert.equal(japanese.body.error.message, "続けるにはログインしてください。");
+    const korean = await api("GET", "/me", { headers: { "accept-language": "ko-KR,ko;q=0.9" } });
+    assert.equal(korean.body.error.message, "계속하려면 로그인해 주세요.");
     const other = await api("GET", "/me", { headers: { "accept-language": "sv" } });
     assert.equal(other.body.error.message, "Sign in to continue.");
   });
@@ -54,7 +56,7 @@ describe("error messages", () => {
     await api("PATCH", "/me", { body: { locale: "es" }, token: kira.accessToken });
     const result = await api("PATCH", "/me", { body: { locale: "xx" }, token: kira.accessToken });
     assert.equal(result.status, 400);
-    assert.equal(result.body.error.message, "Elige una de estas opciones: en, ru, es, de, fr, it, pt, nl, pl, tr, uk, ja.");
+    assert.equal(result.body.error.message, "Elige una de estas opciones: en, ru, es, de, fr, it, pt, nl, pl, tr, uk, ja, ko.");
     assert.equal(
       translateErrorMessage("Daily protein must be a whole number from 10 to 400 grams.", "de"),
       "Tageswert für Eiweiß: eine ganze Zahl von 10 bis 400 g.",
@@ -90,6 +92,10 @@ describe("error messages", () => {
     assert.equal(
       translateErrorMessage("Daily protein must be a whole number from 10 to 400 grams.", "ja"),
       "1日のたんぱく質は10〜400 gの整数で入力してください。",
+    );
+    assert.equal(
+      translateErrorMessage("Daily protein must be a whole number from 10 to 400 grams.", "ko"),
+      "1일 단백질 목표는 10~400 g 사이의 정수로 입력해 주세요.",
     );
   });
 

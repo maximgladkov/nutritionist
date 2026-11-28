@@ -149,7 +149,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
     frequentFoods({ limit: 12, now, userId }),
     dishes(userId),
     usualNow(userId, now, timezone, today),
-    achievementsViews(userId, ["de", "en", "es", "fr", "it", "nl", "pl", "pt", "ru", "tr", "uk", "ja"]),
+    achievementsViews(userId, ["de", "en", "es", "fr", "it", "nl", "pl", "pt", "ru", "tr", "uk", "ja", "ko"]),
     prisma.weightEntry.findMany({ orderBy: { date: "desc" }, take: 60, where: { userId } }),
     prisma.dailyActivity.findMany({ orderBy: { date: "desc" }, where: { date: { gte: shiftYmd(today, -8), lt: today }, userId } }),
     recentWords(userId, now),
@@ -215,12 +215,15 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
     if (proteinLeft !== null && proteinLeft >= 15 && hour >= 10 && !flagged.has("protein_low")) {
       const best = (next ? foods : []).filter((food) => (food.proteins ?? 0) > 0 && isNew(food.name)).sort((a, b) => (b.proteins ?? 0) - (a.proteins ?? 0))[0];
       const share = best ? coverage(best.proteins ?? 0, proteinLeft) : null;
-      // Japanese has the food in 「」, no space between sentences and its own "。".
-      const covers = (locale: "de" | "es" | "fr" | "it" | "ja" | "nl" | "pl" | "pt" | "ru" | "tr" | "uk") =>
+      // Japanese has the food in 「」, no space between sentences and its own "。". Korean has it in ‘’,
+      // with the invariant 만 straight after.
+      const covers = (locale: "de" | "es" | "fr" | "it" | "ja" | "ko" | "nl" | "pl" | "pt" | "ru" | "tr" | "uk") =>
         best && share
           ? locale === "ja"
             ? `「${best.name}」${coverageWords("ja", best.proteins ?? 0, proteinLeft)}。`
-            : ` ${upperFirst(best.name, locale)} ${coverageWords(locale, best.proteins ?? 0, proteinLeft)}.`
+            : locale === "ko"
+              ? ` ‘${best.name}’${coverageWords("ko", best.proteins ?? 0, proteinLeft)}.`
+              : ` ${upperFirst(best.name, locale)} ${coverageWords(locale, best.proteins ?? 0, proteinLeft)}.`
           : "";
       const idea = best && share ? ` ${best.name}, which they often log, ${share}.` : "";
       add(
@@ -241,6 +244,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
           tr: `bugün ${num("tr", proteinLeft)} g protein daha alman gerekiyor.${covers("tr")}`,
           uk: `тобі ще треба ${num("uk", proteinLeft)} г білків.${covers("uk")}`,
           ja: `今日はたんぱく質があと${num("ja", proteinLeft)} g必要です。${covers("ja")}`,
+          ko: `오늘 단백질이 ${num("ko", proteinLeft)} g 더 필요해요.${covers("ko")}`,
         },
       );
     }
@@ -272,6 +276,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
             tr: `bugün ${num("tr", kcalLeft)} kcal daha alabilirsin. ${upperFirst(MEAL_FOR.tr[next!], "tr")} uygun bir seçenek: ${dish.name}.`,
             uk: `сьогодні можна ще ${num("uk", kcalLeft)} ккал. ${upperFirst(MEAL_FOR.uk[next!])} підійде: ${dish.name}.`,
             ja: `今日はあと${num("ja", kcalLeft)} kcal食べられます。${MEAL_FOR.ja[next!]}には「${dish.name}」がおすすめです。`,
+            ko: `오늘 ${num("ko", kcalLeft)} kcal 더 먹을 수 있어요. ${MEAL_FOR.ko[next!]} 메뉴로 ‘${dish.name}’ 어때요?`,
           },
         );
       } else {
@@ -288,6 +293,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
           tr: `bugün ${num("tr", kcalLeft)} kcal daha alabilirsin.`,
           uk: `сьогодні можна ще ${num("uk", kcalLeft)} ккал.`,
           ja: `今日はあと${num("ja", kcalLeft)} kcal食べられます。`,
+          ko: `오늘 ${num("ko", kcalLeft)} kcal 더 먹을 수 있어요.`,
         });
       }
     }
@@ -305,6 +311,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
         tr: "bugünkü protein hedefine ulaştın. Böyle devam!",
         uk: "ціль щодо білків на сьогодні досягнуто. Чудова робота!",
         ja: "今日のたんぱく質の目標を達成しました。その調子です！",
+        ko: "오늘 단백질 목표를 달성했어요. 잘하고 있어요!",
       });
     }
   }
@@ -326,6 +333,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
           tr: `bu hafta kayıt tuttuğun ${dayCount("tr", week.length)} içinde ${hit} gün protein hedefine ulaştın.`,
           uk: `за тиждень ціль щодо білків досягнуто в ${hit} з ${ukDaysOf(week.length)}.`,
           ja: `この1週間、記録した${dayCount("ja", week.length)}のうち${dayCount("ja", hit)}でたんぱく質の目標を達成しました。`,
+          ko: `최근 일주일 동안 기록한 ${dayCount("ko", week.length)} 중 ${dayCount("ko", hit)} 동안 단백질 목표를 달성했어요.`,
         });
       }
     }
@@ -346,6 +354,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
           tr: `bu hafta günde ortalama ${num("tr", average)} kcal kaydettin, hedefinin epey altında. Eksik bir şey var mı?`,
           uk: `за тиждень у середньому записано ${num("uk", average)} ккал на день — помітно менше за ціль. Може, щось не записано?`,
           ja: `この1週間の記録は1日平均${num("ja", average)} kcalで、目標をかなり下回っています。記録し忘れはありませんか？`,
+          ko: `최근 일주일 동안 하루 평균 ${num("ko", average)} kcal 기록했어요. 목표보다 꽤 적어요. 빠뜨린 기록은 없나요?`,
         });
       } else if (ratio <= 1.05) {
         add("week", 58, "happy", `Averaged ${n(average)} kcal a day over the last 7 days, close to the goal of ${n(kcalGoal)}.`, {
@@ -361,6 +370,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
           tr: `bu hafta günde ortalama ${num("tr", average)} kcal aldın, hedefine yakın.`,
           uk: `за тиждень у середньому ${num("uk", average)} ккал на день — близько до цілі.`,
           ja: `この1週間は1日平均${num("ja", average)} kcalで、目標に近いペースです。`,
+          ko: `최근 일주일 동안 하루 평균 ${num("ko", average)} kcal 먹었어요. 목표에 가까워요.`,
         });
       } else {
         add("week", 46, "thinking", `Averaged ${n(average)} kcal a day over the last 7 days; the goal is ${n(kcalGoal)}. Be kind; offer help planning.`, {
@@ -376,6 +386,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
           tr: `bu hafta günde ortalama ${num("tr", average)} kcal aldın. Önümüzdeki haftayı birlikte planlayalım mı?`,
           uk: `за тиждень у середньому ${num("uk", average)} ккал на день. Допомогти спланувати наступний?`,
           ja: `この1週間は1日平均${num("ja", average)} kcalでした。来週の計画を一緒に立てましょうか？`,
+          ko: `최근 일주일 동안 하루 평균 ${num("ko", average)} kcal 먹었어요. 다음 주 계획을 같이 세워 볼까요?`,
         });
       }
     }
@@ -395,6 +406,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
           tr: `proteinin arttı: günde ${num("tr", is)} g (önceki hafta ${num("tr", was)} g).`,
           uk: `білків стало більше: ${num("uk", is)} г на день проти ${num("uk", was)} г тиждень тому.`,
           ja: `たんぱく質が1日${num("ja", is)} gに増えました（前の週は${num("ja", was)} g）。`,
+          ko: `단백질 섭취가 하루 ${num("ko", is)} g까지 늘었어요(그 전 주: ${num("ko", was)} g).`,
         });
       }
     }
@@ -416,6 +428,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
       tr: `üst üste ${dayCount("tr", streak.days)} kayıt tuttun. Böyle devam!`,
       uk: `уже ${dayCount("uk", streak.days)} поспіль із записами. Так тримати!`,
       ja: `${dayCount("ja", streak.days)}連続で記録しています。この調子で続けましょう！`,
+      ko: `${dayCount("ko", streak.days)} 연속으로 기록하고 있어요. 이대로 계속해요!`,
     });
     else add("streak", hour >= 17 ? 88 : 56, "idle", `${days(streak.days)} in a row with something logged. Nothing logged yet today; logging keeps the streak.`, {
       en: `log something today to keep your ${streak.days}-day streak.`,
@@ -430,12 +443,13 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
       tr: `bugün bir şey ekle, ${num("tr", streak.days)} günlük serin bozulmasın.`,
       uk: `запиши щось сьогодні, щоб не перервати серію (${dayCount("uk", streak.days)} поспіль).`,
       ja: `今日も記録して、${dayCount("ja", streak.days)}連続の記録を続けましょう。`,
+      ko: `오늘도 기록해서 ${dayCount("ko", streak.days)} 연속 기록을 이어 가세요.`,
     });
   }
   // A badge just earned has its own moment; the coach only mentions one that's close.
   const near = badges.closest[0];
   // The same badge in another language.
-  const local = (locale: "de" | "es" | "fr" | "it" | "ja" | "nl" | "pl" | "pt" | "ru" | "tr" | "uk") => {
+  const local = (locale: "de" | "es" | "fr" | "it" | "ja" | "ko" | "nl" | "pl" | "pt" | "ru" | "tr" | "uk") => {
     const found = badgeViews[locale].families.flatMap((family) => family.badges).find((badge) => badge.id === near?.id);
     return found ?? near!;
   };
@@ -452,6 +466,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
     tr: `bir rozete yakınsın: “${local("tr").title}”, ${local("tr").progressText}.`,
     uk: `ти вже близько до нового значка: «${local("uk").title}», ${local("uk").progressText}.`,
     ja: `もうすぐ「${local("ja").title}」のバッジを獲得できます（${local("ja").progressText}）。`,
+    ko: `‘${local("ko").title}’ 배지까지 얼마 안 남았어요(${local("ko").progressText}).`,
   });
 
   if (recentWeight && earlierWeight) {
@@ -471,6 +486,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
         tr: `hedef kilona birkaç hafta öncesine göre ${tenth("tr", closer)} kg daha yakınsın.`,
         uk: `ти на ${tenth("uk", closer)} кг ближче до цільової ваги, ніж кілька тижнів тому.`,
         ja: `数週間前より目標体重に${tenth("ja", closer)} kg近づきました。`,
+        ko: `몇 주 전보다 목표 체중에 ${tenth("ko", closer)} kg 더 가까워졌어요.`,
       });
     }
   }
@@ -492,6 +508,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
       tr: `dün ${num("tr", steps)} adım attın, her zamankinden fazla (genelde ${num("tr", usualSteps)}).`,
       uk: `учора ${num("uk", steps)} ${pluralForm("uk", Math.round(steps), { few: "кроки", many: "кроків", one: "крок", other: "кроку" })} — більше, ніж зазвичай (${num("uk", usualSteps)}).`,
       ja: `昨日の歩数は${num("ja", steps)}歩で、いつもの${num("ja", usualSteps)}歩より多めでした。`,
+      ko: `어제는 ${num("ko", steps)}걸음 걸었어요. 평소 ${num("ko", usualSteps)}걸음보다 많아요.`,
     });
   }
 
@@ -512,6 +529,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
       tr: `gününe ${from === "their coach" ? "koçun" : from} ${comments.length === 1 ? "yorum yaptı" : `${comments.length} yorum yaptı`}.`,
       uk: `${from === "their coach" ? "тренер" : from} коментує твій день${comments.length === 1 ? "" : ` (${comments.length} ${pluralForm("uk", comments.length, { few: "коментарі", many: "коментарів", one: "коментар", other: "коментаря" })})`}.`,
       ja: `${from === "their coach" ? "コーチ" : from}から今日の記録にコメントが${comments.length === 1 ? "" : `${comments.length}件`}届いています。`,
+      ko: `오늘 기록에 ${from === "their coach" ? "코치" : from}의 댓글이 ${comments.length === 1 ? "있어요" : `${comments.length}개 있어요`}.`,
     });
   }
 
@@ -528,6 +546,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
     tr: `her zamanki ${usual.name} zamanı mı? Söyle, ekleyeyim.`,
     uk: `час для звичного: ${usual.name}? Скажи — і я запишу.`,
     ja: `いつもの「${usual.name}」の時間ですか？教えてくれたら記録します。`,
+    ko: `평소처럼 ‘${usual.name}’ 먹을 시간인가요? 말해 주면 기록할게요.`,
   });
 
   if (eaten === 0 && !flagged.has("empty_evening")) {
@@ -544,6 +563,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
       tr: "bugün henüz bir şey eklenmedi. Ne yediğini söyle, ben ekleyeyim.",
       uk: "сьогодні поки нічого не записано. Розкажи, що було на тарілці, — я додам.",
       ja: "今日はまだ何も記録されていません。食べたものを教えてくれたら追加します。",
+      ko: "오늘은 아직 아무것도 기록하지 않았어요. 먹은 음식을 알려 주면 추가할게요.",
     });
     else if (hour >= 4) add("morning", 44, "happy", "A new day with nothing logged yet. Ask what's for breakfast, or wish them a good start.", {
       en: "good morning! What's for breakfast?",
@@ -558,6 +578,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
       tr: "günaydın! Kahvaltıda ne var?",
       uk: "доброго ранку! Що на сніданок?",
       ja: "おはようございます！朝食は何にしますか？",
+      ko: "좋은 아침이에요! 아침은 뭘 먹을까요?",
     });
   }
 
@@ -582,6 +603,7 @@ export async function loadHomeFacts(userId: string, now: Date): Promise<HomeFact
     tr: "benden bir öğün önerisi iste ya da ne yediğinin fotoğrafını gönder.",
     uk: "попроси в мене ідею, що поїсти, або надішли фото того, що їси.",
     ja: "食事のアイデアを聞いたり、食べているものの写真を送ったりしてみてください。",
+    ko: "식사 아이디어를 물어보거나 먹고 있는 음식 사진을 보내 보세요.",
   });
 
   return {
